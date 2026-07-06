@@ -38,13 +38,13 @@ static void spibus_cs_set(spibus_obj_t *self, int level) {
 }
 
 static void spibus_reinit_spi(spibus_obj_t *self) {
-    mp_obj_t kwargs = mp_dict_new();
+    mp_obj_t kwargs = mp_obj_new_dict(0);
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_baudrate), mp_obj_new_int(self->baudrate));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_polarity), mp_obj_new_int(self->polarity));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_phase), mp_obj_new_int(self->phase));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_bits), mp_obj_new_int(self->bits));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
-    mp_call_method_n_kw(self->spi, MP_QSTR_init, 0, 0, kwargs);
+    displayif_obj_call_method_kw(self->spi, MP_QSTR_init, kwargs);
 }
 
 static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -77,7 +77,7 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         { MP_QSTR_reset, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all_kw_array(n_args, args, n_kw, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
     if (vals[ARG_dc].u_int < 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("DC pin must be specified"));
@@ -85,13 +85,13 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
 
     spibus_obj_t *self = mp_obj_malloc(spibus_obj_t, type);
 
-    mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, mp_const_empty_dict, MP_OBJ_NULL);
-    mp_obj_t pin_cls = mp_obj_get_attr(machine_mod, MP_OBJ_NEW_QSTR(MP_QSTR_Pin));
-    mp_int_t pin_out = mp_obj_get_int(mp_obj_get_attr(pin_cls, MP_OBJ_NEW_QSTR(MP_QSTR_OUT)));
-    mp_int_t pin_in = mp_obj_get_int(mp_obj_get_attr(pin_cls, MP_OBJ_NEW_QSTR(MP_QSTR_IN)));
-    mp_obj_t spi_mod = mp_obj_get_attr(machine_mod, MP_OBJ_NEW_QSTR(MP_QSTR_SPI));
-    mp_int_t spi_lsb = mp_obj_get_int(mp_obj_get_attr(spi_mod, MP_OBJ_NEW_QSTR(MP_QSTR_LSB)));
-    mp_int_t spi_msb = mp_obj_get_int(mp_obj_get_attr(spi_mod, MP_OBJ_NEW_QSTR(MP_QSTR_MSB)));
+    mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
+    mp_obj_t pin_cls = mp_load_attr(machine_mod, MP_QSTR_Pin);
+    mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
+    mp_int_t pin_in = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_IN));
+    mp_obj_t spi_mod = mp_load_attr(machine_mod, MP_QSTR_SPI);
+    mp_int_t spi_lsb = mp_obj_get_int(mp_load_attr(spi_mod, MP_QSTR_LSB));
+    mp_int_t spi_msb = mp_obj_get_int(mp_load_attr(spi_mod, MP_QSTR_MSB));
 
     self->baudrate = vals[ARG_baudrate].u_int;
     self->polarity = vals[ARG_polarity].u_int;
@@ -99,7 +99,7 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->bits = vals[ARG_bits].u_int;
     self->firstbit = vals[ARG_lsb_first].u_bool ? spi_lsb : spi_msb;
 
-    mp_obj_t spi_kwargs = mp_dict_new();
+    mp_obj_t spi_kwargs = mp_obj_new_dict(0);
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_id), mp_obj_new_int(vals[ARG_id].u_int));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_baudrate), mp_obj_new_int(self->baudrate));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_polarity), mp_obj_new_int(self->polarity));
@@ -171,7 +171,7 @@ static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
         uint8_t cmd = mp_obj_get_int(command);
         ((uint8_t *)MP_OBJ_TO_PTR(self->buf1))[0] = cmd;
         displayif_pin_set(self->dc, DC_CMD);
-        mp_call_method_n_kw(self->spi, MP_QSTR_write, 1, 0, &self->buf1);
+        displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
     }
 
     if (data != mp_const_none && data != mp_const_empty_bytes) {
@@ -179,7 +179,7 @@ static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
         mp_get_buffer_raise(data, &bufinfo, MP_BUFFER_READ);
         if (bufinfo.len > 0) {
             displayif_pin_set(self->dc, DC_DATA);
-            mp_call_method_n_kw(self->spi, MP_QSTR_write, 1, 0, &data);
+            displayif_obj_call_method1(self->spi, MP_QSTR_write, data);
         }
     }
 
@@ -190,7 +190,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(spibus_send_obj, 1, 3, spibus_send);
 
 static mp_obj_t spibus_deinit(mp_obj_t self_in) {
     spibus_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    mp_call_method_n_kw(self->spi, MP_QSTR_deinit, 0, 0, NULL);
+    displayif_obj_call_method0(self->spi, MP_QSTR_deinit);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(spibus_deinit_obj, spibus_deinit);

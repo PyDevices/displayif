@@ -1,6 +1,7 @@
 # MicroPython CMake glue for displayif (ESP32, RP2, …).
 #
 # Included from cmods/micropython.cmake when displayif is a workspace sibling.
+# Hardware interfaces build only on MCU ports — not unix, windows, etc.
 
 set(DISPLAYIF_MOD_DIR ${CMAKE_CURRENT_LIST_DIR})
 
@@ -15,7 +16,14 @@ elseif(_DISPLAYIF_PORT_DIR MATCHES "/ports/mimxrt")
     set(DISPLAYIF_PORT_MIMXRT TRUE)
 endif()
 
-include(${DISPLAYIF_MOD_DIR}/ports/common/micropython.cmake)
+set(DISPLAYIF_IS_MCU FALSE)
+if(DISPLAYIF_PORT_ESP32 OR DISPLAYIF_PORT_MIMXRT)
+    set(DISPLAYIF_IS_MCU TRUE)
+endif()
+
+if(DISPLAYIF_IS_MCU)
+    include(${DISPLAYIF_MOD_DIR}/ports/common/micropython.cmake)
+endif()
 
 if(DISPLAYIF_PORT_ESP32)
     include(${DISPLAYIF_MOD_DIR}/ports/esp32/micropython.cmake)

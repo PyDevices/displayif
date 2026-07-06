@@ -8,6 +8,7 @@
 # Patched in by apply_cp_displayif_patches.sh (graphics/usdl2 pattern).
 # Folder names under ports/ follow MP port names; CP port dirs may differ
 # (e.g. espressif → ports/esp32/).
+# Hardware interfaces build only on MCU ports.
 
 DISPLAYIF_MOD_DIR ?= $(patsubst %/,%,$(dir $(lastword $(MAKEFILE_LIST))))
 
@@ -28,7 +29,17 @@ else
 DISPLAYIF_PORT_MIMXRT := 1
 endif
 
+DISPLAYIF_IS_MCU := 0
+ifeq ($(DISPLAYIF_PORT_ESP32),1)
+DISPLAYIF_IS_MCU := 1
+endif
+ifeq ($(DISPLAYIF_PORT_MIMXRT),1)
+DISPLAYIF_IS_MCU := 1
+endif
+
+ifeq ($(DISPLAYIF_IS_MCU),1)
 include $(DISPLAYIF_MOD_DIR)/ports/common/circuitpython.mk
+endif
 
 ifeq ($(DISPLAYIF_PORT_ESP32),1)
 include $(DISPLAYIF_MOD_DIR)/ports/esp32/circuitpython.mk

@@ -2,7 +2,7 @@
 
 | Script | Port | Notes |
 |--------|------|-------|
-| `test_spi_smoke.py` | any SPI-capable | native `spibus` |
+| `test_spi_smoke.py` | MCU with SPI (`esp32`, …) | native `spibus` |
 | `test_rgbframebuffer_smoke.py` | `esp32` | buffer protocol; `refresh()` raises until scanout lands |
 
 ```bash

@@ -102,7 +102,7 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
         { MP_QSTR_overscan_left, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all_kw_array(n_args, args, n_kw, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
     bool rgb666 = vals[ARG_red].u_obj != MP_OBJ_NULL;
     bool rgb565 = vals[ARG_data].u_obj != MP_OBJ_NULL;

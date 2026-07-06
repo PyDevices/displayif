@@ -1,7 +1,8 @@
 # MicroPython user C module glue for displayif.
 #
 # Discovered when USER_C_MODULES points at the cmods workspace root.
-# Includes ports/common/ always, then ports/<port>/ when the active MP port matches.
+# Hardware interfaces (spibus, rgbframebuffer, …) build only on MCU ports —
+# not unix, windows, or other desktop targets.
 
 DISPLAYIF_MOD_DIR := $(USERMOD_DIR)
 
@@ -21,7 +22,17 @@ else
 DISPLAYIF_PORT_MIMXRT := 1
 endif
 
+DISPLAYIF_IS_MCU := 0
+ifeq ($(DISPLAYIF_PORT_ESP32),1)
+DISPLAYIF_IS_MCU := 1
+endif
+ifeq ($(DISPLAYIF_PORT_MIMXRT),1)
+DISPLAYIF_IS_MCU := 1
+endif
+
+ifeq ($(DISPLAYIF_IS_MCU),1)
 include $(DISPLAYIF_MOD_DIR)/ports/common/micropython.mk
+endif
 
 ifeq ($(DISPLAYIF_PORT_ESP32),1)
 include $(DISPLAYIF_MOD_DIR)/ports/esp32/micropython.mk
