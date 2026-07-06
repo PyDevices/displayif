@@ -14,8 +14,8 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 
 | Location | Native module | pydisplay backend | Phase |
 |----------|---------------|-------------------|-------|
-| `spi` (name TBD) | **BusDisplay** | **1 — `spibus` C module** |
-| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | 2 — buffer + `refresh()` stub |
+| `ports/common` | `spibus` | **BusDisplay** | **1 — shipped** |
+| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — buffer; scanout WIP** |
 | `ports/esp32` / `mimxrt` | `rgbmatrix` | **FBDisplay** | 3+ |
 | `ports/mimxrt` | TBD | TBD | later |
 
@@ -166,11 +166,11 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 ## Suggested work sequence
 
 1. Scaffold (done)
-2. pydisplay: apply [changes above](#pydisplay-changes-unify-on-fbdisplay--rgbframebuffer) — can land before displayif C code
-3. `ports/common/spi/` + smoke test
-4. `ports/esp32/rgbframebuffer.c` + Qualia hardware
-5. `ports/esp32/rgbframebuffer.c` RGB565 pin layout + parallel-RGB board
-6. `rgbmatrix` on esp32 / mimxrt + MatrixPortal configs
+2. pydisplay board configs on `rgbframebuffer` + `FBDisplay` (done)
+3. `ports/common/spi/mod_spibus.c` + smoke test (done)
+4. `ports/esp32/mod_rgbframebuffer.c` buffer protocol (done); ESP-IDF `refresh()` scanout
+5. Qualia + parallel-RGB hardware validation
+6. `rgbmatrix` on esp32 / mimxrt
 7. CP patch script (`apply_cp_displayif_patches.sh`)
 
 ---
