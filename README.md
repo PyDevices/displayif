@@ -1,2 +1,2 @@
 # displayif
-Micropython display interfaces written in C
+*Python display interfaces written in C
