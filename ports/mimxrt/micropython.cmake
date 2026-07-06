@@ -1,4 +1,4 @@
-# mimxrt CMake glue (ports/mimxrt/).
+# mimxrt CMake glue.
 
 add_library(displayif_mimxrt INTERFACE)
 target_include_directories(displayif_mimxrt INTERFACE ${DISPLAYIF_MOD_DIR}/ports/mimxrt)

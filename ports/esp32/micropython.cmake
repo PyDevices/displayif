@@ -1,4 +1,4 @@
-# ESP32 CMake glue (ports/esp32/).
+# ESP32 CMake glue.
 
 add_library(displayif_esp32 INTERFACE)
 target_include_directories(displayif_esp32 INTERFACE ${DISPLAYIF_MOD_DIR}/ports/esp32)

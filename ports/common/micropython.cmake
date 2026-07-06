@@ -1,4 +1,4 @@
-# Portable CMake interface library (ports/common/).
+# Portable CMake interface library.
 
 add_library(displayif_common INTERFACE)
 target_include_directories(displayif_common INTERFACE

@@ -1,31 +1,34 @@
 # displayif
 
-Native display interface drivers for pydisplay — portable code in `ports/common/`, SoC-specific code under `ports/<mp-port>/`.
+Native display **interface** cmods for pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/`.
 
-**Status:** scaffolded layout — Phase 1 is universal SPI. See [HANDOFF.md](HANDOFF.md).
+pydisplay MicroPython board configs that raise `NotImplementedError` for missing native interfaces are **waiting on this repo**.
+
+**Status:** scaffolded — Phase 1 is universal SPI. See [HANDOFF.md](HANDOFF.md).
 
 ## Layout
 
 ```
 displayif/
   micropython.mk / micropython.cmake / circuitpython.mk / manifest.py
-  mk/                    # port-gated build fragments
   ports/
-    common/              # portable (SPI, …) — all ports
-    esp32/               # ESP-IDF RGB panel, rgb666
-    mimxrt/              # NXP LCD blocks
+    common/              # micropython.mk, micropython.cmake, circuitpython.mk + spi/
+    esp32/               # same trio + RGB panel, rgb666, rgbmatrix (planned)
+    mimxrt/              # same trio + NXP drivers (planned)
   py/displayif/
   tests/
 ```
 
-## Consumers
+Each `ports/<name>/` directory contains the same build filenames; root makefiles detect the active port and include the right trees.
 
-| Location | Module | pydisplay backend |
-|----------|--------|-------------------|
-| `ports/common` | `displayif.spi` | **BusDisplay** |
-| `ports/esp32` | `displayif.rgbpanel` | **RGBDisplay** |
-| `ports/esp32` | `displayif.rgb666` | **FBDisplay** |
-| `ports/mimxrt` | TBD | TBD |
+## Planned modules
+
+| Module | Port tree | pydisplay backend |
+|--------|-----------|-------------------|
+| `displayif.spi` | `common` | **BusDisplay** |
+| `displayif.rgbpanel` | `esp32` | **RGBDisplay** |
+| `displayif.rgb666` | `esp32` | **FBDisplay** |
+| `displayif.rgbmatrix` | `esp32` / `mimxrt` | **FBDisplay** |
 
 ## Build (cmods workspace)
 
@@ -33,7 +36,7 @@ displayif/
 cd ~/github/cmods
 git clone https://github.com/PyDevices/displayif.git displayif
 
-# Add to cmods/manifest.py:
+# cmods/manifest.py:
 #   package("displayif", base_path="displayif/py", opt=3)
 
 ./build_mp.sh --port rp2 --board RPI_PICO2_W
@@ -41,10 +44,8 @@ git clone https://github.com/PyDevices/displayif.git displayif
 ./build_mp.sh --port mimxrt --board TEENSY40
 ```
 
-CircuitPython: `circuitpython.mk` at repo root; `apply_cp_displayif_patches.sh` (to be added) before `lv_circuitpython_mod/build_cp.sh`.
-
 ## Related
 
-- [HANDOFF.md](HANDOFF.md) — architecture, phases, naming
+- [HANDOFF.md](HANDOFF.md)
 - [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
 - [PyDevices/cmods](https://github.com/PyDevices/cmods)

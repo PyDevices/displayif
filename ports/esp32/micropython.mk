@@ -1,4 +1,4 @@
-# ESP32 port only (ports/esp32/) — ESP-IDF LCD / RGB peripherals.
+# ESP32 port — ESP-IDF LCD / RGB peripherals.
 
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/esp32
 

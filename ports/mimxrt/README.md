@@ -1,7 +1,10 @@
-# mimxrt port drivers
+# mimxrt port
 
-Targets MicroPython and CircuitPython **mimxrt** port (Teensy 4.x, M7 EVKs, etc.).
+NXP display interfaces for MicroPython and CircuitPython `mimxrt` port.
 
-Drivers here use NXP blocks (LCDIF, ELCDIF, FlexIO, …) and compile only when `mk/mimxrt.mk` is included.
+## Planned
 
-Add sources when a pydisplay board config requires NXP-specific scanout.
+- HUB75 / `displayif.rgbmatrix` for MatrixPortal M4 and similar boards
+- LCDIF, ELCDIF, FlexIO drivers as board configs require
+
+`micropython.mk`, `micropython.cmake`, and `circuitpython.mk` in this directory are included only for mimxrt builds.

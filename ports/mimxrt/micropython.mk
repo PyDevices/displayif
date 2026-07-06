@@ -1,4 +1,4 @@
-# mimxrt port only (ports/mimxrt/).
+# mimxrt port — NXP LCD blocks.
 
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/mimxrt
 

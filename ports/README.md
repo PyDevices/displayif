@@ -1,6 +1,6 @@
 # ports/
 
-All interface code lives under `ports/`, named after **MicroPython port** directories (`esp32`, `mimxrt`, `rp2`, …) or `common` for portable code.
+All interface code and **per-port build glue** live here. Folder names match **MicroPython** `ports/<name>/`.
 
 | Directory | When included | MP port | CP port dir |
 |-----------|---------------|---------|-------------|
@@ -8,14 +8,21 @@ All interface code lives under `ports/`, named after **MicroPython port** direct
 | `esp32/` | esp32 builds | `esp32` | `espressif` |
 | `mimxrt/` | mimxrt builds | `mimxrt` | `mimxrt` |
 
+## Build files in every port tree
+
+Each `ports/<name>/` directory has the same three filenames:
+
+| File | Used by |
+|------|---------|
+| `micropython.mk` | Make-based MicroPython ports |
+| `micropython.cmake` | CMake MicroPython ports (esp32, rp2, …) |
+| `circuitpython.mk` | CircuitPython ports |
+
+Root `micropython.mk` / `micropython.cmake` / `circuitpython.mk` detect the active port and `include` `ports/common/` plus the matching port tree.
+
 ## Rules
 
-1. **`ports/common/`** — uses only `machine.SPI`, `machine.Pin`, or equivalent portable APIs. No ESP-IDF or NXP SDK headers.
-2. **`ports/<port>/`** — SoC SDK code (`esp_lcd`, `fsl_elcdif`, …). One tree per MP port name.
-3. Chip variants (S3 vs P4) use `SOC_*` / `IDF_TARGET` guards inside `ports/esp32/`, not separate folders.
-4. New portable interface → `ports/common/<name>/` + line in `mk/common.mk`.
-5. New port-specific interface → `ports/<port>/` + fragment in `mk/<port>.mk`.
-
-## CP vs MP port names
-
-Folder names always match **MicroPython** `ports/<name>/`. CircuitPython may use a different port directory (e.g. `espressif`); `mk/detect_cp.mk` maps that to `ports/esp32/` sources.
+1. **`ports/common/`** — portable; only `machine.*` / CP bus APIs.
+2. **`ports/<port>/`** — SoC SDK code. One tree per MP port name.
+3. New portable interface → `ports/common/<name>/` + update `ports/common/micropython.mk`.
+4. New port-specific interface → source under `ports/<port>/` + update that port's `micropython.mk`.
