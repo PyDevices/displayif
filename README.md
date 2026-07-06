@@ -4,7 +4,7 @@ Native display **interface** cmods for pydisplay. Portable code in `ports/common
 
 pydisplay MP board configs that raise `NotImplementedError` are waiting on modules built here. Native C modules register directly — **no Python re-export layer** in this repo.
 
-**Status:** scaffolded — Phase 1 is SPI. See [HANDOFF.md](HANDOFF.md) for architecture and **pydisplay changes** needed to unify on `FBDisplay` + `rgbframebuffer`.
+**Status:** Phase 1 `spibus` and esp32 `rgbframebuffer` skeleton landed — scanout WIP. See [HANDOFF.md](HANDOFF.md).
 
 ## Planned native modules
 

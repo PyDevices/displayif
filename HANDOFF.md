@@ -14,8 +14,8 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 
 | Location | Native module | pydisplay backend | Phase |
 |----------|---------------|-------------------|-------|
-| `ports/common` | `spi` (TBD name) | **BusDisplay** | **1** |
-| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | 2 |
+| `spi` (name TBD) | **BusDisplay** | **1 — `spibus` C module** |
+| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | 2 — buffer + `refresh()` stub |
 | `ports/esp32` / `mimxrt` | `rgbmatrix` | **FBDisplay** | 3+ |
 | `ports/mimxrt` | TBD | TBD | later |
 

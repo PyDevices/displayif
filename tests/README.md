@@ -1,9 +1,14 @@
 # displayif tests
 
-| Script | Port | Phase |
+| Script | Port | Notes |
 |--------|------|-------|
-| `test_spi_smoke.py` | any SPI-capable | 1 |
-| `test_rgbframebuffer_smoke.py` | `esp32` + Qualia or parallel-RGB board config | 2 |
-| `test_rgbmatrix_smoke.py` | `esp32` or `mimxrt` + MatrixPortal board config | 3 |
+| `test_spi_smoke.py` | any SPI-capable | native `spibus` |
+| `test_rgbframebuffer_smoke.py` | `esp32` | buffer protocol; `refresh()` raises until scanout lands |
 
-Board configs and `FBDisplay` wiring live in pydisplay; tests import native modules directly.
+```bash
+# After cmods build with displayif:
+./micropython/ports/rp2/build-*/micropython displayif/tests/test_spi_smoke.py
+./micropython/ports/esp32/build-*/micropython displayif/tests/test_rgbframebuffer_smoke.py
+```
+
+Do not install pydisplay viper `spibus` in the same firmware as displayif `spibus`.
