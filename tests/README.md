@@ -4,6 +4,7 @@
 |--------|------|-------|
 | `test_spi_smoke.py` | MCU with SPI (`esp32`, …) | native `spibus` |
 | `test_rgbframebuffer_smoke.py` | `esp32` | buffer protocol; `refresh()` raises until scanout lands |
+| `test_mipidsi_smoke.py` | `esp32p4` | import `Bus` / `Display`; full panel needs Waveshare 4B hardware |
 
 ```bash
 # After cmods build with displayif:

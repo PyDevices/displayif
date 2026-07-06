@@ -16,6 +16,7 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 |----------|---------------|-------------------|-------|
 | `ports/common` | `spibus` | **BusDisplay** | **1 — shipped** |
 | `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — buffer; scanout WIP** |
+| `ports/esp32` | `mipidsi` | **FBDisplay** | **2 — ESP32-P4 MIPI DSI** |
 | `ports/esp32` / `mimxrt` | `rgbmatrix` | **FBDisplay** | 3+ |
 | `ports/mimxrt` | TBD | TBD | later |
 

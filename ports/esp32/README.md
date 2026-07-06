@@ -7,6 +7,7 @@ ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espress
 | C source | Python import | pydisplay backend |
 |----------|---------------|-------------------|
 | `rgbframebuffer.c` | `rgbframebuffer.RGBFrameBuffer` | **FBDisplay** |
+| `mod_mipidsi.c` | `mipidsi.Bus` / `mipidsi.Display` | **FBDisplay** (ESP32-P4 MIPI DSI) |
 | `rgbmatrix.c` | `rgbmatrix.RGBMatrix` | **FBDisplay** |
 
 `RGBFrameBuffer` mirrors CP `dotclockframebuffer.DotClockFramebuffer`. Supports RGB-666 pin tuples (`red`/`green`/`blue`) and 16-pin RGB565 (`data=`) layouts via constructor — one driver, not separate backends.
