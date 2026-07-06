@@ -10,6 +10,36 @@ int displayif_pin_get(mp_obj_t pin) {
     return mp_obj_get_int(mp_load_attr(pin, MP_QSTR_value));
 }
 
+int displayif_pin_id(mp_obj_t pin_or_int) {
+    if (mp_obj_is_small_int(pin_or_int) || mp_obj_is_int(pin_or_int)) {
+        return mp_obj_get_int(pin_or_int);
+    }
+    return mp_obj_get_int(pin_or_int);
+}
+
+size_t displayif_pin_tuple_to_ints(mp_obj_t tuple, int *out, size_t max_out) {
+    return displayif_pin_seq_to_ints(tuple, out, max_out);
+}
+
+size_t displayif_pin_seq_to_ints(mp_obj_t seq, int *out, size_t max_out) {
+    size_t len;
+    mp_obj_t *items;
+    if (mp_obj_is_type(seq, &mp_type_tuple)) {
+        mp_obj_tuple_get(seq, &len, &items);
+    } else if (mp_obj_is_type(seq, &mp_type_list)) {
+        mp_obj_list_get(seq, &len, &items);
+    } else {
+        mp_raise_TypeError(MP_ERROR_TEXT("expected a sequence of pin numbers"));
+    }
+    if (len > max_out) {
+        mp_raise_ValueError(MP_ERROR_TEXT("too many pins in sequence"));
+    }
+    for (size_t i = 0; i < len; i++) {
+        out[i] = displayif_pin_id(items[i]);
+    }
+    return len;
+}
+
 mp_obj_t displayif_machine_pin(mp_int_t pin_id, mp_int_t mode, mp_int_t value) {
     mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
     mp_obj_t pin_type = mp_load_attr(machine_mod, MP_QSTR_Pin);

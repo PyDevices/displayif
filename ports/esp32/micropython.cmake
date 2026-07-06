@@ -8,9 +8,10 @@ target_link_libraries(usermod INTERFACE displayif_esp32)
 target_sources(displayif_esp32 INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/esp32/mod_rgbframebuffer.c
     ${DISPLAYIF_MOD_DIR}/ports/esp32/mod_mipidsi.c
+    ${DISPLAYIF_MOD_DIR}/ports/esp32/mod_i80bus.c
 )
 
-# MIPI DSI headers and symbols (mod_mipidsi.c is a no-op when SOC_MIPI_DSI_SUPPORTED=0).
-if(CONFIG_SOC_MIPI_DSI_SUPPORTED)
+# esp_lcd symbols for RGB, I80, and MIPI DSI backends.
+if(CONFIG_SOC_LCD_RGB_SUPPORTED OR CONFIG_SOC_LCD_I80_SUPPORTED OR CONFIG_SOC_MIPI_DSI_SUPPORTED)
     target_link_libraries(displayif_esp32 INTERFACE idf::esp_lcd)
 endif()

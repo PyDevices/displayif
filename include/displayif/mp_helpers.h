@@ -10,6 +10,9 @@
 
 void displayif_pin_set(mp_obj_t pin, int value);
 int displayif_pin_get(mp_obj_t pin);
+int displayif_pin_id(mp_obj_t pin_or_int);
+size_t displayif_pin_tuple_to_ints(mp_obj_t tuple, int *out, size_t max_out);
+size_t displayif_pin_seq_to_ints(mp_obj_t seq, int *out, size_t max_out);
 mp_obj_t displayif_machine_pin(mp_int_t pin_id, mp_int_t mode, mp_int_t value);
 mp_obj_t displayif_machine_spi(mp_obj_t kwargs);
 mp_obj_t displayif_obj_call_method0(mp_obj_t obj, qstr method);

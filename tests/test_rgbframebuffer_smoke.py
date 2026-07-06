@@ -38,8 +38,8 @@ assert mv.format == "H"
 
 try:
     fb.refresh()
-except NotImplementedError:
-    print("refresh stub ok (scanout not implemented yet)")
+except (NotImplementedError, OSError) as exc:
+    print("refresh deferred or hardware unavailable:", type(exc).__name__)
 else:
     print("refresh ok")
 

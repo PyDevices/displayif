@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Dot-clock RGB framebuffer for esp32 port (ESP-IDF scanout backend — WIP).
+// Dot-clock RGB framebuffer for esp32 port (ESP-IDF esp_lcd RGB panel).
 
 #include <string.h>
 #include <stdlib.h>
@@ -9,8 +9,15 @@
 #include "py/binary.h"
 #include "displayif/mp_helpers.h"
 
+#define RGBFB_MAX_DATA_PINS 16
+
 #if defined(ESP_PLATFORM)
 #include "esp_heap_caps.h"
+#include "esp_err.h"
+#include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_rgb.h"
+#include "esp_cache.h"
+#include "soc/soc_caps.h"
 #endif
 
 typedef struct _rgbframebuffer_obj_t {
@@ -20,35 +27,144 @@ typedef struct _rgbframebuffer_obj_t {
     uint16_t row_stride;
     uint8_t *buf;
     size_t buf_len;
-    mp_obj_t pin_args;
+    int de_pin;
+    int vsync_pin;
+    int hsync_pin;
+    int dclk_pin;
+    int data_pins[RGBFB_MAX_DATA_PINS];
+    size_t data_pin_count;
+    uint32_t frequency;
+    uint16_t hsync_pulse_width;
+    uint16_t hsync_front_porch;
+    uint16_t hsync_back_porch;
+    uint16_t vsync_pulse_width;
+    uint16_t vsync_front_porch;
+    uint16_t vsync_back_porch;
+    bool hsync_idle_low;
+    bool vsync_idle_low;
+    bool de_idle_high;
+    bool pclk_active_high;
+    bool pclk_idle_high;
+    int overscan_left;
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    esp_lcd_panel_handle_t panel;
+    bool panel_ready;
+#endif
 } rgbframebuffer_obj_t;
 
 static const mp_obj_type_t rgbframebuffer_type;
 
-static uint8_t *rgbframebuffer_alloc(size_t nbytes) {
 #if defined(ESP_PLATFORM)
+static uint8_t *rgbframebuffer_alloc(size_t nbytes) {
     uint8_t *ptr = heap_caps_malloc(nbytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (ptr == NULL) {
         ptr = heap_caps_malloc(nbytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     }
     return ptr;
-#else
-    return malloc(nbytes);
-#endif
 }
 
 static void rgbframebuffer_free(uint8_t *ptr) {
-#if defined(ESP_PLATFORM)
-    heap_caps_free(ptr);
+    if (ptr != NULL) {
+        heap_caps_free(ptr);
+    }
+}
 #else
-    free(ptr);
-#endif
+static uint8_t *rgbframebuffer_alloc(size_t nbytes) {
+    return malloc(nbytes);
 }
 
-static mp_obj_t rgbframebuffer_store_pin(mp_obj_t dict, qstr key, mp_obj_t value) {
-    mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(key), value);
-    return value;
+static void rgbframebuffer_free(uint8_t *ptr) {
+    free(ptr);
 }
+#endif
+
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+static void rgbframebuffer_raise_esp_err(esp_err_t err) {
+    if (err == ESP_OK) {
+        return;
+    }
+    mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("ESP-IDF error %d (%s)"), err, esp_err_to_name(err));
+}
+
+static void rgbframebuffer_fill_data_pins(rgbframebuffer_obj_t *self, mp_obj_t red, mp_obj_t green, mp_obj_t blue, mp_obj_t data) {
+    int pins[RGBFB_MAX_DATA_PINS];
+    size_t count = 0;
+
+    if (data != MP_OBJ_NULL) {
+        count = displayif_pin_tuple_to_ints(data, pins, RGBFB_MAX_DATA_PINS);
+    } else {
+        size_t n_red = displayif_pin_tuple_to_ints(red, pins, RGBFB_MAX_DATA_PINS);
+        size_t n_green = displayif_pin_tuple_to_ints(green, pins + n_red, RGBFB_MAX_DATA_PINS - n_red);
+        size_t n_blue = displayif_pin_tuple_to_ints(blue, pins + n_red + n_green,
+            RGBFB_MAX_DATA_PINS - n_red - n_green);
+        count = n_red + n_green + n_blue;
+    }
+
+    if (count == 0 || count > RGBFB_MAX_DATA_PINS) {
+        mp_raise_ValueError(MP_ERROR_TEXT("invalid RGB data pin layout"));
+    }
+
+    self->data_pin_count = count;
+    for (size_t i = 0; i < RGBFB_MAX_DATA_PINS; i++) {
+        self->data_pins[i] = (i < count) ? pins[i] : -1;
+    }
+}
+
+static void rgbframebuffer_init_panel(rgbframebuffer_obj_t *self) {
+    if (self->panel_ready) {
+        return;
+    }
+
+    esp_lcd_rgb_panel_config_t panel_config = {
+        .clk_src = LCD_CLK_SRC_DEFAULT,
+        .data_width = self->data_pin_count,
+        .bits_per_pixel = 16,
+        .num_fbs = 1,
+        .dma_burst_size = 64,
+        .hsync_gpio_num = self->hsync_pin,
+        .vsync_gpio_num = self->vsync_pin,
+        .de_gpio_num = self->de_pin,
+        .pclk_gpio_num = self->dclk_pin,
+        .disp_gpio_num = -1,
+        .timings = {
+            .pclk_hz = self->frequency,
+            .h_res = self->width,
+            .v_res = self->height,
+            .hsync_pulse_width = self->hsync_pulse_width,
+            .hsync_front_porch = self->hsync_front_porch,
+            .hsync_back_porch = self->hsync_back_porch,
+            .vsync_pulse_width = self->vsync_pulse_width,
+            .vsync_front_porch = self->vsync_front_porch,
+            .vsync_back_porch = self->vsync_back_porch,
+            .flags = {
+                .hsync_idle_low = self->hsync_idle_low,
+                .vsync_idle_low = self->vsync_idle_low,
+                .de_idle_high = self->de_idle_high,
+                .pclk_active_neg = !self->pclk_active_high,
+                .pclk_idle_high = self->pclk_idle_high,
+            },
+        },
+        .flags = {
+            .refresh_on_demand = 1,
+            .fb_in_psram = 1,
+        },
+    };
+
+    memcpy(panel_config.data_gpio_nums, self->data_pins, sizeof(self->data_pins));
+
+    esp_lcd_panel_handle_t panel = NULL;
+    rgbframebuffer_raise_esp_err(esp_lcd_new_rgb_panel(&panel_config, &panel));
+    rgbframebuffer_raise_esp_err(esp_lcd_panel_reset(panel));
+    rgbframebuffer_raise_esp_err(esp_lcd_panel_init(panel));
+
+    if (self->overscan_left != 0) {
+        rgbframebuffer_raise_esp_err(esp_lcd_panel_set_gap(panel, self->overscan_left, 0));
+    }
+
+    self->panel = panel;
+    self->panel_ready = true;
+}
+#endif
 
 static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
@@ -109,6 +225,15 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     if (rgb666 == rgb565) {
         mp_raise_ValueError(MP_ERROR_TEXT("Specify exactly one of red/green/blue or data pin layout"));
     }
+    if (rgb666 && (vals[ARG_green].u_obj == MP_OBJ_NULL || vals[ARG_blue].u_obj == MP_OBJ_NULL)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("red/green/blue pin tuples required together"));
+    }
+    if (vals[ARG_width].u_int <= 0 || vals[ARG_height].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("width and height must be positive"));
+    }
+    if (vals[ARG_frequency].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
+    }
 
     rgbframebuffer_obj_t *self = mp_obj_malloc(rgbframebuffer_obj_t, type);
     self->width = vals[ARG_width].u_int;
@@ -121,42 +246,47 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     }
     memset(self->buf, 0, self->buf_len);
 
-    self->pin_args = mp_obj_new_dict(0);
-    rgbframebuffer_store_pin(self->pin_args, MP_QSTR_de, vals[ARG_de].u_obj);
-    rgbframebuffer_store_pin(self->pin_args, MP_QSTR_vsync, vals[ARG_vsync].u_obj);
-    rgbframebuffer_store_pin(self->pin_args, MP_QSTR_hsync, vals[ARG_hsync].u_obj);
-    rgbframebuffer_store_pin(self->pin_args, MP_QSTR_dclk, vals[ARG_dclk].u_obj);
-    if (rgb666) {
-        if (vals[ARG_green].u_obj == MP_OBJ_NULL || vals[ARG_blue].u_obj == MP_OBJ_NULL) {
-            mp_raise_ValueError(MP_ERROR_TEXT("red/green/blue pin tuples required together"));
-        }
-        rgbframebuffer_store_pin(self->pin_args, MP_QSTR_red, vals[ARG_red].u_obj);
-        rgbframebuffer_store_pin(self->pin_args, MP_QSTR_green, vals[ARG_green].u_obj);
-        rgbframebuffer_store_pin(self->pin_args, MP_QSTR_blue, vals[ARG_blue].u_obj);
-    } else {
-        rgbframebuffer_store_pin(self->pin_args, MP_QSTR_data, vals[ARG_data].u_obj);
-    }
+    self->de_pin = displayif_pin_id(vals[ARG_de].u_obj);
+    self->vsync_pin = displayif_pin_id(vals[ARG_vsync].u_obj);
+    self->hsync_pin = displayif_pin_id(vals[ARG_hsync].u_obj);
+    self->dclk_pin = displayif_pin_id(vals[ARG_dclk].u_obj);
+    self->frequency = vals[ARG_frequency].u_int;
+    self->hsync_pulse_width = vals[ARG_hsync_pulse_width].u_int;
+    self->hsync_front_porch = vals[ARG_hsync_front_porch].u_int;
+    self->hsync_back_porch = vals[ARG_hsync_back_porch].u_int;
+    self->vsync_pulse_width = vals[ARG_vsync_pulse_width].u_int;
+    self->vsync_front_porch = vals[ARG_vsync_front_porch].u_int;
+    self->vsync_back_porch = vals[ARG_vsync_back_porch].u_int;
+    self->hsync_idle_low = vals[ARG_hsync_idle_low].u_bool;
+    self->vsync_idle_low = vals[ARG_vsync_idle_low].u_bool;
+    self->de_idle_high = vals[ARG_de_idle_high].u_bool;
+    self->pclk_active_high = vals[ARG_pclk_active_high].u_bool;
+    self->pclk_idle_high = vals[ARG_pclk_idle_high].u_bool;
+    self->overscan_left = vals[ARG_overscan_left].u_int;
 
-    (void)vals[ARG_frequency];
-    (void)vals[ARG_hsync_pulse_width];
-    (void)vals[ARG_hsync_front_porch];
-    (void)vals[ARG_hsync_back_porch];
-    (void)vals[ARG_vsync_pulse_width];
-    (void)vals[ARG_vsync_front_porch];
-    (void)vals[ARG_vsync_back_porch];
-    (void)vals[ARG_hsync_idle_low];
-    (void)vals[ARG_vsync_idle_low];
-    (void)vals[ARG_de_idle_high];
-    (void)vals[ARG_pclk_active_high];
-    (void)vals[ARG_pclk_idle_high];
-    (void)vals[ARG_overscan_left];
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    self->panel = NULL;
+    self->panel_ready = false;
+    rgbframebuffer_fill_data_pins(self, vals[ARG_red].u_obj, vals[ARG_green].u_obj,
+        vals[ARG_blue].u_obj, vals[ARG_data].u_obj);
+#else
+    self->data_pin_count = 0;
+#endif
 
     return MP_OBJ_FROM_PTR(self);
 }
 
 static mp_obj_t rgbframebuffer_refresh(mp_obj_t self_in) {
-    (void)self_in;
-    mp_raise_msg(&mp_type_NotImplementedError, MP_ERROR_TEXT("ESP-IDF dotclock scanout not implemented yet"));
+    rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    rgbframebuffer_init_panel(self);
+    rgbframebuffer_raise_esp_err(esp_cache_msync(self->buf, self->buf_len, ESP_CACHE_MSYNC_FLAG_DIR_C2M));
+    rgbframebuffer_raise_esp_err(esp_lcd_panel_draw_bitmap(self->panel, 0, 0, self->width, self->height, self->buf));
+    rgbframebuffer_raise_esp_err(esp_lcd_rgb_panel_refresh(self->panel));
+    return mp_const_none;
+#else
+    mp_raise_msg(&mp_type_NotImplementedError, MP_ERROR_TEXT("ESP-IDF dotclock scanout not supported on this target"));
+#endif
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(rgbframebuffer_refresh_obj, rgbframebuffer_refresh);
 
@@ -184,6 +314,13 @@ static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bu
 
 static mp_obj_t rgbframebuffer_del(mp_obj_t self_in) {
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    if (self->panel_ready && self->panel != NULL) {
+        esp_lcd_panel_del(self->panel);
+        self->panel = NULL;
+        self->panel_ready = false;
+    }
+#endif
     if (self->buf != NULL) {
         rgbframebuffer_free(self->buf);
         self->buf = NULL;
