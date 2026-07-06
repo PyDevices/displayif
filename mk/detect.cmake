@@ -1,0 +1,15 @@
+# Shared port detection for CMake-based MicroPython builds (ESP32, RP2).
+
+get_filename_component(_DISPLAYIF_PORT_DIR "${MICROPY_PORT_DIR}" ABSOLUTE)
+
+set(DISPLAYIF_PORT_ESP32 FALSE)
+set(DISPLAYIF_PORT_IMXRT FALSE)
+set(DISPLAYIF_PORT_RP2 FALSE)
+
+if(_DISPLAYIF_PORT_DIR MATCHES "/ports/esp32")
+    set(DISPLAYIF_PORT_ESP32 TRUE)
+elseif(_DISPLAYIF_PORT_DIR MATCHES "/ports/mimxrt")
+    set(DISPLAYIF_PORT_IMXRT TRUE)
+elseif(_DISPLAYIF_PORT_DIR MATCHES "/ports/rp2")
+    set(DISPLAYIF_PORT_RP2 TRUE)
+endif()
