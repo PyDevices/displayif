@@ -14,3 +14,16 @@ target_sources(displayif_common INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/common/i2c/mod_i2cbus.c
     ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/mod_rgbmatrix.c
 )
+
+if(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    target_include_directories(displayif_common INTERFACE
+        ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/protomatter
+    )
+    target_compile_definitions(displayif_common INTERFACE
+        DISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1
+        CIRCUITPY=1
+    )
+    target_sources(displayif_common INTERFACE
+        ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/protomatter/core.c
+    )
+endif()

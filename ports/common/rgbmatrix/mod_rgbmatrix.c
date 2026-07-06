@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// HUB75 RGB LED matrix — portable GPIO bitbang (no ESP-IDF / SoC LCD blocks).
+// HUB75 RGB LED matrix — Protomatter (hardware timer) or portable GPIO bitbang fallback.
 
 #include <string.h>
 #include <stdlib.h>
@@ -9,9 +9,15 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/rgbmatrix_pm.h"
+
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+#include "protomatter/core.h"
+#endif
 
 #define RGBMATRIX_MAX_ADDR_PINS 6
 #define RGBMATRIX_RGB_PINS 6
+#define RGBMATRIX_MAX_PM_PINS 64
 
 typedef struct _rgbmatrix_obj_t {
     mp_obj_base_t base;
@@ -32,6 +38,16 @@ typedef struct _rgbmatrix_obj_t {
     uint8_t *draw_buf;
     uint8_t *scan_buf;
     size_t buf_len;
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    Protomatter_core pm;
+    void *pm_timer;
+    bool pm_started;
+    uint8_t pm_rgb_pins[RGBMATRIX_RGB_PINS];
+    uint8_t pm_addr_pins[RGBMATRIX_MAX_ADDR_PINS];
+    uint8_t pm_clock_pin;
+    uint8_t pm_latch_pin;
+    uint8_t pm_oe_pin;
+#endif
 } rgbmatrix_obj_t;
 
 static const mp_obj_type_t rgbmatrix_type;
@@ -120,6 +136,98 @@ static void rgbmatrix_shift_row(rgbmatrix_obj_t *self, uint8_t addr, uint8_t pla
     }
 }
 
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+
+static void rgbmatrix_pm_status_raise(ProtomatterStatus stat) {
+    switch (stat) {
+        case PROTOMATTER_ERR_PINS:
+            mp_raise_ValueError(MP_ERROR_TEXT("rgbmatrix pin/port layout invalid"));
+        case PROTOMATTER_ERR_MALLOC:
+            mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("rgbmatrix allocation failed"));
+        case PROTOMATTER_ERR_ARG:
+            mp_raise_ValueError(MP_ERROR_TEXT("invalid rgbmatrix arguments"));
+        default:
+            mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("rgbmatrix error %d"), (int)stat);
+    }
+}
+
+static uint8_t rgbmatrix_pm_assign_pin(rgbmatrix_obj_t *self, uint8_t *next_pm_pin, mp_obj_t pin_obj, int pin_id) {
+    uint8_t pm_pin = *next_pm_pin;
+    if (pm_pin >= RGBMATRIX_MAX_PM_PINS) {
+        mp_raise_ValueError(MP_ERROR_TEXT("too many rgbmatrix pins"));
+    }
+    if (pin_obj == MP_OBJ_NULL) {
+        pin_obj = rgbmatrix_make_pin(pin_id);
+    }
+    displayif_rgbmatrix_pm_bind_pin(pm_pin, pin_obj);
+    *next_pm_pin = pm_pin + 1;
+    return pm_pin;
+}
+
+static void rgbmatrix_pm_start(rgbmatrix_obj_t *self) {
+    if (!displayif_rgbmatrix_pm_available()) {
+        return;
+    }
+
+    self->pm_timer = displayif_rgbmatrix_pm_timer_alloc();
+    if (self->pm_timer == NULL) {
+        mp_raise_ValueError(MP_ERROR_TEXT("no timer available for rgbmatrix"));
+    }
+
+    memset(&self->pm, 0, sizeof(self->pm));
+    int8_t pm_tile = self->serpentine ? -(int8_t)self->tile : (int8_t)self->tile;
+    ProtomatterStatus stat = _PM_init(
+        &self->pm,
+        self->width,
+        self->bit_depth,
+        1,
+        self->pm_rgb_pins,
+        self->addr_pin_count,
+        self->pm_addr_pins,
+        self->pm_clock_pin,
+        self->pm_latch_pin,
+        self->pm_oe_pin,
+        self->doublebuffer,
+        pm_tile,
+        self->pm_timer);
+    if (stat != PROTOMATTER_OK) {
+        displayif_rgbmatrix_pm_timer_free(self->pm_timer);
+        self->pm_timer = NULL;
+        rgbmatrix_pm_status_raise(stat);
+    }
+
+    displayif_rgbmatrix_pm_set_active(&self->pm);
+    displayif_rgbmatrix_pm_timer_enable(self->pm_timer);
+    stat = _PM_begin(&self->pm);
+    if (stat != PROTOMATTER_OK) {
+        _PM_deallocate(&self->pm);
+        displayif_rgbmatrix_pm_timer_free(self->pm_timer);
+        self->pm_timer = NULL;
+        displayif_rgbmatrix_pm_set_active(NULL);
+        rgbmatrix_pm_status_raise(stat);
+    }
+
+    _PM_convert_565(&self->pm, (uint16_t *)self->draw_buf, self->width);
+    _PM_swapbuffer_maybe(&self->pm);
+    self->pm_started = true;
+}
+
+static void rgbmatrix_pm_stop(rgbmatrix_obj_t *self) {
+    if (!self->pm_started) {
+        return;
+    }
+    displayif_rgbmatrix_pm_timer_disable(self->pm_timer);
+    _PM_stop(&self->pm);
+    _PM_deallocate(&self->pm);
+    displayif_rgbmatrix_pm_timer_free(self->pm_timer);
+    self->pm_timer = NULL;
+    displayif_rgbmatrix_pm_set_active(NULL);
+    self->pm_started = false;
+    memset(&self->pm, 0, sizeof(self->pm));
+}
+
+#endif /* DISPLAYIF_RGBMATRIX_USE_PROTOMATTER */
+
 static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
         ARG_width,
@@ -161,13 +269,8 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
     if (vals[ARG_clock_pin].u_int < 0 || vals[ARG_latch_pin].u_int < 0 || vals[ARG_output_enable_pin].u_int < 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("clock, latch, and output_enable pins required"));
     }
-
-    uint16_t height = vals[ARG_height].u_int;
-    if (height == 0) {
-        height = vals[ARG_width].u_int;
-    }
-    if (height <= 0 || (height % 2) != 0) {
-        mp_raise_ValueError(MP_ERROR_TEXT("height must be a positive even number"));
+    if (vals[ARG_tile].u_int < 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("tile must be >= 1"));
     }
 
     int rgb_ids[RGBMATRIX_RGB_PINS];
@@ -181,9 +284,24 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
     if (addr_count == 0 || addr_count > RGBMATRIX_MAX_ADDR_PINS) {
         mp_raise_ValueError(MP_ERROR_TEXT("addr_pins must contain 1..6 pins"));
     }
-    if ((size_t)(height / 2) > (1U << addr_count)) {
-        mp_raise_ValueError(MP_ERROR_TEXT("not enough addr_pins for height"));
+
+    int tile = vals[ARG_tile].u_int;
+    int computed_height = (int)(rgb_count / 3) * (1 << addr_count) * tile;
+    uint16_t height = vals[ARG_height].u_int;
+    if (height == 0) {
+        height = computed_height;
+    } else if (height != computed_height) {
+        mp_raise_ValueError(MP_ERROR_TEXT("height does not match addr_pins/rgb_pins/tile"));
     }
+    if (height <= 0 || (height % 2) != 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("height must be a positive even number"));
+    }
+
+#if !defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    if (tile != 1) {
+        mp_raise_NotImplementedError(MP_ERROR_TEXT("tile requires Protomatter backend"));
+    }
+#endif
 
     rgbmatrix_obj_t *self = mp_obj_malloc(rgbmatrix_obj_t, type);
     self->width = vals[ARG_width].u_int;
@@ -193,15 +311,16 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
     self->bit_depth = vals[ARG_bit_depth].u_int;
     self->addr_pin_count = addr_count;
     self->doublebuffer = vals[ARG_doublebuffer].u_bool;
-    self->tile = vals[ARG_tile].u_int;
+    self->tile = tile;
     self->serpentine = vals[ARG_serpentine].u_bool;
     self->external_fb = false;
     self->draw_buf = NULL;
     self->scan_buf = NULL;
-
-    if (self->tile != 1) {
-        mp_raise_NotImplementedError(MP_ERROR_TEXT("tile != 1 not supported yet"));
-    }
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    self->pm_timer = NULL;
+    self->pm_started = false;
+    memset(&self->pm, 0, sizeof(self->pm));
+#endif
 
     for (size_t i = 0; i < RGBMATRIX_RGB_PINS; i++) {
         self->rgb_pins[i] = rgbmatrix_make_pin(rgb_ids[i]);
@@ -212,6 +331,21 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
     self->clock_pin = rgbmatrix_make_pin(vals[ARG_clock_pin].u_int);
     self->latch_pin = rgbmatrix_make_pin(vals[ARG_latch_pin].u_int);
     self->oe_pin = rgbmatrix_make_pin(vals[ARG_output_enable_pin].u_int);
+
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    if (displayif_rgbmatrix_pm_available()) {
+        uint8_t next_pm_pin = 0;
+        for (size_t i = 0; i < RGBMATRIX_RGB_PINS; i++) {
+            self->pm_rgb_pins[i] = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->rgb_pins[i], rgb_ids[i]);
+        }
+        for (size_t i = 0; i < addr_count; i++) {
+            self->pm_addr_pins[i] = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->addr_pins[i], addr_ids[i]);
+        }
+        self->pm_clock_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->clock_pin, vals[ARG_clock_pin].u_int);
+        self->pm_latch_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->latch_pin, vals[ARG_latch_pin].u_int);
+        self->pm_oe_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->oe_pin, vals[ARG_output_enable_pin].u_int);
+    }
+#endif
 
     displayif_pin_set(self->clock_pin, 0);
     displayif_pin_set(self->latch_pin, 0);
@@ -247,11 +381,25 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
         }
     }
 
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    if (displayif_rgbmatrix_pm_available()) {
+        rgbmatrix_pm_start(self);
+    }
+#endif
+
     return MP_OBJ_FROM_PTR(self);
 }
 
 static mp_obj_t rgbmatrix_refresh(mp_obj_t self_in) {
     rgbmatrix_obj_t *self = MP_OBJ_TO_PTR(self_in);
+
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    if (self->pm_started) {
+        _PM_convert_565(&self->pm, (uint16_t *)self->draw_buf, self->width);
+        _PM_swapbuffer_maybe(&self->pm);
+        return mp_const_none;
+    }
+#endif
 
     if (self->doublebuffer && self->scan_buf != self->draw_buf) {
         memcpy(self->scan_buf, self->draw_buf, self->buf_len);
@@ -306,6 +454,9 @@ static mp_int_t rgbmatrix_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo
 
 static mp_obj_t rgbmatrix_del(mp_obj_t self_in) {
     rgbmatrix_obj_t *self = MP_OBJ_TO_PTR(self_in);
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    rgbmatrix_pm_stop(self);
+#endif
     if (!self->external_fb) {
         if (self->doublebuffer && self->scan_buf != NULL && self->scan_buf != self->draw_buf) {
             rgbmatrix_free(self->scan_buf);

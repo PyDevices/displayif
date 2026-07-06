@@ -31,6 +31,16 @@ DISPLAYIF_IS_MCU := 1
 endif
 
 ifeq ($(DISPLAYIF_IS_MCU),1)
+ifeq ($(DISPLAYIF_PORT_ESP32),1)
+ifeq ($(IDF_TARGET),esp32s3)
+DISPLAYIF_RGBMATRIX_USE_PROTOMATTER = 1
+endif
+endif
+ifeq ($(DISPLAYIF_PORT_MIMXRT),1)
+ifeq ($(MCU_SERIES),MIMXRT1062)
+DISPLAYIF_RGBMATRIX_USE_PROTOMATTER = 1
+endif
+endif
 include $(DISPLAYIF_MOD_DIR)/ports/common/micropython.mk
 endif
 

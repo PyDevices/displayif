@@ -15,3 +15,9 @@ target_sources(displayif_esp32 INTERFACE
 if(CONFIG_SOC_LCD_RGB_SUPPORTED OR CONFIG_SOC_LCD_I80_SUPPORTED OR CONFIG_SOC_MIPI_DSI_SUPPORTED)
     target_link_libraries(displayif_esp32 INTERFACE idf::esp_lcd)
 endif()
+
+if(CONFIG_IDF_TARGET_ESP32S3)
+    target_sources(displayif_esp32 INTERFACE
+        ${DISPLAYIF_MOD_DIR}/ports/esp32/rgbmatrix_pm.c
+    )
+endif()
