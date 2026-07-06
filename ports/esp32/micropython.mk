@@ -2,7 +2,6 @@
 
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/esp32
 
-# Phase 2 — enable when sources land.
+# Phase 2 — enable when rgbframebuffer.c lands.
 # SRC_USERMOD_C += \
-#     $(DISPLAYIF_MOD_DIR)/ports/esp32/rgb_panel.c \
-#     $(DISPLAYIF_MOD_DIR)/ports/esp32/rgb666.c
+#     $(DISPLAYIF_MOD_DIR)/ports/esp32/rgbframebuffer.c

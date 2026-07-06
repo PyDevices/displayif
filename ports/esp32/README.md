@@ -2,18 +2,16 @@
 
 ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espressif` port.
 
-## Planned modules
+## Planned native modules
 
-| C source | Python | Interface |
-|----------|--------|-----------|
-| `rgb_panel.c` | `displayif.rgbpanel.RGBPanel` | Parallel timed RGB LCD |
-| `rgb666.c` | `displayif.rgb666.RGBFrameBuffer` | RGB666 dotclock framebuffer |
-| `rgbmatrix.c` | `displayif.rgbmatrix.RGBMatrix` | HUB75 (ESP32-S3 MatrixPortal, etc.) |
+| C source | Python import | pydisplay backend |
+|----------|---------------|-------------------|
+| `rgbframebuffer.c` | `rgbframebuffer.RGBFrameBuffer` | **FBDisplay** |
+| `rgbmatrix.c` | `rgbmatrix.RGBMatrix` | **FBDisplay** |
 
-## Naming
+`RGBFrameBuffer` mirrors CP `dotclockframebuffer.DotClockFramebuffer`. Supports RGB-666 pin tuples (`red`/`green`/`blue`) and 16-pin RGB565 (`data=`) layouts via constructor — one driver, not separate backends.
 
-- **`rgbpanel`** — parallel timed RGB LCD. Not `rgb565` (reserved for color packing helpers).
-- **`rgb666`** — aligns with CircuitPython RGB666 / `dotclockframebuffer`.
+Do not use `rgb565` as a module name (color helper collision). No `present()` / panel API.
 
 ## Build
 
