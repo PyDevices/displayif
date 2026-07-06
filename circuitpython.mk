@@ -13,9 +13,9 @@ include $(DISPLAYIF_MOD_DIR)/mk/detect_cp.mk
 include $(DISPLAYIF_MOD_DIR)/mk/common_cp.mk
 
 ifeq ($(DISPLAYIF_PORT_ESP32),1)
-include $(DISPLAYIF_MOD_DIR)/mk/esp_idf_cp.mk
+include $(DISPLAYIF_MOD_DIR)/mk/esp32_cp.mk
 endif
 
-ifeq ($(DISPLAYIF_PORT_IMXRT),1)
-include $(DISPLAYIF_MOD_DIR)/mk/imxrt_cp.mk
+ifeq ($(DISPLAYIF_PORT_MIMXRT),1)
+include $(DISPLAYIF_MOD_DIR)/mk/mimxrt_cp.mk
 endif

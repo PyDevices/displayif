@@ -1,6 +1,6 @@
 # displayif
 
-Native display interface drivers for pydisplay — **universal** buses plus **MCU-specific** scanout (ESP-IDF, i.MX RT, …).
+Native display interface drivers for pydisplay — portable code in `ports/common/`, SoC-specific code under `ports/<mp-port>/`.
 
 **Status:** scaffolded layout — Phase 1 is universal SPI. See [HANDOFF.md](HANDOFF.md).
 
@@ -8,22 +8,24 @@ Native display interface drivers for pydisplay — **universal** buses plus **MC
 
 ```
 displayif/
-  micropython.mk / micropython.cmake / circuitpython.mk / manifest.py   # cmods discovery (repo root)
-  mk/                  # port-gated build fragments
-  drivers/             # universal (machine.SPI, …)
-  ports/               # esp_idf/, imxrt/, …
-  py/displayif/        # frozen Python package
+  micropython.mk / micropython.cmake / circuitpython.mk / manifest.py
+  mk/                    # port-gated build fragments
+  ports/
+    common/              # portable (SPI, …) — all ports
+    esp32/               # ESP-IDF RGB panel, rgb666
+    mimxrt/              # NXP LCD blocks
+  py/displayif/
   tests/
 ```
 
 ## Consumers
 
-| Tier | Module | pydisplay backend |
-|------|--------|-------------------|
-| Universal | `displayif.spi` | **BusDisplay** |
-| ESP-IDF | `displayif.rgb565` | **RGBDisplay** |
-| ESP-IDF | `displayif.rgbframebuffer` | **FBDisplay** |
-| i.MX RT | TBD | TBD |
+| Location | Module | pydisplay backend |
+|----------|--------|-------------------|
+| `ports/common` | `displayif.spi` | **BusDisplay** |
+| `ports/esp32` | `displayif.rgbpanel` | **RGBDisplay** |
+| `ports/esp32` | `displayif.rgb666` | **FBDisplay** |
+| `ports/mimxrt` | TBD | TBD |
 
 ## Build (cmods workspace)
 
@@ -34,15 +36,15 @@ git clone https://github.com/PyDevices/displayif.git displayif
 # Add to cmods/manifest.py:
 #   package("displayif", base_path="displayif/py", opt=3)
 
-./build_mp.sh --port rp2 --board RPI_PICO2_W      # SPI only (Phase 1)
-./build_mp.sh --port esp32 --board ESP32_GENERIC_S3   # SPI + ESP-IDF RGB (Phase 2)
-./build_mp.sh --port mimxrt --board TEENSY40      # SPI only until imxrt drivers land
+./build_mp.sh --port rp2 --board RPI_PICO2_W
+./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
+./build_mp.sh --port mimxrt --board TEENSY40
 ```
 
-CircuitPython: `circuitpython.mk` at repo root; use `apply_cp_displayif_patches.sh` (to be added) before `lv_circuitpython_mod/build_cp.sh`.
+CircuitPython: `circuitpython.mk` at repo root; `apply_cp_displayif_patches.sh` (to be added) before `lv_circuitpython_mod/build_cp.sh`.
 
 ## Related
 
-- [HANDOFF.md](HANDOFF.md) — architecture, phases, PR sequence
-- [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay) — board configs, displaysys backends
-- [PyDevices/cmods](https://github.com/PyDevices/cmods) — workspace build scripts
+- [HANDOFF.md](HANDOFF.md) — architecture, phases, naming
+- [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
+- [PyDevices/cmods](https://github.com/PyDevices/cmods)

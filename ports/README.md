@@ -1,15 +1,21 @@
-# SoC port trees
+# ports/
 
-Each subdirectory under `ports/` holds drivers that **only compile** on a specific SDK or MCU family.
+All interface code lives under `ports/`, named after **MicroPython port** directories (`esp32`, `mimxrt`, `rp2`, …) or `common` for portable code.
 
-| Directory | SDK / port | MP `PORT` | CP port |
-|-----------|------------|-----------|---------|
-| `esp_idf/` | ESP-IDF (`esp_lcd`, RGB panel API) | `esp32` | `espressif` |
-| `imxrt/` | NXP MCUXpresso / register headers | `mimxrt` | `mimxrt` |
+| Directory | When included | MP port | CP port dir |
+|-----------|---------------|---------|-------------|
+| `common/` | always | all | all (when patched) |
+| `esp32/` | esp32 builds | `esp32` | `espressif` |
+| `mimxrt/` | mimxrt builds | `mimxrt` | `mimxrt` |
 
-Add a new `ports/<family>/` when:
+## Rules
 
-- the driver needs vendor SDK headers, **and**
-- it cannot live in `drivers/` (universal / `machine.SPI` only).
+1. **`ports/common/`** — uses only `machine.SPI`, `machine.Pin`, or equivalent portable APIs. No ESP-IDF or NXP SDK headers.
+2. **`ports/<port>/`** — SoC SDK code (`esp_lcd`, `fsl_elcdif`, …). One tree per MP port name.
+3. Chip variants (S3 vs P4) use `SOC_*` / `IDF_TARGET` guards inside `ports/esp32/`, not separate folders.
+4. New portable interface → `ports/common/<name>/` + line in `mk/common.mk`.
+5. New port-specific interface → `ports/<port>/` + fragment in `mk/<port>.mk`.
 
-Chip variants (S3 vs P4) stay in one tree with `SOC_*` / `IDF_TARGET` guards — do not fork per chip.
+## CP vs MP port names
+
+Folder names always match **MicroPython** `ports/<name>/`. CircuitPython may use a different port directory (e.g. `espressif`); `mk/detect_cp.mk` maps that to `ports/esp32/` sources.

@@ -5,6 +5,6 @@
 freeze_as_str = (
     "./py/displayif/__init__.py",
     "./py/displayif/spi.py",
-    "./py/displayif/rgb565.py",
-    "./py/displayif/rgbframebuffer.py",
+    "./py/displayif/rgbpanel.py",
+    "./py/displayif/rgb666.py",
 )

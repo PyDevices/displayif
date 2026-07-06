@@ -1,6 +1,6 @@
 """Universal SPI display bus (Phase 1).
 
-Native implementation: ``displayif.spi`` C module when built with drivers/spi/.
+Native implementation: ``displayif.spi`` C module when built with ports/common/spi/.
 """
 
 try:
