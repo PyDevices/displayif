@@ -1,6 +1,6 @@
 # mimxrt port
 
-NXP i.MX RT display interfaces for MicroPython `mimxrt` port / CircuitPython `mimxrt` port.
+NXP i.MX RT display interfaces for MicroPython `mimxrt` port.
 
 ## Native modules
 
@@ -33,11 +33,13 @@ On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel *
 - **Data** and **wr** must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11).
 - **dc** and **cs** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
 - Only **one** `I80Bus` instance per board (single FLEXIO2 peripheral).
-- **IOMUX** for FlexIO pins is applied at construction; there is no pydisplay board config yet for a specific shield.
+- **IOMUX** for FlexIO pins is applied at construction; see pydisplay `teensy41_flexio_ili9341` for an example pin map.
 
 On **MIMXRT1060-EVK**, the LCDIF RGB pins on `GPIO_B0_04`–`GPIO_B0_11` overlap the typical FlexIO2 data mapping — do not use the RK043 RGB shield pins simultaneously with i80bus. Teensy 4.x boards can wire an external 8080 display to FLEXIO2-capable pads per the schematic.
 
-Default `freq` is 20 MHz (byte rate). FlexIO root clock is the board default (~30 MHz on 1062); higher `freq` values may fail `FLEXIO_MCULCD_SetBaudRate`.
+Default `freq` is 20 MHz (byte rate). Bulk transfers (≥64 bytes) use `FLEXIO_MCULCD_TransferBlocking` with `dataOnly=true`.
+
+Example pydisplay config: `busdisplay/i80/teensy41_flexio_ili9341`.
 
 ### Stubs
 
@@ -51,8 +53,9 @@ Non-1062 mimxrt boards get stub `rgbframebuffer`; non-1176 boards get stub `mipi
 | `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` | MIMXRT1170-EVK + Waveshare 50H-800480-IPS (TC358762 bridge) on J84 |
 | `fbdisplay/matrixportal_m4_64x32` | `rgbmatrix` | Metro M4 (SAMD — see samd port) |
 | `fbdisplay/rgb_matrix_featherwing_teensy41_64x32` | `rgbmatrix` | Teensy 4.1 + FeatherWing |
+| `busdisplay/i80/teensy41_flexio_ili9341` | `i80bus` | Teensy 4.1 + external ILI9341 (FlexIO2) |
 
-CircuitPython board IDs: [imxrt1060_evk](https://circuitpython.org/board/imxrt1060_evk/), [nxp_mimxrt1170_evk](https://circuitpython.org/board/nxp_mimxrt1170_evk/).
+CircuitPython board configs for the same hardware live under pydisplay `cp_*` (use CP native modules, not displayif).
 
 On MIMXRT1062 boards, `rgbmatrix` uses the **Protomatter** backend (PIT timer ISR + GPIO set/clear registers). Other mimxrt chips (RT1011, RT1170, …) still get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
 
@@ -69,4 +72,4 @@ Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings.
 
 ## Future work
 
-FlexIO i80bus pin mux is limited to FLEXIO2 on GPIO_B pads; board-specific pydisplay configs and DMA transfers are not implemented yet.
+- Hardware validation: Teensy 4.1 + external 8080 panel on FlexIO2 wiring
