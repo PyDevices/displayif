@@ -14,10 +14,11 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 
 | Location | Native module | pydisplay backend | Phase |
 |----------|---------------|-------------------|-------|
-| `ports/common` | `spibus` | **BusDisplay** | **1 — shipped** |
-| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — buffer; scanout WIP** |
+| `ports/common` | `spibus` / `i2cbus` | **BusDisplay** | **1 — shipped** |
+| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — esp_lcd RGB scanout (SoCs with RGB LCD)** |
+| `ports/esp32` | `i80bus` | bus driver | **2 — esp_lcd I80 (ESP32-S3)** |
 | `ports/esp32` | `mipidsi` | **FBDisplay** | **2 — ESP32-P4 MIPI DSI** |
-| `ports/esp32` / `mimxrt` | `rgbmatrix` | **FBDisplay** | 3+ |
+| `ports/esp32` / `mimxrt` / `samd` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends** |
 | `ports/mimxrt` | TBD | TBD | later |
 
 All parallel dot-clock RGB panels (RGB-666 **and** 16-pin RGB565 wiring) use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
@@ -116,7 +117,7 @@ displayif/
 ├── include/displayif/
 ├── ports/
 │   ├── common/          # spi/ + micropython.mk / .cmake / circuitpython.mk
-│   ├── esp32/           # rgbframebuffer.c, rgbmatrix.c (planned)
+│   ├── esp32/           # rgbframebuffer, i80bus, mipidsi, rgbmatrix (S3)
 │   └── mimxrt/
 └── tests/
 ```
@@ -169,10 +170,11 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 1. Scaffold (done)
 2. pydisplay board configs on `rgbframebuffer` + `FBDisplay` (done)
 3. `ports/common/spi/mod_spibus.c` + smoke test (done)
-4. `ports/esp32/mod_rgbframebuffer.c` buffer protocol (done); ESP-IDF `refresh()` scanout
-5. Qualia + parallel-RGB hardware validation
-6. `rgbmatrix` on esp32 / mimxrt
-7. CP patch script (`apply_cp_displayif_patches.sh`)
+4. `ports/esp32/mod_rgbframebuffer.c` — buffer protocol + ESP-IDF `refresh()` scanout (done)
+5. `ports/esp32/mod_i80bus.c`, `mod_mipidsi.c` — accelerated bus/display drivers (done)
+6. Qualia + parallel-RGB hardware validation
+7. `rgbmatrix` Protomatter backends on esp32-S3 / mimxrt / samd (done); extend to other SoCs as needed
+8. CP patch script (`apply_cp_displayif_patches.sh`)
 
 ---
 
@@ -184,4 +186,4 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 
 ---
 
-*Updated 2026-07-06 — FBDisplay + rgbframebuffer only; pydisplay change list.*
+*Updated 2026-07-07 — ESP32 accelerated interfaces complete; pydisplay change list.*

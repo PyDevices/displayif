@@ -3,7 +3,8 @@
 | Script | Port | Notes |
 |--------|------|-------|
 | `test_spi_smoke.py` | MCU with SPI (`esp32`, …) | native `spibus` |
-| `test_rgbframebuffer_smoke.py` | `esp32` | buffer protocol; `refresh()` raises until scanout lands |
+| `test_rgbframebuffer_smoke.py` | `esp32` (RGB LCD SoC) | buffer protocol; `refresh()` uses esp_lcd scanout |
+| `test_i80bus_smoke.py` | `esp32-S3` | import `I80Bus` |
 | `test_mipidsi_smoke.py` | `esp32p4` | import `Bus` / `Display`; full panel needs Waveshare 4B hardware |
 
 ```bash

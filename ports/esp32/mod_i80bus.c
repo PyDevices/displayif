@@ -7,6 +7,7 @@
 #include "py/obj.h"
 #include "py/binary.h"
 #include "displayif/mp_helpers.h"
+#include "displayif_esp32_pins.h"
 
 #include "soc/soc_caps.h"
 
@@ -45,16 +46,16 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         ARG_freq,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_dc, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_cs, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_wr, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
+        { MP_QSTR_dc, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_cs, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_wr, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_data, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_freq, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 20000000 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    if (vals[ARG_dc].u_int < 0 || vals[ARG_wr].u_int < 0) {
+    if (vals[ARG_dc].u_obj == MP_OBJ_NULL || vals[ARG_wr].u_obj == MP_OBJ_NULL) {
         mp_raise_ValueError(MP_ERROR_TEXT("dc and wr pins must be specified"));
     }
     if (vals[ARG_freq].u_int <= 0) {
@@ -62,20 +63,24 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
 
     int data_pins[ESP_LCD_I80_BUS_WIDTH_MAX];
-    size_t data_count = displayif_pin_seq_to_ints(vals[ARG_data].u_obj, data_pins, ESP_LCD_I80_BUS_WIDTH_MAX);
+    size_t data_count = displayif_esp32_pin_seq_to_gpios(vals[ARG_data].u_obj, data_pins, ESP_LCD_I80_BUS_WIDTH_MAX);
     if (data_count != 8 && data_count != 16) {
         mp_raise_ValueError(MP_ERROR_TEXT("data must be 8 or 16 pins"));
     }
 
+    int dc_pin = displayif_esp32_pin_gpio(vals[ARG_dc].u_obj);
+    int cs_pin = (vals[ARG_cs].u_obj == MP_OBJ_NULL) ? -1 : displayif_esp32_pin_gpio(vals[ARG_cs].u_obj);
+    int wr_pin = displayif_esp32_pin_gpio(vals[ARG_wr].u_obj);
+
     i80bus_obj_t *self = mp_obj_malloc(i80bus_obj_t, type);
     self->bus = NULL;
     self->io = NULL;
-    self->has_cs = vals[ARG_cs].u_int >= 0;
+    self->has_cs = cs_pin >= 0;
 
     esp_lcd_i80_bus_config_t bus_config = {
         .clk_src = LCD_CLK_SRC_DEFAULT,
-        .dc_gpio_num = vals[ARG_dc].u_int,
-        .wr_gpio_num = vals[ARG_wr].u_int,
+        .dc_gpio_num = dc_pin,
+        .wr_gpio_num = wr_pin,
         .bus_width = data_count,
         .max_transfer_bytes = 65536,
         .dma_burst_size = 64,
@@ -87,7 +92,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     i80bus_raise_esp_err(esp_lcd_new_i80_bus(&bus_config, &self->bus));
 
     esp_lcd_panel_io_i80_config_t io_config = {
-        .cs_gpio_num = self->has_cs ? vals[ARG_cs].u_int : -1,
+        .cs_gpio_num = self->has_cs ? cs_pin : -1,
         .pclk_hz = vals[ARG_freq].u_int,
         .trans_queue_depth = 10,
         .lcd_cmd_bits = 8,
@@ -153,6 +158,38 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     MP_TYPE_FLAG_NONE,
     make_new, i80bus_make,
     locals_dict, &i80bus_locals_dict
+);
+
+static const mp_rom_map_elem_t i80bus_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_i80bus) },
+    { MP_ROM_QSTR(MP_QSTR_I80Bus), MP_ROM_PTR(&i80bus_type) },
+};
+static MP_DEFINE_CONST_DICT(i80bus_module_globals, i80bus_module_globals_table);
+
+const mp_obj_module_t i80bus_user_cmodule = {
+    .base = { &mp_type_module },
+    .globals = (mp_obj_dict_t *)&i80bus_module_globals,
+};
+
+MP_REGISTER_MODULE(MP_QSTR_i80bus, i80bus_user_cmodule);
+
+#else /* SOC_LCD_I80_SUPPORTED */
+
+#include "py/runtime.h"
+
+static mp_obj_t i80bus_unsupported_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+    (void)type;
+    (void)n_args;
+    (void)n_kw;
+    (void)args;
+    mp_raise_msg(&mp_type_NotImplementedError, MP_ERROR_TEXT("esp_lcd I80 bus not supported on this SoC"));
+}
+
+static MP_DEFINE_CONST_OBJ_TYPE(
+    i80bus_type,
+    MP_QSTR_I80Bus,
+    MP_TYPE_FLAG_NONE,
+    make_new, i80bus_unsupported_make
 );
 
 static const mp_rom_map_elem_t i80bus_module_globals_table[] = {

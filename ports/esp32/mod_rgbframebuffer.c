@@ -9,16 +9,20 @@
 #include "py/binary.h"
 #include "displayif/mp_helpers.h"
 
-#define RGBFB_MAX_DATA_PINS 16
+#define RGBFB_MAX_DATA_PINS 18
 
 #if defined(ESP_PLATFORM)
 #include "esp_heap_caps.h"
 #include "esp_err.h"
+#include "soc/soc_caps.h"
+#if SOC_LCD_RGB_SUPPORTED
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_cache.h"
-#include "soc/soc_caps.h"
 #endif
+#endif
+
+#include "displayif_esp32_pins.h"
 
 typedef struct _rgbframebuffer_obj_t {
     mp_obj_base_t base;
@@ -46,6 +50,8 @@ typedef struct _rgbframebuffer_obj_t {
     bool pclk_active_high;
     bool pclk_idle_high;
     int overscan_left;
+    uint8_t bits_per_pixel;
+    bool rgb666_layout;
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     esp_lcd_panel_handle_t panel;
     bool panel_ready;
@@ -91,11 +97,11 @@ static void rgbframebuffer_fill_data_pins(rgbframebuffer_obj_t *self, mp_obj_t r
     size_t count = 0;
 
     if (data != MP_OBJ_NULL) {
-        count = displayif_pin_tuple_to_ints(data, pins, RGBFB_MAX_DATA_PINS);
+        count = displayif_esp32_pin_seq_to_gpios(data, pins, RGBFB_MAX_DATA_PINS);
     } else {
-        size_t n_red = displayif_pin_tuple_to_ints(red, pins, RGBFB_MAX_DATA_PINS);
-        size_t n_green = displayif_pin_tuple_to_ints(green, pins + n_red, RGBFB_MAX_DATA_PINS - n_red);
-        size_t n_blue = displayif_pin_tuple_to_ints(blue, pins + n_red + n_green,
+        size_t n_red = displayif_esp32_pin_seq_to_gpios(red, pins, RGBFB_MAX_DATA_PINS);
+        size_t n_green = displayif_esp32_pin_seq_to_gpios(green, pins + n_red, RGBFB_MAX_DATA_PINS - n_red);
+        size_t n_blue = displayif_esp32_pin_seq_to_gpios(blue, pins + n_red + n_green,
             RGBFB_MAX_DATA_PINS - n_red - n_green);
         count = n_red + n_green + n_blue;
     }
@@ -118,7 +124,7 @@ static void rgbframebuffer_init_panel(rgbframebuffer_obj_t *self) {
     esp_lcd_rgb_panel_config_t panel_config = {
         .clk_src = LCD_CLK_SRC_DEFAULT,
         .data_width = self->data_pin_count,
-        .bits_per_pixel = 16,
+        .bits_per_pixel = self->bits_per_pixel,
         .num_fbs = 1,
         .dma_burst_size = 64,
         .hsync_gpio_num = self->hsync_pin,
@@ -246,10 +252,10 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     }
     memset(self->buf, 0, self->buf_len);
 
-    self->de_pin = displayif_pin_id(vals[ARG_de].u_obj);
-    self->vsync_pin = displayif_pin_id(vals[ARG_vsync].u_obj);
-    self->hsync_pin = displayif_pin_id(vals[ARG_hsync].u_obj);
-    self->dclk_pin = displayif_pin_id(vals[ARG_dclk].u_obj);
+    self->de_pin = displayif_esp32_pin_gpio(vals[ARG_de].u_obj);
+    self->vsync_pin = displayif_esp32_pin_gpio(vals[ARG_vsync].u_obj);
+    self->hsync_pin = displayif_esp32_pin_gpio(vals[ARG_hsync].u_obj);
+    self->dclk_pin = displayif_esp32_pin_gpio(vals[ARG_dclk].u_obj);
     self->frequency = vals[ARG_frequency].u_int;
     self->hsync_pulse_width = vals[ARG_hsync_pulse_width].u_int;
     self->hsync_front_porch = vals[ARG_hsync_front_porch].u_int;
@@ -263,12 +269,17 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     self->pclk_active_high = vals[ARG_pclk_active_high].u_bool;
     self->pclk_idle_high = vals[ARG_pclk_idle_high].u_bool;
     self->overscan_left = vals[ARG_overscan_left].u_int;
+    self->rgb666_layout = rgb666;
+    self->bits_per_pixel = 16;
 
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     self->panel = NULL;
     self->panel_ready = false;
     rgbframebuffer_fill_data_pins(self, vals[ARG_red].u_obj, vals[ARG_green].u_obj,
         vals[ARG_blue].u_obj, vals[ARG_data].u_obj);
+    if (rgb666 && self->data_pin_count == 18) {
+        self->bits_per_pixel = 18;
+    }
 #else
     self->data_pin_count = 0;
 #endif

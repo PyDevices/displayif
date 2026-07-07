@@ -2,6 +2,7 @@
 // ESP32 Protomatter timer backend for rgbmatrix.
 
 #include "displayif/rgbmatrix_pm.h"
+#include "displayif_esp32_pins.h"
 
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
 
@@ -63,14 +64,9 @@ void displayif_rgbmatrix_pm_set_active(void *core) {
     _PM_protoPtr = core;
 }
 
-#include "displayif/mp_helpers.h"
-#include "machine_pin.h"
-
 uint8_t displayif_rgbmatrix_pm_pin_index(uint8_t pm_slot, mp_obj_t pin_obj) {
     (void)pm_slot;
-    mp_obj_t pin = displayif_obj_is_pin(pin_obj) ? pin_obj : displayif_pin_resolve(pin_obj);
-    const machine_pin_obj_t *pin_ptr = pin;
-    return (uint8_t)(pin_ptr - machine_pin_obj_table);
+    return (uint8_t)displayif_esp32_pin_gpio(pin_obj);
 }
 
 #endif /* DISPLAYIF_RGBMATRIX_USE_PROTOMATTER */
