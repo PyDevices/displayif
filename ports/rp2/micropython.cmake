@@ -12,11 +12,13 @@ target_sources(displayif_rp2 INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/rp2/mod_i80bus.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_rgbframebuffer.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_mipidsi.c
+    ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_picodvi.c
 )
 
 target_compile_definitions(displayif_rp2 INTERFACE
     DISPLAYIF_STUB_RGBFRAMEBUFFER_MSG="RP2040 has no native RGB LCD scanout"
     DISPLAYIF_STUB_MIPIDSI_MSG="RP2040 has no MIPI DSI host"
+    DISPLAYIF_STUB_PICODVI_MSG="picodvi backend not implemented on rp2 yet"
 )
 
 target_link_libraries(displayif_rp2 INTERFACE
