@@ -21,11 +21,12 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 | `ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends — verified** |
 | `ports/rp2` | `spibus` / `i2cbus` | **BusDisplay** |
 | `ports/rp2` | `i80bus` | bus driver | **2 — PIO+DMA (pico-sdk)** |
-| `ports/rp2` | `picodvi` (stub) | **FBDisplay** | **2 — RP2040 PIO / RP2350 HSTX** |
+| `ports/rp2` | `picodvi` | **FBDisplay** | **2 — RP2040 PIO (libdvi) / RP2350 HSTX** |
 | `ports/rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter** |
-| `ports/mimxrt` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
+| `ports/mimxrt` | `rgbframebuffer` | **FBDisplay** | **2 — eLCDIF on MIMXRT1062 (1060-EVK / RK043)** |
+| `ports/mimxrt` | `mipidsi` | **FBDisplay** | **2 — MIPI DSI on MIMXRT1176 (LCDIFV2 bridge)** |
+| `ports/mimxrt` | `i80bus` (stub) | bus driver | FlexIO I80 TBD |
 | `ports/samd` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
-| `ports/mimxrt` | TBD | TBD | FlexIO I80 / LCDIF later |
 
 All parallel dot-clock RGB panels (RGB-666 **and** 16-pin RGB565 wiring) use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
 
@@ -112,7 +113,7 @@ Add `packages/rgbframebuffer.json` pointing at board configs that need it (Quali
 | `fbdisplay/rgb_matrix_featherwing_64x32` | `rgbmatrix` | `cp_rgb_matrix_featherwing_64x32` |
 | `fbdisplay/qualia_tl040hds20` | `rgbframebuffer` | `cp_qualia_tl040hds20` |
 | `fbdisplay/mimxrt1060_evk_rk043_rgb` | `rgbframebuffer` | `cp_mimxrt1060_evk_rk043_rgb` |
-| `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` | `cp_mimxrt1170_evk_waveshare_5dsi` |
+| `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` | `cp_mimxrt1170_evk_waveshare_5dsi` (Waveshare 50H-800480-IPS via **TC358762** DSI bridge) |
 | `fbdisplay/pimoroni_pico_dv_base_640x480` | `picodvi` | `cp_pimoroni_pico_dv_base_640x480` |
 | `fbdisplay/pico2_dvi_sock_640x480` | `picodvi` | `cp_pico2_dvi_sock_640x480` |
 | `fbdisplay/feather_rp2040_rgb_matrix_64x32` | `rgbmatrix` | `cp_rgb_matrix_featherwing_64x32` |
@@ -129,10 +130,9 @@ displayif/
 ├── ports/
 │   ├── common/          # spi/ + micropython.mk / .cmake / circuitpython.mk
 │   ├── esp32/           # rgbframebuffer, i80bus, mipidsi, rgbmatrix (S3)
-│   ├── mimxrt/          # rgbmatrix Protomatter (1062); stubs for rgbframebuffer/i80/mipidsi
+│   ├── mimxrt/          # rgbmatrix Protomatter (1062); eLCDIF rgbframebuffer; RT1176 mipidsi; i80bus stub
 │   ├── samd/            # rgbmatrix Protomatter (SAMD51); stubs for rgbframebuffer/i80/mipidsi
-│   └── rp2/             # rgbmatrix Protomatter; i80bus PIO+DMA; picodvi stub
-│   └── mimxrt/
+│   └── rp2/             # rgbmatrix Protomatter; i80bus PIO+DMA; picodvi (RP2040/RP2350)
 └── tests/
 ```
 
@@ -187,9 +187,12 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 3. `ports/common/spi/mod_spibus.c` + smoke test (done)
 4. `ports/esp32/mod_rgbframebuffer.c` — buffer protocol + ESP-IDF `refresh()` scanout (done)
 5. `ports/esp32/mod_i80bus.c`, `mod_mipidsi.c` — accelerated bus/display drivers (done)
-6. Qualia + parallel-RGB hardware validation
-7. `rgbmatrix` Protomatter backends on esp32-S3 / mimxrt-1062 / samd51 (done); extend to other SoCs as needed
-8. CP patch script (`apply_cp_displayif_patches.sh`)
+6. `ports/mimxrt/mod_rgbframebuffer_elcdif.c` — eLCDIF scanout on MIMXRT1062 (done)
+7. `ports/mimxrt/mod_mipidsi.c` + `mimxrt1176_dsi_display.c` — MIPI DSI on RT1176 (done; TC358762 bridge for Waveshare 50H-800480-IPS)
+8. `ports/rp2/mod_picodvi.c` — RP2040 PIO (libdvi) + RP2350 HSTX (done)
+9. Qualia + parallel-RGB hardware validation
+10. `rgbmatrix` Protomatter backends on esp32-S3 / mimxrt-1062 / samd51 (done); extend to other SoCs as needed
+11. CP patch script (`apply_cp_displayif_patches.sh`)
 
 ---
 
@@ -201,4 +204,4 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 
 ---
 
-*Updated 2026-07-07 — All MCU ports (esp32, mimxrt, samd, rp2) accelerated interfaces verified.*
+*Updated 2026-07-07 — SDK drivers shipped: mimxrt eLCDIF rgbframebuffer, RT1176 mipidsi (TC358762 DSI bridge), rp2 picodvi (RP2040/RP2350).*

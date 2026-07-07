@@ -35,5 +35,17 @@ SRC_USERMOD_C += \
 endif
 
 ifeq ($(MCU_SERIES),MIMXRT1062)
+SRC_USERMOD_C := $(filter-out $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_i80bus.c,$(SRC_USERMOD_C))
+SRC_USERMOD_C += \
+    $(DISPLAYIF_MOD_DIR)/ports/mimxrt/mod_i80bus.c \
+    $(DISPLAYIF_NXP_SDK)/drivers/flexio/mculcd/fsl_flexio_mculcd.c \
+    $(DISPLAYIF_NXP_SDK)/drivers/flexio/fsl_flexio.c
+CFLAGS_USERMOD += \
+    -DFLEXIO_MCULCD_DATA_BUS_WIDTH=8 \
+    -I$(DISPLAYIF_NXP_SDK)/drivers/flexio/mculcd \
+    -I$(DISPLAYIF_NXP_SDK)/drivers/flexio
+endif
+
+ifeq ($(MCU_SERIES),MIMXRT1062)
 SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/ports/mimxrt/rgbmatrix_pm.c
 endif

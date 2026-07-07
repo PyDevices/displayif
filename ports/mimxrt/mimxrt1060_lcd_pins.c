@@ -1,5 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // NXP MIMXRT1060-EVK LCDIF pin mux (from MCUXpresso BOARD_InitLCDPins).
+//
+// Fixed EVK routing only — mod_rgbframebuffer_elcdif validates constructor pin
+// arguments against these pads but does not mux arbitrary pins.
 
 #include "fsl_iomuxc.h"
 #include "fsl_clock.h"

@@ -33,4 +33,8 @@ void displayif_mimxrt1176_dsi_set_framebuffer(uint8_t *buf);
 void displayif_mimxrt1176_dsi_lcdifv2_start(uint8_t *buf);
 status_t displayif_mimxrt1176_dsi_send_init_sequence(const uint8_t *init_sequence, size_t init_len);
 
+// TC358762 DSI-to-DPI bridge (Raspberry Pi / Waveshare 50H-800480-IPS class panels).
+status_t displayif_mimxrt1176_dsi_generic_write_reg(uint16_t reg, uint32_t value);
+status_t displayif_mimxrt1176_dsi_init_tc358762_bridge(uint8_t num_lanes);
+
 #endif /* DISPLAYIF_MIMXRT1176_DSI_DISPLAY_H */

@@ -22,6 +22,23 @@
 #define DISPLAYIF_MIPI_DPHY_BIT_CLK_ENLARGE(origin) (((origin) / 8U) * 9U)
 #define DISPLAYIF_DSI_INIT_DELAY_FLAG 0x80U
 
+/* TC358762 register addresses (Linux panel-raspberrypi-touchscreen.c). */
+#define DISPLAYIF_TC358762_DSI_LANEENABLE        0x0210U
+#define DISPLAYIF_TC358762_PPI_D0S_CLRSIPOCOUNT 0x0164U
+#define DISPLAYIF_TC358762_PPI_D1S_CLRSIPOCOUNT 0x0168U
+#define DISPLAYIF_TC358762_PPI_D0S_ATMR          0x0144U
+#define DISPLAYIF_TC358762_PPI_D1S_ATMR          0x0148U
+#define DISPLAYIF_TC358762_PPI_LPTXTIMECNT     0x0114U
+#define DISPLAYIF_TC358762_SPICMR                0x0450U
+#define DISPLAYIF_TC358762_LCDCTRL               0x0420U
+#define DISPLAYIF_TC358762_SYSCTRL               0x0464U
+#define DISPLAYIF_TC358762_PPI_STARTPPI          0x0104U
+#define DISPLAYIF_TC358762_DSI_STARTDSI          0x0204U
+
+#define DISPLAYIF_TC358762_LANE_CLOCK 0x01U
+#define DISPLAYIF_TC358762_LANE_D0     0x02U
+#define DISPLAYIF_TC358762_LANE_D1     0x04U
+
 static const MIPI_DSI_Type s_mipi_dsi = {
     .host = DSI_HOST,
     .apb = DSI_HOST_APB_PKT_IF,
@@ -129,6 +146,94 @@ static void displayif_set_mipi_dsi_config(uint8_t num_lanes, const displayif_mim
 
 static status_t displayif_dsi_transfer_blocking(dsi_transfer_t *xfer) {
     return DSI_TransferBlocking(&s_mipi_dsi, xfer);
+}
+
+status_t displayif_mimxrt1176_dsi_generic_write_reg(uint16_t reg, uint32_t value) {
+    uint8_t payload[6] = {
+        (uint8_t)(reg & 0xFFU),
+        (uint8_t)(reg >> 8),
+        (uint8_t)(value & 0xFFU),
+        (uint8_t)((value >> 8) & 0xFFU),
+        (uint8_t)((value >> 16) & 0xFFU),
+        (uint8_t)((value >> 24) & 0xFFU),
+    };
+
+    dsi_transfer_t xfer = {0};
+    xfer.virtualChannel = 0;
+    xfer.flags = kDSI_TransferUseHighSpeed;
+    xfer.txDataType = kDSI_TxDataGenLongWr;
+    xfer.txDataSize = sizeof(payload);
+    xfer.txData = payload;
+    xfer.sendDscCmd = false;
+    return displayif_dsi_transfer_blocking(&xfer);
+}
+
+status_t displayif_mimxrt1176_dsi_init_tc358762_bridge(uint8_t num_lanes) {
+    if (num_lanes == 0 || num_lanes > DISPLAYIF_MIPI_DSI_LANE_NUM_MAX) {
+        return kStatus_InvalidArgument;
+    }
+
+    uint32_t lane_enable = DISPLAYIF_TC358762_LANE_CLOCK;
+    if (num_lanes >= 1) {
+        lane_enable |= DISPLAYIF_TC358762_LANE_D0;
+    }
+    if (num_lanes >= 2) {
+        lane_enable |= DISPLAYIF_TC358762_LANE_D1;
+    }
+
+    status_t status;
+
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_DSI_LANEENABLE, lane_enable);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_PPI_D0S_CLRSIPOCOUNT, 0x05U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_PPI_D1S_CLRSIPOCOUNT, 0x05U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_PPI_D0S_ATMR, 0x00U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_PPI_D1S_ATMR, 0x00U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_PPI_LPTXTIMECNT, 0x03U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_SPICMR, 0x00U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    /* RGB888 DPI, HSYNC/VSYNC active low — matches vc4-kms-dsi-7inch / RPi firmware. */
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_LCDCTRL, 0x00100150U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_SYSCTRL, 0x040fU);
+    if (status != kStatus_Success) {
+        return status;
+    }
+
+    mp_hal_delay_ms(100);
+
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_PPI_STARTPPI, 0x01U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+    status = displayif_mimxrt1176_dsi_generic_write_reg(DISPLAYIF_TC358762_DSI_STARTDSI, 0x01U);
+    if (status != kStatus_Success) {
+        return status;
+    }
+
+    mp_hal_delay_ms(100);
+    return kStatus_Success;
 }
 
 status_t displayif_mimxrt1176_dsi_send_init_sequence(const uint8_t *init_sequence, size_t init_len) {
@@ -290,6 +395,12 @@ status_t displayif_mimxrt1176_dsi_display_start(const displayif_mimxrt1176_dsi_t
     displayif_gpio_reset(reset_pin);
     if (init_sequence != NULL && init_len > 0) {
         status_t status = displayif_mimxrt1176_dsi_send_init_sequence(init_sequence, init_len);
+        if (status != kStatus_Success) {
+            return status;
+        }
+    } else {
+        /* Waveshare 50H-800480-IPS / RPi 7" class: TC358762 DSI-to-DPI bridge. */
+        status_t status = displayif_mimxrt1176_dsi_init_tc358762_bridge(timings->num_lanes);
         if (status != kStatus_Success) {
             return status;
         }
