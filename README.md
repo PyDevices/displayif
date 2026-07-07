@@ -4,7 +4,7 @@ Native display **interface** cmods for pydisplay. Portable code in `ports/common
 
 pydisplay MP board configs that raise `NotImplementedError` are waiting on modules built here. Native C modules register directly — **no Python re-export layer** in this repo.
 
-**Status:** Phase 1 `spibus` shipped. ESP32 accelerated interfaces complete. mimxrt Protomatter `rgbmatrix` verified on TEENSY40/41. See [HANDOFF.md](HANDOFF.md).
+**Status:** Phase 1 `spibus` shipped. ESP32, mimxrt, and samd accelerated `rgbmatrix` verified. See [HANDOFF.md](HANDOFF.md).
 
 ## Native modules
 
@@ -25,6 +25,7 @@ cd ~/github/cmods
 git clone https://github.com/PyDevices/displayif.git displayif
 ./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
 ./build_mp.sh --port mimxrt --board TEENSY41
+./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
 ```
 
 ## Related

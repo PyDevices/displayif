@@ -11,6 +11,7 @@
 
 ```bash
 # After cmods build with displayif:
+./micropython/ports/samd/build-ADAFRUIT_METRO_M4_EXPRESS/micropython displayif/tests/test_rgbmatrix_smoke.py
 ./micropython/ports/mimxrt/build-TEENSY41/micropython displayif/tests/test_rgbmatrix_smoke.py
 ./micropython/ports/esp32/build-*/micropython displayif/tests/test_rgbframebuffer_smoke.py
 ```
