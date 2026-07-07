@@ -15,10 +15,10 @@ On SoCs without the matching peripheral, modules import but constructors raise `
 
 Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings (via `displayif_pin_resolve`).
 
-`RGBFrameBuffer` mirrors CP `dotclockframebuffer.DotClockFramebuffer`. Supports RGB-666 pin tuples (`red`/`green`/`blue`) and 16-pin RGB565 (`data=`) layouts via constructor — one driver, not separate backends.
+`RGBFrameBuffer` mirrors CircuitPython `dotclockframebuffer.DotClockFramebuffer`. Supports RGB-666 pin tuples (`red`/`green`/`blue`) and 16-pin RGB565 (`data=`) layouts.
 
-Do not use `rgb565` as a module name (color helper collision). No `present()` / panel API.
+Large framebuffers use **PSRAM** when available — see [HANDOFF.md](../../HANDOFF.md#esp32-psram--sdkconfig-large-framebuffers).
 
 ## Build
 
-`micropython.mk`, `micropython.cmake`, and `circuitpython.mk` in this directory are included when building the esp32 / espressif port.
+`micropython.mk` and `micropython.cmake` in this directory are included when building the esp32 port.

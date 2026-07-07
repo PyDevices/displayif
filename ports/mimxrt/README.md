@@ -57,7 +57,7 @@ Non-1062 mimxrt boards get stub `rgbframebuffer`; non-1176 boards get stub `mipi
 
 CircuitPython board configs for the same hardware live under pydisplay `cp_*` (use CP native modules, not displayif).
 
-On MIMXRT1062 boards, `rgbmatrix` uses the **Protomatter** backend (PIT timer ISR + GPIO set/clear registers). Other mimxrt chips (RT1011, RT1170, …) still get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
+On MIMXRT1062 boards, `rgbmatrix` uses the **Protomatter** backend (PIT timer ISR + GPIO set/clear registers). Other mimxrt chips still get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
 
 Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings.
 

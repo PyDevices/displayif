@@ -5,7 +5,7 @@
 | `test_spi_smoke.py` | MCU with SPI (`rp2`, `esp32`, …) | native `spibus` |
 | `test_rgbframebuffer_smoke.py` | `esp32` (RGB LCD SoC) | buffer protocol; `refresh()` uses esp_lcd scanout |
 | `test_mimxrt_rgbframebuffer_smoke.py` | `mimxrt` (MIMXRT1062) | small buffer; `refresh()` uses eLCDIF scanout |
-| `test_i80bus_smoke.py` | `esp32-S3`, `rp2` | import `I80Bus` |
+| `test_i80bus_smoke.py` | `esp32-S3`, `rp2`, `mimxrt` (1062), `samd` (SAMD51) | import `I80Bus` |
 | `test_mipidsi_smoke.py` | `esp32p4` | import `Bus` / `Display`; full panel needs Waveshare 4B hardware |
 | `test_mimxrt_mipidsi_smoke.py` | `mimxrt` (MIMXRT1176) | import `Bus` / `Display`; full panel needs MIMXRT1170-EVK + Waveshare 5\" DSI |
 | `test_picodvi_smoke.py` | `rp2` | import `Framebuffer`; smallest mode (320x240); full DVI needs Pico DV hardware |
