@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: MIT
 // Dot-clock RGB framebuffer for mimxrt (NXP eLCDIF) — MIMXRT1060-EVK / RK043 shield.
+//
+// Constructor pin arguments are validated against the EVK LCDIF pad routing
+// (BOARD_InitLCDPins / RK043 shield). IOMUX is applied from mimxrt1060_lcd_pins.c
+// and is not configurable for arbitrary pins.
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "py/runtime.h"
 #include "py/obj.h"
@@ -10,9 +15,14 @@
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
 #include "displayif_mimxrt.h"
+#include "pin.h"
 
 #include "fsl_elcdif.h"
 #include "fsl_clock.h"
+
+#define RGBFB_LCDIF_FREQ_MIN_HZ 1000000u
+#define RGBFB_LCDIF_FREQ_MAX_HZ 65000000u
+#define RGBFB_LCDIF_DATA_PIN_COUNT 16u
 
 #if defined(MIMXRT1062) || defined(CPU_MIMXRT1062) || defined(__IMXRT1062__)
 
@@ -69,12 +79,83 @@ static void rgbframebuffer_raise_status(status_t status) {
     mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("NXP SDK status %d"), (int)status);
 }
 
+static const clock_name_t rgbframebuffer_lcdif_mux_sources[] = {
+    kCLOCK_SysPllClk,
+    kCLOCK_Usb1PllPfd3Clk,
+    kCLOCK_VideoPllClk,
+    kCLOCK_SysPllPfd0Clk,
+    kCLOCK_SysPllPfd1Clk,
+    kCLOCK_Usb1PllPfd1Clk,
+};
+
+static void rgbframebuffer_validate_evk_pin(const machine_pin_obj_t *pin, GPIO_Type *exp_gpio, uint32_t exp_bit) {
+    if (pin->gpio != exp_gpio || pin->pin != exp_bit) {
+        mp_raise_ValueError(MP_ERROR_TEXT(
+            "pin does not match MIMXRT1060-EVK LCDIF routing; IOMUX is EVK-fixed"));
+    }
+}
+
+static void rgbframebuffer_validate_evk_pins(mp_obj_t de, mp_obj_t vsync, mp_obj_t hsync, mp_obj_t dclk, mp_obj_t data) {
+    rgbframebuffer_validate_evk_pin(pin_find(de), GPIO2, 1);
+    rgbframebuffer_validate_evk_pin(pin_find(vsync), GPIO2, 3);
+    rgbframebuffer_validate_evk_pin(pin_find(hsync), GPIO2, 2);
+    rgbframebuffer_validate_evk_pin(pin_find(dclk), GPIO2, 0);
+
+    mp_obj_t data_pins[RGBFB_LCDIF_DATA_PIN_COUNT];
+    size_t count = displayif_pin_seq_to_objs(data, data_pins, RGBFB_LCDIF_DATA_PIN_COUNT);
+    if (count != RGBFB_LCDIF_DATA_PIN_COUNT) {
+        mp_raise_ValueError(MP_ERROR_TEXT("data must be a 16-pin sequence for RGB565"));
+    }
+    for (size_t i = 0; i < RGBFB_LCDIF_DATA_PIN_COUNT; i++) {
+        rgbframebuffer_validate_evk_pin(pin_find(data_pins[i]), GPIO2, 4 + i);
+    }
+}
+
+static void rgbframebuffer_init_lcdif_clock(uint32_t target_hz) {
+    CLOCK_DisableClock(kCLOCK_LcdPixel);
+
+    uint32_t best_diff = UINT32_MAX;
+    uint32_t best_mux = 5;
+    uint32_t best_pre = 1;
+    uint32_t best_div = 3;
+
+    for (size_t mux = 0; mux < MP_ARRAY_SIZE(rgbframebuffer_lcdif_mux_sources); mux++) {
+        uint32_t src_hz = CLOCK_GetFreq(rgbframebuffer_lcdif_mux_sources[mux]);
+        if (src_hz == 0) {
+            continue;
+        }
+        for (uint32_t pre = 0; pre < 8; pre++) {
+            uint32_t mid_hz = src_hz / (pre + 1);
+            for (uint32_t div = 0; div < 8; div++) {
+                uint32_t out_hz = mid_hz / (div + 1);
+                uint32_t diff = (out_hz > target_hz) ? (out_hz - target_hz) : (target_hz - out_hz);
+                if (diff < best_diff) {
+                    best_diff = diff;
+                    best_mux = (uint32_t)mux;
+                    best_pre = pre;
+                    best_div = div;
+                }
+            }
+        }
+    }
+
+    if (best_diff == UINT32_MAX) {
+        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("unable to derive LCDIF pixel clock"));
+    }
+
+    CLOCK_SetMux(kCLOCK_LcdifPreMux, best_mux);
+    CLOCK_SetDiv(kCLOCK_LcdifPreDiv, best_pre);
+    CLOCK_SetDiv(kCLOCK_LcdifDiv, best_div);
+    CLOCK_EnableClock(kCLOCK_LcdPixel);
+}
+
 static void rgbframebuffer_init_elcdif(rgbframebuffer_obj_t *self) {
     if (self->elcdif_ready) {
         return;
     }
 
     displayif_mimxrt1060_init_lcd_pins();
+    rgbframebuffer_init_lcdif_clock(self->frequency);
 
     elcdif_rgb_mode_config_t config;
     ELCDIF_RgbModeGetDefaultConfig(&config);
@@ -94,7 +175,6 @@ static void rgbframebuffer_init_elcdif(rgbframebuffer_obj_t *self) {
     ELCDIF_RgbModeInit(LCDIF, &config);
     ELCDIF_RgbModeStart(LCDIF);
     self->elcdif_ready = true;
-    (void)self->frequency;
 }
 
 static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -162,15 +242,14 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     if (vals[ARG_width].u_int <= 0 || vals[ARG_height].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("width and height must be positive"));
     }
-    if (vals[ARG_frequency].u_int <= 0) {
-        mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
+    if (vals[ARG_frequency].u_int < RGBFB_LCDIF_FREQ_MIN_HZ
+        || vals[ARG_frequency].u_int > RGBFB_LCDIF_FREQ_MAX_HZ) {
+        mp_raise_ValueError(MP_ERROR_TEXT("frequency out of range (1-65 MHz)"));
     }
+    rgbframebuffer_validate_evk_pins(vals[ARG_de].u_obj, vals[ARG_vsync].u_obj,
+        vals[ARG_hsync].u_obj, vals[ARG_dclk].u_obj, vals[ARG_data].u_obj);
     (void)vals[ARG_overscan_left];
     (void)vals[ARG_pclk_idle_high];
-    (void)vals[ARG_de];
-    (void)vals[ARG_vsync];
-    (void)vals[ARG_hsync];
-    (void)vals[ARG_dclk];
 
     rgbframebuffer_obj_t *self = mp_obj_malloc(rgbframebuffer_obj_t, type);
     self->width = vals[ARG_width].u_int;
