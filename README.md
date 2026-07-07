@@ -12,9 +12,10 @@ pydisplay MP board configs that raise `NotImplementedError` are waiting on modul
 |--------|-----------|-------------------|
 | `spibus` / `i2cbus` | `common` | **BusDisplay** |
 | `rgbframebuffer` | `esp32` (RGB LCD SoCs) | **FBDisplay** |
-| `i80bus` | `esp32` (S3 I80) | bus driver |
+| `i80bus` | `esp32` (S3 I80), `rp2` (PIO+DMA) | bus driver |
 | `mipidsi` | `esp32` (P4 MIPI DSI) | **FBDisplay** |
 | `rgbmatrix` | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2` | **FBDisplay** |
+| `rgbframebuffer` / `mipidsi` / `i80bus` stubs | `mimxrt`, `samd`; `rgbframebuffer`+`mipidsi` on `rp2` | import ok; ctor raises |
 
 Parallel dot-clock RGB (RGB-666 and 16-pin RGB565) both use `rgbframebuffer.RGBFrameBuffer` — no `RGBDisplay`.
 

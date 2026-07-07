@@ -19,7 +19,12 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 | `ports/esp32` | `i80bus` | bus driver | **2 — esp_lcd I80 (ESP32-S3)** |
 | `ports/esp32` | `mipidsi` | **FBDisplay** | **2 — ESP32-P4 MIPI DSI** |
 | `ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends — verified** |
-| `ports/mimxrt` | TBD | TBD | later |
+| `ports/rp2` | `spibus` / `i2cbus` | **BusDisplay** |
+| `ports/rp2` | `i80bus` | bus driver | **2 — PIO+DMA (pico-sdk)** |
+| `ports/rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter** |
+| `ports/mimxrt` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
+| `ports/samd` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
+| `ports/mimxrt` | TBD | TBD | FlexIO I80 / LCDIF later |
 
 All parallel dot-clock RGB panels (RGB-666 **and** 16-pin RGB565 wiring) use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
 
@@ -118,9 +123,9 @@ displayif/
 ├── ports/
 │   ├── common/          # spi/ + micropython.mk / .cmake / circuitpython.mk
 │   ├── esp32/           # rgbframebuffer, i80bus, mipidsi, rgbmatrix (S3)
-│   ├── mimxrt/          # rgbmatrix Protomatter (1062)
-│   ├── samd/            # rgbmatrix Protomatter (SAMD51)
-│   └── rp2/             # rgbmatrix Protomatter (RP2040/2350)
+│   ├── mimxrt/          # rgbmatrix Protomatter (1062); stubs for rgbframebuffer/i80/mipidsi
+│   ├── samd/            # rgbmatrix Protomatter (SAMD51); stubs for rgbframebuffer/i80/mipidsi
+│   └── rp2/             # rgbmatrix Protomatter; i80bus PIO+DMA; rgbframebuffer/mipidsi stubs
 │   └── mimxrt/
 └── tests/
 ```
