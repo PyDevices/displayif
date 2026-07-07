@@ -33,8 +33,8 @@ static mp_obj_t picodvi_framebuffer_make(const mp_obj_type_t *type, size_t n_arg
         ARG_color_depth,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_POSITIONAL, { .u_int = 0 } },
-        { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_POSITIONAL, { .u_int = 0 } },
+        { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_clk_dp, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_clk_dn, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_red_dp, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },

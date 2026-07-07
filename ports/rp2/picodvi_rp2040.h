@@ -5,6 +5,7 @@
 #define PICODVI_RP2040_H
 
 #include "py/obj.h"
+#include "dvi.h"
 
 typedef struct _picodvi_framebuffer_obj_t {
     mp_obj_base_t base;

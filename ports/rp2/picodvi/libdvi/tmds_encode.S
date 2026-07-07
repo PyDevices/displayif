@@ -29,7 +29,7 @@
 #endif
 
 .macro decl_func_x name
-.section .scratch_x.\name, "ax"
+.section .time_critical.\name, "ax"
 .global \name
 #ifdef __arm__
 .type \name,%function
@@ -39,7 +39,7 @@
 .endm
 
 .macro decl_func_y name
-.section .scratch_y.\name, "ax"
+.section .time_critical.\name, "ax"
 .global \name
 #ifdef __arm__
 .type \name,%function

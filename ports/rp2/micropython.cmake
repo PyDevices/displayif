@@ -29,6 +29,7 @@ else()
         ${PICODVI_LIBDVI_DIR}/dvi_serialiser.c
         ${PICODVI_LIBDVI_DIR}/dvi_timing.c
         ${PICODVI_LIBDVI_DIR}/tmds_encode.c
+        ${PICODVI_LIBDVI_DIR}/tmds_encode.S
     )
 endif()
 
@@ -42,11 +43,10 @@ target_link_libraries(displayif_rp2 INTERFACE
     hardware_irq
     hardware_pio
     hardware_dma
+    hardware_gpio
+    hardware_interp
     hardware_sync_spin_lock
     pico_stdlib
     pico_multicore
+    pico_util
 )
-
-if(PICO_RP2350)
-    target_link_libraries(displayif_rp2 INTERFACE hardware_hstx)
-endif()

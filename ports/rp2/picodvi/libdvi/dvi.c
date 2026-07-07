@@ -10,7 +10,7 @@
 // Time-critical functions pulled into RAM but each in a unique section to
 // allow garbage collection
 #define __dvi_func(f) __not_in_flash_func(f)
-#define __dvi_func_x(f) __scratch_x(__STRING(f)) f
+#define __dvi_func_x(f) __dvi_func(f)
 
 // We require exclusive use of a DMA IRQ line. (you wouldn't want to share
 // anyway). It's possible in theory to hook both IRQs and have two DVI outs.

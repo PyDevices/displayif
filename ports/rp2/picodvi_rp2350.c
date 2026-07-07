@@ -217,7 +217,7 @@ void picodvi_rp2350_construct(picodvi_framebuffer_obj_t *self,
     };
     for (size_t i = 0; i < 8; i++) {
         if (!(12 <= pins[i] && pins[i] <= 19)) {
-            mp_raise_ValueError(MP_ERROR_TEXT("HSTX DVI pins must be GP12–GP19"));
+            mp_raise_ValueError(MP_ERROR_TEXT("HSTX DVI pins must be GP12-GP19"));
         }
         pins[i] -= 12;
         size_t mask = 1 << pins[i];
@@ -276,7 +276,7 @@ void picodvi_rp2350_construct(picodvi_framebuffer_obj_t *self,
     self->dma_command_channel = dma_claim_unused_channel(false);
     if (self->dma_pixel_channel < 0 || self->dma_command_channel < 0) {
         picodvi_rp2350_deinit(self);
-        mp_raise_RuntimeError(MP_ERROR_TEXT("Internal resource(s) in use"));
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("Internal resource(s) in use"));
         return;
     }
 

@@ -7,7 +7,8 @@ PICODVI_LIBDVI_SRC = \
     $(DISPLAYIF_MOD_DIR)/ports/rp2/picodvi/libdvi/dvi.c \
     $(DISPLAYIF_MOD_DIR)/ports/rp2/picodvi/libdvi/dvi_serialiser.c \
     $(DISPLAYIF_MOD_DIR)/ports/rp2/picodvi/libdvi/dvi_timing.c \
-    $(DISPLAYIF_MOD_DIR)/ports/rp2/picodvi/libdvi/tmds_encode.c
+    $(DISPLAYIF_MOD_DIR)/ports/rp2/picodvi/libdvi/tmds_encode.c \
+    $(DISPLAYIF_MOD_DIR)/ports/rp2/picodvi/libdvi/tmds_encode.S
 
 SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/ports/rp2/rgbmatrix_pm.c \

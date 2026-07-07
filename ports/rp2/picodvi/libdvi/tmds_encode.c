@@ -3,19 +3,16 @@
 #include "hardware/gpio.h"
 #include "hardware/sync.h"
 
-static const __unused uint32_t __scratch_x("tmds_table") tmds_table[] = {
+static const __unused uint32_t tmds_table[] = {
 #include "tmds_table.h"
 };
 
-// Fullres table is bandwidth-critical, so gets one copy for each scratch
-// memory. There is a third copy which can go in flash, because it's just used
-// to generate palette LUTs. The ones we don't use will get garbage collected
-// during linking.
-const __unused uint32_t __scratch_x("tmds_table_fullres_x") tmds_table_fullres_x[] = {
+// Fullres tables live in flash on MicroPython rp2 (no SCRATCH_X region).
+const __unused uint32_t tmds_table_fullres_x[] = {
 #include "tmds_table_fullres.h"
 };
 
-const __unused uint32_t __scratch_y("tmds_table_fullres_y") tmds_table_fullres_y[] = {
+const __unused uint32_t tmds_table_fullres_y[] = {
 #include "tmds_table_fullres.h"
 };
 

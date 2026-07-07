@@ -13,7 +13,7 @@
 #include "hardware/clocks.h"
 #include "hardware/dma.h"
 #include "hardware/irq.h"
-#include "hardware/mpu.h"
+#include "hardware/structs/mpu.h"
 #include "hardware/pio.h"
 #include "hardware/pwm.h"
 #include "hardware/sync.h"
@@ -177,7 +177,7 @@ bool picodvi_rp2040_construct(picodvi_framebuffer_obj_t *self, uint16_t width, u
         }
     }
     if (pio_index == NUM_PIOS) {
-        mp_raise_RuntimeError(MP_ERROR_TEXT("All state machines in use"));
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("All state machines in use"));
     }
 
     self->width = width;
