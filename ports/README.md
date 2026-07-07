@@ -4,9 +4,10 @@ All interface code and **per-port build glue** live here. Folder names match **M
 
 | Directory | When included | MP port | CP port dir |
 |-----------|---------------|---------|-------------|
-| `common/` | MCU builds only | esp32, mimxrt, … | espressif, mimxrt, … |
+| `common/` | MCU builds only | esp32, mimxrt, samd, … | espressif, mimxrt, … |
 | `esp32/` | esp32 builds | `esp32` | `espressif` |
 | `mimxrt/` | mimxrt builds | `mimxrt` | `mimxrt` |
+| `samd/` | samd builds | `samd` | *(CP glue pending)* |
 
 Hardware-specific interfaces (`spibus`, `rgbframebuffer`, …) do **not** build on desktop MicroPython ports (`unix`, `windows`, …).
 

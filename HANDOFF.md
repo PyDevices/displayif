@@ -18,7 +18,7 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 | `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — esp_lcd RGB scanout (SoCs with RGB LCD)** |
 | `ports/esp32` | `i80bus` | bus driver | **2 — esp_lcd I80 (ESP32-S3)** |
 | `ports/esp32` | `mipidsi` | **FBDisplay** | **2 — ESP32-P4 MIPI DSI** |
-| `ports/esp32` / `mimxrt` / `samd` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends** |
+| `ports/esp32` / `mimxrt` / `samd` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends (S3 / 1062 / SAMD51)** |
 | `ports/mimxrt` | TBD | TBD | later |
 
 All parallel dot-clock RGB panels (RGB-666 **and** 16-pin RGB565 wiring) use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
@@ -158,7 +158,8 @@ Framebuffer memory is allocated by the C driver (PSRAM on ESP32). pydisplay draw
 ```bash
 ./build_mp.sh --port rp2 --board RPI_PICO2_W
 ./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
-./build_mp.sh --port mimxrt --board TEENSY40
+./build_mp.sh --port mimxrt --board TEENSY41
+./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
 ```
 
 No `manifest.py` frozen package required unless we later add pure-Python helpers (not planned).
@@ -173,7 +174,7 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 4. `ports/esp32/mod_rgbframebuffer.c` — buffer protocol + ESP-IDF `refresh()` scanout (done)
 5. `ports/esp32/mod_i80bus.c`, `mod_mipidsi.c` — accelerated bus/display drivers (done)
 6. Qualia + parallel-RGB hardware validation
-7. `rgbmatrix` Protomatter backends on esp32-S3 / mimxrt / samd (done); extend to other SoCs as needed
+7. `rgbmatrix` Protomatter backends on esp32-S3 / mimxrt-1062 / samd51 (done); extend to other SoCs as needed
 8. CP patch script (`apply_cp_displayif_patches.sh`)
 
 ---
@@ -186,4 +187,4 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 
 ---
 
-*Updated 2026-07-07 — ESP32 accelerated interfaces complete; pydisplay change list.*
+*Updated 2026-07-07 — ESP32 + mimxrt accelerated interfaces verified; pydisplay change list.*

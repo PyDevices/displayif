@@ -6,10 +6,12 @@
 | `test_rgbframebuffer_smoke.py` | `esp32` (RGB LCD SoC) | buffer protocol; `refresh()` uses esp_lcd scanout |
 | `test_i80bus_smoke.py` | `esp32-S3` | import `I80Bus` |
 | `test_mipidsi_smoke.py` | `esp32p4` | import `Bus` / `Display`; full panel needs Waveshare 4B hardware |
+| `test_rgbmatrix_smoke.py` | MCU with `rgbmatrix` (Protomatter on S3 / 1062 / SAMD51) | buffer + tile height |
+| `test_i2cbus_smoke.py` | MCU with I2C | native `i2cbus` |
 
 ```bash
 # After cmods build with displayif:
-./micropython/ports/rp2/build-*/micropython displayif/tests/test_spi_smoke.py
+./micropython/ports/mimxrt/build-TEENSY41/micropython displayif/tests/test_rgbmatrix_smoke.py
 ./micropython/ports/esp32/build-*/micropython displayif/tests/test_rgbframebuffer_smoke.py
 ```
 
