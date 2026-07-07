@@ -29,7 +29,7 @@
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_BOARD) || \
     defined(__RP2040__) || defined(__RP2350__)
 
-#include "../../hardware_pwm/include/hardware/pwm.h"
+#include "hardware/pwm.h"
 #include "hardware/irq.h"
 #include "hardware/timer.h"
 #include "pico/stdlib.h" // For sio_hw, etc.
@@ -104,6 +104,10 @@ void _PM_timerInit(Protomatter_core* core) {
 }
 
 #elif defined(CIRCUITPY) // COMPILING FOR CIRCUITPYTHON --------------------
+
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+#include "displayif_pm_rp2040_arch.h"
+#endif
 
 #if !defined(F_CPU) // Not sure if CircuitPython build defines this
 #ifdef __RP2040__

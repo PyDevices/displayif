@@ -18,7 +18,7 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 | `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — esp_lcd RGB scanout (SoCs with RGB LCD)** |
 | `ports/esp32` | `i80bus` | bus driver | **2 — esp_lcd I80 (ESP32-S3)** |
 | `ports/esp32` | `mipidsi` | **FBDisplay** | **2 — ESP32-P4 MIPI DSI** |
-| `ports/esp32` / `mimxrt` / `samd` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends (S3 / 1062 / SAMD51) — verified** |
+| `ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends — verified** |
 | `ports/mimxrt` | TBD | TBD | later |
 
 All parallel dot-clock RGB panels (RGB-666 **and** 16-pin RGB565 wiring) use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
@@ -118,6 +118,9 @@ displayif/
 ├── ports/
 │   ├── common/          # spi/ + micropython.mk / .cmake / circuitpython.mk
 │   ├── esp32/           # rgbframebuffer, i80bus, mipidsi, rgbmatrix (S3)
+│   ├── mimxrt/          # rgbmatrix Protomatter (1062)
+│   ├── samd/            # rgbmatrix Protomatter (SAMD51)
+│   └── rp2/             # rgbmatrix Protomatter (RP2040/2350)
 │   └── mimxrt/
 └── tests/
 ```
@@ -187,4 +190,4 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 
 ---
 
-*Updated 2026-07-07 — ESP32, mimxrt, and samd accelerated interfaces verified; pydisplay change list.*
+*Updated 2026-07-07 — All MCU ports (esp32, mimxrt, samd, rp2) accelerated interfaces verified.*

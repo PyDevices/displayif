@@ -4,7 +4,7 @@ Native display **interface** cmods for pydisplay. Portable code in `ports/common
 
 pydisplay MP board configs that raise `NotImplementedError` are waiting on modules built here. Native C modules register directly — **no Python re-export layer** in this repo.
 
-**Status:** Phase 1 `spibus` shipped. ESP32, mimxrt, and samd accelerated `rgbmatrix` verified. See [HANDOFF.md](HANDOFF.md).
+**Status:** Phase 1 `spibus` shipped. Accelerated interfaces verified on esp32, mimxrt, samd, and rp2. See [HANDOFF.md](HANDOFF.md).
 
 ## Native modules
 
@@ -14,7 +14,7 @@ pydisplay MP board configs that raise `NotImplementedError` are waiting on modul
 | `rgbframebuffer` | `esp32` (RGB LCD SoCs) | **FBDisplay** |
 | `i80bus` | `esp32` (S3 I80) | bus driver |
 | `mipidsi` | `esp32` (P4 MIPI DSI) | **FBDisplay** |
-| `rgbmatrix` | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) | **FBDisplay** |
+| `rgbmatrix` | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2` | **FBDisplay** |
 
 Parallel dot-clock RGB (RGB-666 and 16-pin RGB565) both use `rgbframebuffer.RGBFrameBuffer` — no `RGBDisplay`.
 
@@ -26,6 +26,7 @@ git clone https://github.com/PyDevices/displayif.git displayif
 ./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
 ./build_mp.sh --port mimxrt --board TEENSY41
 ./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
+./build_mp.sh --port rp2 --board RPI_PICO
 ```
 
 ## Related
