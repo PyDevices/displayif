@@ -1,8 +1,11 @@
 # rp2 CMake glue.
 
+set(PICODVI_LIBDVI_DIR ${DISPLAYIF_MOD_DIR}/ports/rp2/picodvi/libdvi)
+
 add_library(displayif_rp2 INTERFACE)
 target_include_directories(displayif_rp2 INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/rp2
+    ${PICODVI_LIBDVI_DIR}
     ${MICROPY_PORT_DIR}
 )
 target_link_libraries(usermod INTERFACE displayif_rp2)
@@ -12,7 +15,23 @@ target_sources(displayif_rp2 INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/rp2/mod_i80bus.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_rgbframebuffer.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_mipidsi.c
+    ${DISPLAYIF_MOD_DIR}/ports/rp2/mod_picodvi.c
 )
+
+if(PICO_RP2350)
+    target_sources(displayif_rp2 INTERFACE
+        ${DISPLAYIF_MOD_DIR}/ports/rp2/picodvi_rp2350.c
+    )
+else()
+    target_sources(displayif_rp2 INTERFACE
+        ${DISPLAYIF_MOD_DIR}/ports/rp2/picodvi_rp2040.c
+        ${PICODVI_LIBDVI_DIR}/dvi.c
+        ${PICODVI_LIBDVI_DIR}/dvi_serialiser.c
+        ${PICODVI_LIBDVI_DIR}/dvi_timing.c
+        ${PICODVI_LIBDVI_DIR}/tmds_encode.c
+        ${PICODVI_LIBDVI_DIR}/tmds_encode.S
+    )
+endif()
 
 target_compile_definitions(displayif_rp2 INTERFACE
     DISPLAYIF_STUB_RGBFRAMEBUFFER_MSG="RP2040 has no native RGB LCD scanout"
@@ -24,5 +43,10 @@ target_link_libraries(displayif_rp2 INTERFACE
     hardware_irq
     hardware_pio
     hardware_dma
+    hardware_gpio
+    hardware_interp
+    hardware_sync_spin_lock
     pico_stdlib
+    pico_multicore
+    pico_util
 )

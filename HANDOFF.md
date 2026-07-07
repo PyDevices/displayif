@@ -21,6 +21,7 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 | `ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends — verified** |
 | `ports/rp2` | `spibus` / `i2cbus` | **BusDisplay** |
 | `ports/rp2` | `i80bus` | bus driver | **2 — PIO+DMA (pico-sdk)** |
+| `ports/rp2` | `picodvi` (stub) | **FBDisplay** | **2 — RP2040 PIO / RP2350 HSTX** |
 | `ports/rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter** |
 | `ports/mimxrt` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
 | `ports/samd` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
@@ -110,6 +111,11 @@ Add `packages/rgbframebuffer.json` pointing at board configs that need it (Quali
 | `fbdisplay/matrixportal_m4_64x32` | `rgbmatrix` | `cp_matrixportal_m4_64x32` |
 | `fbdisplay/rgb_matrix_featherwing_64x32` | `rgbmatrix` | `cp_rgb_matrix_featherwing_64x32` |
 | `fbdisplay/qualia_tl040hds20` | `rgbframebuffer` | `cp_qualia_tl040hds20` |
+| `fbdisplay/mimxrt1060_evk_rk043_rgb` | `rgbframebuffer` | `cp_mimxrt1060_evk_rk043_rgb` |
+| `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` | `cp_mimxrt1170_evk_waveshare_5dsi` |
+| `fbdisplay/pimoroni_pico_dv_base_640x480` | `picodvi` | `cp_pimoroni_pico_dv_base_640x480` |
+| `fbdisplay/pico2_dvi_sock_640x480` | `picodvi` | `cp_pico2_dvi_sock_640x480` |
+| `fbdisplay/feather_rp2040_rgb_matrix_64x32` | `rgbmatrix` | `cp_rgb_matrix_featherwing_64x32` |
 | parallel RGB `fbdisplay/*` | `rgbframebuffer` | CP `dotclockframebuffer` configs |
 
 ---
@@ -125,7 +131,7 @@ displayif/
 │   ├── esp32/           # rgbframebuffer, i80bus, mipidsi, rgbmatrix (S3)
 │   ├── mimxrt/          # rgbmatrix Protomatter (1062); stubs for rgbframebuffer/i80/mipidsi
 │   ├── samd/            # rgbmatrix Protomatter (SAMD51); stubs for rgbframebuffer/i80/mipidsi
-│   └── rp2/             # rgbmatrix Protomatter; i80bus PIO+DMA; rgbframebuffer/mipidsi stubs
+│   └── rp2/             # rgbmatrix Protomatter; i80bus PIO+DMA; picodvi stub
 │   └── mimxrt/
 └── tests/
 ```
