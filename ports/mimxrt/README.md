@@ -11,7 +11,8 @@ NXP i.MX RT display interfaces for MicroPython `mimxrt` port / CircuitPython `mi
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | MIMXRT1062 (`TEENSY40`, `TEENSY41`, `MIMXRT1060_EVK`) | **FBDisplay** |
 | `mod_rgbframebuffer_elcdif.c` | `rgbframebuffer.RGBFrameBuffer` | MIMXRT1062 (`MIMXRT1060_EVK`, Teensy 4.x) | **FBDisplay** |
 | `mod_mipidsi.c` + `mimxrt1176_dsi_display.c` | `mipidsi.Bus` / `Display` | MIMXRT1176 (`MIMXRT1170_EVK`) | **FBDisplay** |
-| `ports/common/notimpl/mod_i80bus.c` | `i80bus.I80Bus` | stub | bus driver (N/A) |
+| `mod_i80bus.c` | `i80bus.I80Bus` | MIMXRT1062 (`TEENSY40`, `TEENSY41`, `MIMXRT1060_EVK`) | bus driver |
+| `ports/common/notimpl/mod_i80bus.c` | `i80bus.I80Bus` | stub (non-1062) | bus driver (N/A) |
 | `ports/common/notimpl/mod_rgbframebuffer.c` | `rgbframebuffer.RGBFrameBuffer` | stub (non-1062) | **FBDisplay** (N/A) |
 | `ports/common/notimpl/mod_mipidsi.c` | `mipidsi.Bus` / `Display` | stub (non-1176) | **FBDisplay** (N/A) |
 
@@ -23,9 +24,24 @@ On **MIMXRT1062**, `rgbframebuffer` uses the NXP SDK **eLCDIF** block for dot-cl
 
 On **MIMXRT1176**, `mipidsi` drives the SoC MIPI DSI host (NXP `mipi_dsi_split`) with an **LCDIFV2** video bridge to the DPI path. Primary hardware target: **MIMXRT1170-EVK** + Waveshare 5" DSI on J84 — panel **50H-800480-IPS** with a **TC358762** DSI-to-RGB bridge. Panel init is supplied via the pydisplay board config `init_sequence` bytes.
 
+### `i80bus` (FlexIO MCULCD)
+
+On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel **8080** mode with an **8-bit** data bus. Matches the pydisplay `I80Bus(dc, cs, wr, data, freq)` contract with `.send(command, data=None)` and `.deinit()`.
+
+**Pin constraints (minimal driver):**
+
+- **Data** and **wr** must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11).
+- **dc** and **cs** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
+- Only **one** `I80Bus` instance per board (single FLEXIO2 peripheral).
+- **IOMUX** for FlexIO pins is applied at construction; there is no pydisplay board config yet for a specific shield.
+
+On **MIMXRT1060-EVK**, the LCDIF RGB pins on `GPIO_B0_04`–`GPIO_B0_11` overlap the typical FlexIO2 data mapping — do not use the RK043 RGB shield pins simultaneously with i80bus. Teensy 4.x boards can wire an external 8080 display to FLEXIO2-capable pads per the schematic.
+
+Default `freq` is 20 MHz (byte rate). FlexIO root clock is the board default (~30 MHz on 1062); higher `freq` values may fail `FLEXIO_MCULCD_SetBaudRate`.
+
 ### Stubs
 
-`i80bus` remains a stub on all mimxrt boards (FlexIO I80 TBD). Non-1062 boards get stub `rgbframebuffer`; non-1176 boards get stub `mipidsi`. Stub modules import but raise `NotImplementedError` from the constructor.
+Non-1062 mimxrt boards get stub `rgbframebuffer`; non-1176 boards get stub `mipidsi`. Stub modules import but raise `NotImplementedError` from the constructor.
 
 ## pydisplay board configs
 
@@ -53,4 +69,4 @@ Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings.
 
 ## Future work
 
-NXP SDK **FlexIO** I80 parallel bus (`i80bus`) is not implemented yet.
+FlexIO i80bus pin mux is limited to FLEXIO2 on GPIO_B pads; board-specific pydisplay configs and DMA transfers are not implemented yet.

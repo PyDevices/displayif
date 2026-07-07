@@ -51,3 +51,22 @@ if(BOARD MATCHES "TEENSY4.*|MIMXRT1060_EVK")
         ${DISPLAYIF_MOD_DIR}/ports/mimxrt/rgbmatrix_pm.c
     )
 endif()
+
+if(BOARD MATCHES "TEENSY4.*|MIMXRT1060_EVK")
+    target_sources(displayif_mimxrt INTERFACE
+        ${DISPLAYIF_MOD_DIR}/ports/mimxrt/mod_i80bus.c
+        ${DISPLAYIF_NXP_SDK}/drivers/flexio/mculcd/fsl_flexio_mculcd.c
+        ${DISPLAYIF_NXP_SDK}/drivers/flexio/fsl_flexio.c
+    )
+    target_include_directories(displayif_mimxrt INTERFACE
+        ${DISPLAYIF_NXP_SDK}/drivers/flexio/mculcd
+        ${DISPLAYIF_NXP_SDK}/drivers/flexio
+    )
+    target_compile_definitions(displayif_mimxrt INTERFACE
+        FLEXIO_MCULCD_DATA_BUS_WIDTH=8
+    )
+    set_source_files_properties(
+        ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_i80bus.c
+        PROPERTIES HEADER_FILE_ONLY TRUE
+    )
+endif()
