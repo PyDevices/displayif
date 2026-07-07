@@ -10,7 +10,7 @@ Microchip SAMD display interfaces for MicroPython `samd` port.
 | `ports/common/i2c/mod_i2cbus.c` | `i2cbus.I2CBus` | all samd | **BusDisplay** |
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | SAMD51 (`ADAFRUIT_METRO_M4_EXPRESS`, Feather/ItsyBitsy M4, …) | **FBDisplay** |
 
-On SAMD51 boards, `rgbmatrix` uses the **Protomatter** backend (TC3 overflow ISR + PORT OUTSET/OUTCLR). SAMD21 boards get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
+On SAMD51 boards, `rgbmatrix` uses the **Protomatter** backend (TC3 overflow ISR + PORT OUTSET/OUTCLR). MicroPython's vector table does not wire TC3 by default; `samd_irq_hook.c` copies the table to RAM and patches the TC3 slot before scanout starts.
 
 Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings (`Pin("PB00")`, etc.).
 

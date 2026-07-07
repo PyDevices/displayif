@@ -9,6 +9,8 @@
 #include "pin_af.h"
 #include "core.h"
 
+void displayif_samd_pm_install_tc3_vector(void);
+
 Protomatter_core *displayif_pm_proto_ptr = NULL;
 
 bool displayif_rgbmatrix_pm_available(void) {
@@ -21,6 +23,7 @@ void *displayif_rgbmatrix_pm_timer_alloc(void) {
 
 void displayif_rgbmatrix_pm_timer_enable(void *timer) {
     (void)timer;
+    displayif_samd_pm_install_tc3_vector();
 }
 
 void displayif_rgbmatrix_pm_timer_disable(void *timer) {
@@ -54,10 +57,6 @@ void displayif_pm_tc_irq_handler(void) {
         tc->COUNT16.INTFLAG.reg = TC_INTFLAG_OVF;
         _PM_row_handler(displayif_pm_proto_ptr);
     }
-}
-
-void TC3_Handler(void) {
-    displayif_pm_tc_irq_handler();
 }
 
 #endif /* DISPLAYIF_RGBMATRIX_USE_PROTOMATTER && MCU_SAMD51 */
