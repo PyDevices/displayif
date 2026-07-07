@@ -28,9 +28,14 @@
 #define GPIO_DRIVE_STRENGTH GPIO_DRIVE_CAP_3
 #define LCD_CLK_PRESCALE 9 // 8, 9, 10 allowed. Bit clock = 160 MHz / this.
 
-#if defined(CIRCUITPY) // COMPILING FOR CIRCUITPYTHON --------------------
+#if defined(CIRCUITPY) // COMPILING FOR CIRCUITPYTHON / displayif ----------
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+#include "esp_rom_sys.h"
+#include "esp_heap_caps.h"
+#else
 #include "components/esp_rom/include/esp_rom_sys.h"
 #include "components/heap/include/esp_heap_caps.h"
+#endif
 #endif
 
 // Use DMA-capable RAM (not PSRAM) for framebuffer:

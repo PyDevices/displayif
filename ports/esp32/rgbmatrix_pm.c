@@ -59,8 +59,8 @@ void displayif_rgbmatrix_pm_timer_free(void *timer) {
 }
 
 void displayif_rgbmatrix_pm_set_active(void *core) {
-    extern Protomatter_core *_PM_protoPtr;
-    _PM_protoPtr = (Protomatter_core *)core;
+    extern void *_PM_protoPtr;
+    _PM_protoPtr = core;
 }
 
 void displayif_rgbmatrix_pm_bind_pin(uint8_t pm_pin, mp_obj_t pin_obj) {
