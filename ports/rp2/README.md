@@ -37,4 +37,4 @@ Stub modules (`rgbframebuffer`, `mipidsi`, `picodvi`) import on all boards but r
 ./build_mp.sh --port rp2 --board RPI_PICO2_W
 ```
 
-For RP2 builds where picotool host linking fails with clang, use `CC=gcc CXX=g++`.
+`build_mp.sh` fetches a prebuilt `picotool` from [pico-sdk-tools](https://github.com/raspberrypi/pico-sdk-tools/releases/tag/v2.1.1-0) when needed (CircuitPython avoids picotool entirely and uses `uf2conv.py`; MicroPython's cmake-based rp2 port still needs picotool for UF2 output). Override with `picotool_DIR` or `PICOTOOL_FETCH_FROM_GIT_PATH` if you already have one installed.
