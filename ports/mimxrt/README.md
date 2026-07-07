@@ -1,6 +1,6 @@
 # mimxrt port
 
-NXP i.MX RT display interfaces for MicroPython `mimxrt` port / CircuitPython `mimxrt` port.
+NXP i.MX RT display interfaces for MicroPython `mimxrt` port.
 
 ## Native modules
 
@@ -52,9 +52,9 @@ Non-1062 mimxrt boards get stub `rgbframebuffer`; non-1176 boards get stub `mipi
 | `fbdisplay/matrixportal_m4_64x32` | `rgbmatrix` | Metro M4 (SAMD — see samd port) |
 | `fbdisplay/rgb_matrix_featherwing_teensy41_64x32` | `rgbmatrix` | Teensy 4.1 + FeatherWing |
 
-CircuitPython board IDs: [imxrt1060_evk](https://circuitpython.org/board/imxrt1060_evk/), [nxp_mimxrt1170_evk](https://circuitpython.org/board/nxp_mimxrt1170_evk/).
+CircuitPython board configs for the same hardware live under pydisplay `cp_*` (use CP `dotclockframebuffer` / `mipidsi`, not displayif).
 
-On MIMXRT1062 boards, `rgbmatrix` uses the **Protomatter** backend (PIT timer ISR + GPIO set/clear registers). Other mimxrt chips (RT1011, RT1170, …) still get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
+On MIMXRT1062 boards, `rgbmatrix` uses the **Protomatter** backend (PIT timer ISR + GPIO set/clear registers). Other mimxrt chips still get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
 
 Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings.
 
@@ -69,4 +69,6 @@ Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings.
 
 ## Future work
 
-FlexIO i80bus pin mux is limited to FLEXIO2 on GPIO_B pads; board-specific pydisplay configs and DMA transfers are not implemented yet.
+- Board-specific pydisplay config for a FlexIO 8080 shield (no default pin map yet).
+- Optional DMA bulk path for large `send(data=...)` transfers (FlexIO MCULCD CPU path today).
+- Hardware smoke test on MIMXRT1060-EVK / Teensy 4.x with wired 8080 panel.

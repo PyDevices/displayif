@@ -32,7 +32,7 @@ Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DM
 
 Uses the **Protomatter** backend (PWM slice 7 wrap IRQ + GPIO set/clr). Pin arguments accept `machine.Pin` objects, integers, or board pin names.
 
-Stub modules (`rgbframebuffer`, `mipidsi`) import on all boards but raise `NotImplementedError` from the constructor — same pattern as esp32 on unsupported SoCs.
+Stub modules (`rgbframebuffer`, `mipidsi`) import on all boards but raise `NotImplementedError` from the constructor. **RP2350 has no MIPI DSI host** — use `picodvi` (HSTX/DVI) or SPI/I80 buses instead. CircuitPython `mipidsi` is not available on Pico 2; it targets SoCs like ESP32-P4.
 
 ## pydisplay board configs
 
