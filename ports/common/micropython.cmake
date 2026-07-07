@@ -22,7 +22,6 @@ if(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     target_compile_definitions(displayif_common INTERFACE
         DISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1
         CIRCUITPY=1
-        ESP_PLATFORM=1
     )
     target_sources(displayif_common INTERFACE
         ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/protomatter/core.c

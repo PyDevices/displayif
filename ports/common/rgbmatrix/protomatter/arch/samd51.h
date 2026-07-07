@@ -37,6 +37,10 @@
 
 #elif defined(CIRCUITPY) // COMPILING FOR CIRCUITPYTHON --------------------
 
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+#include "displayif_pm_samd51_arch.h"
+#else
+
 #define _PM_portOutRegister(pin) (&PORT->Group[(pin / 32)].OUT.reg)
 
 #define _PM_portSetRegister(pin) (&PORT->Group[(pin / 32)].OUTSET.reg)
@@ -61,6 +65,8 @@ static void _hi_drive(uint8_t pin) {
                 PORT_WRCONFIG_HWSEL | (1 << (pin & 15))
           : PORT_WRCONFIG_WRPINCFG | PORT_WRCONFIG_DRVSTR | (1 << (pin & 15));
 }
+
+#endif // DISPLAYIF_RGBMATRIX_USE_PROTOMATTER
 
 #else
 

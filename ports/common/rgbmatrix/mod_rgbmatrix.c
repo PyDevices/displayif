@@ -62,11 +62,8 @@ static void rgbmatrix_free(uint8_t *ptr) {
     }
 }
 
-static mp_obj_t rgbmatrix_make_pin(int pin_id) {
-    mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
-    mp_obj_t pin_cls = mp_load_attr(machine_mod, MP_QSTR_Pin);
-    mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
-    return displayif_machine_pin(pin_id, pin_out, 0);
+static mp_obj_t rgbmatrix_make_pin(mp_obj_t pin_or_int) {
+    return displayif_pin_resolve(pin_or_int);
 }
 
 static void rgbmatrix_set_addr(rgbmatrix_obj_t *self, uint8_t row) {
@@ -151,16 +148,17 @@ static void rgbmatrix_pm_status_raise(ProtomatterStatus stat) {
     }
 }
 
-static uint8_t rgbmatrix_pm_assign_pin(rgbmatrix_obj_t *self, uint8_t *next_pm_pin, mp_obj_t pin_obj, int pin_id) {
-    uint8_t pm_pin = *next_pm_pin;
-    if (pm_pin >= RGBMATRIX_MAX_PM_PINS) {
+static uint8_t rgbmatrix_pm_assign_pin(rgbmatrix_obj_t *self, uint8_t *next_pm_pin, mp_obj_t pin_obj) {
+    (void)self;
+    uint8_t pm_slot = *next_pm_pin;
+    if (pm_slot >= RGBMATRIX_MAX_PM_PINS) {
         mp_raise_ValueError(MP_ERROR_TEXT("too many rgbmatrix pins"));
     }
     if (pin_obj == MP_OBJ_NULL) {
-        pin_obj = rgbmatrix_make_pin(pin_id);
+        mp_raise_ValueError(MP_ERROR_TEXT("invalid rgbmatrix pin"));
     }
-    displayif_rgbmatrix_pm_bind_pin(pm_pin, pin_obj);
-    *next_pm_pin = pm_pin + 1;
+    uint8_t pm_pin = displayif_rgbmatrix_pm_pin_index(pm_slot, pin_obj);
+    *next_pm_pin = pm_slot + 1;
     return pm_pin;
 }
 
@@ -248,9 +246,9 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
         { MP_QSTR_bit_depth, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_rgb_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_addr_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_clock_pin, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_latch_pin, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_output_enable_pin, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
+        { MP_QSTR_clock_pin, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_latch_pin, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_output_enable_pin, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_doublebuffer, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = true } },
         { MP_QSTR_framebuffer, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_height, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
@@ -266,21 +264,22 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
     if (vals[ARG_bit_depth].u_int < 1 || vals[ARG_bit_depth].u_int > 6) {
         mp_raise_ValueError(MP_ERROR_TEXT("bit_depth must be 1..6"));
     }
-    if (vals[ARG_clock_pin].u_int < 0 || vals[ARG_latch_pin].u_int < 0 || vals[ARG_output_enable_pin].u_int < 0) {
+    if (vals[ARG_clock_pin].u_obj == MP_OBJ_NULL || vals[ARG_latch_pin].u_obj == MP_OBJ_NULL
+        || vals[ARG_output_enable_pin].u_obj == MP_OBJ_NULL) {
         mp_raise_ValueError(MP_ERROR_TEXT("clock, latch, and output_enable pins required"));
     }
     if (vals[ARG_tile].u_int < 1) {
         mp_raise_ValueError(MP_ERROR_TEXT("tile must be >= 1"));
     }
 
-    int rgb_ids[RGBMATRIX_RGB_PINS];
-    size_t rgb_count = displayif_pin_seq_to_ints(vals[ARG_rgb_pins].u_obj, rgb_ids, RGBMATRIX_RGB_PINS);
+    mp_obj_t rgb_pin_objs[RGBMATRIX_RGB_PINS];
+    size_t rgb_count = displayif_pin_seq_to_objs(vals[ARG_rgb_pins].u_obj, rgb_pin_objs, RGBMATRIX_RGB_PINS);
     if (rgb_count != RGBMATRIX_RGB_PINS) {
         mp_raise_ValueError(MP_ERROR_TEXT("rgb_pins must contain 6 pins"));
     }
 
-    int addr_ids[RGBMATRIX_MAX_ADDR_PINS];
-    size_t addr_count = displayif_pin_seq_to_ints(vals[ARG_addr_pins].u_obj, addr_ids, RGBMATRIX_MAX_ADDR_PINS);
+    mp_obj_t addr_pin_objs[RGBMATRIX_MAX_ADDR_PINS];
+    size_t addr_count = displayif_pin_seq_to_objs(vals[ARG_addr_pins].u_obj, addr_pin_objs, RGBMATRIX_MAX_ADDR_PINS);
     if (addr_count == 0 || addr_count > RGBMATRIX_MAX_ADDR_PINS) {
         mp_raise_ValueError(MP_ERROR_TEXT("addr_pins must contain 1..6 pins"));
     }
@@ -323,27 +322,27 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
 #endif
 
     for (size_t i = 0; i < RGBMATRIX_RGB_PINS; i++) {
-        self->rgb_pins[i] = rgbmatrix_make_pin(rgb_ids[i]);
+        self->rgb_pins[i] = rgb_pin_objs[i];
     }
     for (size_t i = 0; i < addr_count; i++) {
-        self->addr_pins[i] = rgbmatrix_make_pin(addr_ids[i]);
+        self->addr_pins[i] = addr_pin_objs[i];
     }
-    self->clock_pin = rgbmatrix_make_pin(vals[ARG_clock_pin].u_int);
-    self->latch_pin = rgbmatrix_make_pin(vals[ARG_latch_pin].u_int);
-    self->oe_pin = rgbmatrix_make_pin(vals[ARG_output_enable_pin].u_int);
+    self->clock_pin = rgbmatrix_make_pin(vals[ARG_clock_pin].u_obj);
+    self->latch_pin = rgbmatrix_make_pin(vals[ARG_latch_pin].u_obj);
+    self->oe_pin = rgbmatrix_make_pin(vals[ARG_output_enable_pin].u_obj);
 
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     if (displayif_rgbmatrix_pm_available()) {
         uint8_t next_pm_pin = 0;
         for (size_t i = 0; i < RGBMATRIX_RGB_PINS; i++) {
-            self->pm_rgb_pins[i] = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->rgb_pins[i], rgb_ids[i]);
+            self->pm_rgb_pins[i] = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->rgb_pins[i]);
         }
         for (size_t i = 0; i < addr_count; i++) {
-            self->pm_addr_pins[i] = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->addr_pins[i], addr_ids[i]);
+            self->pm_addr_pins[i] = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->addr_pins[i]);
         }
-        self->pm_clock_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->clock_pin, vals[ARG_clock_pin].u_int);
-        self->pm_latch_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->latch_pin, vals[ARG_latch_pin].u_int);
-        self->pm_oe_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->oe_pin, vals[ARG_output_enable_pin].u_int);
+        self->pm_clock_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->clock_pin);
+        self->pm_latch_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->latch_pin);
+        self->pm_oe_pin = rgbmatrix_pm_assign_pin(self, &next_pm_pin, self->oe_pin);
     }
 #endif
 

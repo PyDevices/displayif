@@ -17,6 +17,7 @@ if(CONFIG_SOC_LCD_RGB_SUPPORTED OR CONFIG_SOC_LCD_I80_SUPPORTED OR CONFIG_SOC_MI
 endif()
 
 if(CONFIG_IDF_TARGET_ESP32S3)
+    target_compile_definitions(displayif_esp32 INTERFACE ESP_PLATFORM=1)
     target_sources(displayif_esp32 INTERFACE
         ${DISPLAYIF_MOD_DIR}/ports/esp32/rgbmatrix_pm.c
     )

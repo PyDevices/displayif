@@ -58,6 +58,8 @@ void _PM_IRQ_HANDLER(void) {
 
 #elif defined(CIRCUITPY) // COMPILING FOR CIRCUITPYTHON --------------------
 
+#if !defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+
 #include "hal_gpio.h"
 
 #define _PM_pinOutput(pin) gpio_set_pin_direction(pin, GPIO_DIRECTION_OUT)
@@ -88,6 +90,8 @@ void _PM_IRQ_HANDLER(void) {
       TC_INTFLAG_OVF;
   _PM_row_handler(_PM_protoPtr); // In core.c
 }
+
+#endif // !DISPLAYIF_RGBMATRIX_USE_PROTOMATTER
 
 #else // END CIRCUITPYTHON -------------------------------------------------
 

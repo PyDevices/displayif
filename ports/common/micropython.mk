@@ -9,6 +9,6 @@ SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/mod_rgbmatrix.c
 
 ifeq ($(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER),1)
-CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter -DDISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1 -DCIRCUITPY=1 -DESP_PLATFORM=1
+CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter -DDISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1 -DCIRCUITPY=1
 SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter/core.c
 endif

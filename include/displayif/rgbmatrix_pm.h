@@ -15,6 +15,6 @@ void displayif_rgbmatrix_pm_timer_enable(void *timer);
 void displayif_rgbmatrix_pm_timer_disable(void *timer);
 void displayif_rgbmatrix_pm_timer_free(void *timer);
 void displayif_rgbmatrix_pm_set_active(void *core);
-void displayif_rgbmatrix_pm_bind_pin(uint8_t pm_pin, mp_obj_t pin_obj);
+uint8_t displayif_rgbmatrix_pm_pin_index(uint8_t pm_slot, mp_obj_t pin_obj);
 
 #endif /* DISPLAYIF_RGBMATRIX_PM_H */

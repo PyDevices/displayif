@@ -2,6 +2,31 @@
 
 #include "displayif/mp_helpers.h"
 
+static mp_obj_t displayif_pin_type(void) {
+    mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
+    return mp_load_attr(machine_mod, MP_QSTR_Pin);
+}
+
+bool displayif_obj_is_pin(mp_obj_t obj) {
+    return mp_obj_is_type(obj, displayif_pin_type());
+}
+
+mp_obj_t displayif_pin_resolve(mp_obj_t pin_or_int) {
+    if (displayif_obj_is_pin(pin_or_int)) {
+        return pin_or_int;
+    }
+    if (mp_obj_is_small_int(pin_or_int) || mp_obj_is_int(pin_or_int)) {
+        mp_obj_t pin_cls = displayif_pin_type();
+        mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
+        return displayif_machine_pin(mp_obj_get_int(pin_or_int), pin_out, 0);
+    }
+    if (mp_obj_is_str(pin_or_int)) {
+        mp_obj_t pin_cls = displayif_pin_type();
+        return mp_call_function_n_kw(pin_cls, 1, 0, &pin_or_int);
+    }
+    mp_raise_TypeError(MP_ERROR_TEXT("expected pin number or Pin"));
+}
+
 void displayif_pin_set(mp_obj_t pin, int value) {
     mp_store_attr(pin, MP_QSTR_value, mp_obj_new_int(value));
 }
@@ -14,7 +39,7 @@ int displayif_pin_id(mp_obj_t pin_or_int) {
     if (mp_obj_is_small_int(pin_or_int) || mp_obj_is_int(pin_or_int)) {
         return mp_obj_get_int(pin_or_int);
     }
-    return mp_obj_get_int(pin_or_int);
+    mp_raise_TypeError(MP_ERROR_TEXT("expected pin number"));
 }
 
 size_t displayif_pin_tuple_to_ints(mp_obj_t tuple, int *out, size_t max_out) {
@@ -29,13 +54,32 @@ size_t displayif_pin_seq_to_ints(mp_obj_t seq, int *out, size_t max_out) {
     } else if (mp_obj_is_type(seq, &mp_type_list)) {
         mp_obj_list_get(seq, &len, &items);
     } else {
-        mp_raise_TypeError(MP_ERROR_TEXT("expected a sequence of pin numbers"));
+        mp_raise_TypeError(MP_ERROR_TEXT("expected a sequence of pins"));
     }
     if (len > max_out) {
         mp_raise_ValueError(MP_ERROR_TEXT("too many pins in sequence"));
     }
     for (size_t i = 0; i < len; i++) {
         out[i] = displayif_pin_id(items[i]);
+    }
+    return len;
+}
+
+size_t displayif_pin_seq_to_objs(mp_obj_t seq, mp_obj_t *out, size_t max_out) {
+    size_t len;
+    mp_obj_t *items;
+    if (mp_obj_is_type(seq, &mp_type_tuple)) {
+        mp_obj_tuple_get(seq, &len, &items);
+    } else if (mp_obj_is_type(seq, &mp_type_list)) {
+        mp_obj_list_get(seq, &len, &items);
+    } else {
+        mp_raise_TypeError(MP_ERROR_TEXT("expected a sequence of pins"));
+    }
+    if (len > max_out) {
+        mp_raise_ValueError(MP_ERROR_TEXT("too many pins in sequence"));
+    }
+    for (size_t i = 0; i < len; i++) {
+        out[i] = displayif_pin_resolve(items[i]);
     }
     return len;
 }

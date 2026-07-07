@@ -43,13 +43,14 @@ void displayif_rgbmatrix_pm_set_active(void *core) {
     displayif_pm_proto_ptr = (Protomatter_core *)core;
 }
 
-void displayif_rgbmatrix_pm_bind_pin(uint8_t pm_pin, mp_obj_t pin_obj) {
-    if (pm_pin >= 64) {
-        return;
+uint8_t displayif_rgbmatrix_pm_pin_index(uint8_t pm_slot, mp_obj_t pin_obj) {
+    if (pm_slot >= 64) {
+        return pm_slot;
     }
     const machine_pin_obj_t *pin = pin_find(pin_obj);
-    displayif_pm_pin_table[pm_pin].gpio = pin->gpio;
-    displayif_pm_pin_table[pm_pin].bit = pin->pin;
+    displayif_pm_pin_table[pm_slot].gpio = pin->gpio;
+    displayif_pm_pin_table[pm_slot].bit = pin->pin;
+    return pm_slot;
 }
 
 void _PM_timerInit(Protomatter_core *core) {
