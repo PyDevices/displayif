@@ -20,7 +20,7 @@ pydisplay MP board configs that raise `NotImplementedError` are waiting on modul
 
 Parallel dot-clock RGB (RGB-666 and 16-pin RGB565) both use `rgbframebuffer.RGBFrameBuffer` — no `RGBDisplay`.
 
-## Build
+## 🚀 Build
 
 Clone as a sibling of `micropython/`:
 
