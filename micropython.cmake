@@ -1,6 +1,10 @@
 # MicroPython CMake glue for displayif (ESP32, RP2, …).
 #
-# Included from cmods/micropython.cmake when displayif is a workspace sibling.
+# Point USER_C_MODULES at this repo directly, e.g.:
+#   idf.py build -DUSER_C_MODULES=/path/to/displayif/micropython.cmake
+# usermod.cmake also accepts a semicolon-separated list of module paths if you
+# want displayif plus other modules — no aggregator file required, e.g.:
+#   -DUSER_C_MODULES="/path/to/displayif;/path/to/other_mod"
 # Hardware interfaces build only on MCU ports — not unix, windows, etc.
 
 set(DISPLAYIF_MOD_DIR ${CMAKE_CURRENT_LIST_DIR})

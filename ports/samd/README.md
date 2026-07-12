@@ -21,9 +21,12 @@ Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings (
 
 ## Build
 
+Make port — `USER_C_MODULES` is the workspace parent (sibling layout with `displayif/`):
+
 ```bash
-./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
-./build_mp.sh --port samd --board ADAFRUIT_FEATHER_M4_EXPRESS
+cd micropython/ports/samd
+make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
+make USER_C_MODULES=../../.. BOARD=ADAFRUIT_FEATHER_M4_EXPRESS
 ```
 
 Matrix Portal M4 has no dedicated MicroPython board definition; Metro M4 Express is the stand-in (same SAMD51J19A).

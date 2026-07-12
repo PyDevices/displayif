@@ -60,11 +60,14 @@ Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings.
 
 ## Build
 
+Make port — `USER_C_MODULES` is the workspace parent (sibling layout with `displayif/`):
+
 ```bash
-./build_mp.sh --port mimxrt --board TEENSY41          # MIMXRT1062 — eLCDIF rgbframebuffer
-./build_mp.sh --port mimxrt --board TEENSY40
-./build_mp.sh --port mimxrt --board MIMXRT1060_EVK
-./build_mp.sh --port mimxrt --board MIMXRT1170_EVK    # MIMXRT1176 — mipidsi
+cd micropython/ports/mimxrt
+make USER_C_MODULES=../../.. BOARD=TEENSY41          # MIMXRT1062 — eLCDIF rgbframebuffer
+make USER_C_MODULES=../../.. BOARD=TEENSY40
+make USER_C_MODULES=../../.. BOARD=MIMXRT1060_EVK
+make USER_C_MODULES=../../.. BOARD=MIMXRT1170_EVK    # MIMXRT1176 — mipidsi
 ```
 
 ## Future work

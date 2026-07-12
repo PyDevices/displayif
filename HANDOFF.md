@@ -4,7 +4,7 @@ Handoff for **pydevices/displayif**: native display **interface** cmods for pydi
 
 Several pydisplay MicroPython `board_config.py` files currently raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
 
-**Workspace:** clone as a sibling under [PyDevices/cmods](https://github.com/PyDevices/cmods).
+**Workspace:** clone as a sibling of `micropython/` (e.g. via [PyDevices/cmods](https://github.com/PyDevices/cmods), which is an optional convenience wrapper, not a requirement).
 
 **No Python re-export layer in this repo.** Native C modules register directly (e.g. `from rgbframebuffer import RGBFrameBuffer`). pydisplay board configs import those modules; see [pydisplay changes](#pydisplay-changes-unify-on-fbdisplay--rgbframebuffer) below.
 
@@ -167,14 +167,25 @@ Framebuffer memory is allocated by the C driver (PSRAM on ESP32). pydisplay draw
 
 ---
 
-## Build (cmods)
+## Build
+
+From a sibling `micropython/` checkout:
+
+**Make ports** — `USER_C_MODULES` = workspace parent (contains `displayif/`):
 
 ```bash
-./build_mp.sh --port rp2 --board RPI_PICO2_W
-./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
-./build_mp.sh --port mimxrt --board TEENSY41
-./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
+cd micropython/ports/mimxrt && make USER_C_MODULES=../../.. BOARD=TEENSY41
+cd micropython/ports/samd && make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
 ```
+
+**CMake ports** — `USER_C_MODULES` = this repo (or a `;`-separated list of module paths):
+
+```bash
+cd micropython/ports/rp2 && make BOARD=RPI_PICO2_W USER_C_MODULES=../../../displayif
+cd micropython/ports/esp32 && make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
+```
+
+([cmods](https://github.com/PyDevices/cmods) `./build_mp.sh` is optional.)
 
 No `manifest.py` frozen package required unless we later add pure-Python helpers (not planned).
 

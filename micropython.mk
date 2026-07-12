@@ -1,6 +1,7 @@
 # MicroPython user C module glue for displayif.
 #
-# Discovered when USER_C_MODULES points at the cmods workspace root.
+# Discovered via USER_C_MODULES pointing at the workspace directory that
+# contains this repo (its parent), e.g. `make USER_C_MODULES=../../..`.
 # Hardware interfaces (spibus, rgbframebuffer, …) build only on MCU ports —
 # not unix, windows, or other desktop targets.
 

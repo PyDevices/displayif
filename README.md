@@ -20,19 +20,45 @@ pydisplay MP board configs that raise `NotImplementedError` are waiting on modul
 
 Parallel dot-clock RGB (RGB-666 and 16-pin RGB565) both use `rgbframebuffer.RGBFrameBuffer` — no `RGBDisplay`.
 
-## Build (cmods workspace)
+## Build
+
+Clone as a sibling of `micropython/`:
+
+```
+workspace/
+  displayif/      ← this repo
+  micropython/
+```
+
+**Make ports** (mimxrt, samd, …): `USER_C_MODULES` is the **workspace parent** (directory that contains `displayif/` and any other `*/micropython.mk` siblings):
 
 ```bash
-cd ~/github/cmods
-git clone https://github.com/PyDevices/displayif.git displayif
-./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
-./build_mp.sh --port mimxrt --board TEENSY41
-./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
-./build_mp.sh --port rp2 --board RPI_PICO
+cd micropython/ports/mimxrt && make USER_C_MODULES=../../.. BOARD=TEENSY41
+cd micropython/ports/samd && make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
 ```
+
+**CMake ports** (esp32, rp2): `USER_C_MODULES` points at **this repo** (or `displayif/micropython.cmake`). CMake does not scan siblings the way Make does:
+
+```bash
+cd micropython/ports/esp32
+make submodules BOARD=ESP32_GENERIC_S3
+make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
+
+cd micropython/ports/rp2
+make BOARD=RPI_PICO USER_C_MODULES=../../../displayif
+```
+
+To build this module **plus** other usermods on a CMake port, pass a semicolon-separated list (no aggregator file required):
+
+```bash
+make BOARD=ESP32_GENERIC_S3 \
+  USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lv_micropython_cmod"
+```
+
+([cmods](https://github.com/PyDevices/cmods) is an optional convenience workspace with `./build_mp.sh`; it is not required.)
 
 ## Related
 
 - [HANDOFF.md](HANDOFF.md) — pydisplay migration checklist, native API
 - [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
-- [PyDevices/cmods](https://github.com/PyDevices/cmods)
+- [PyDevices/cmods](https://github.com/PyDevices/cmods) — optional build-shortcut workspace

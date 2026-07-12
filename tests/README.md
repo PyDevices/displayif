@@ -13,7 +13,7 @@
 | `test_i2cbus_smoke.py` | MCU with I2C | native `i2cbus` |
 
 ```bash
-# After cmods build with displayif (flash uf2 to board for rp2):
+# After a build with displayif linked in (flash uf2 to board for rp2):
 ./micropython/ports/rp2/build-RPI_PICO/firmware.uf2
 ./micropython/ports/rp2/build-RPI_PICO/micropython displayif/tests/test_picodvi_smoke.py
 ./micropython/ports/mimxrt/build-TEENSY41/micropython displayif/tests/test_rgbmatrix_smoke.py
