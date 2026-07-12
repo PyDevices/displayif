@@ -1,6 +1,6 @@
 # displayif — agent handoff (July 2026)
 
-Handoff for **pydevices/displayif**: native display **interface** cmods for pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/` (names from `micropython/ports/`).
+Handoff for **pydevices/displayif**: native display **interface** modules for pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/` (names from `micropython/ports/`).
 
 Several pydisplay MicroPython `board_config.py` files currently raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
 
