@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Cursor IDE throwaways (do not ignore the whole .cursor/ tree)
+.cursor/debug*
+.cursor/plans/
