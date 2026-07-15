@@ -5,7 +5,7 @@
   <script>try{if(localStorage.getItem('pydevices-theme')==='light'){document.documentElement.setAttribute('data-theme','light');}}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>displayif — PyDevices</title>
-  <meta name="description" content="Native display bus & framebuffer modules.">
+  <meta name="description" content="Native display bus and framebuffer modules for MicroPython — SPI, I80, RGB, MIPI DSI, PicoDVI, and RGB matrix under pydisplay.">
   <link rel="icon" type="image/svg+xml" href="https://pydevices.github.io/assets/img/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -33,39 +33,89 @@
   </header>
 
   <section class="hero wrap">
-    <div class="logo-badge"><img src="https://pydevices.github.io/assets/img/logo.svg" alt="PyDevices logo" width="112" height="112"></div>
+    <div class="logo-badge product-mark"><img src="https://pydevices.github.io/assets/img/products/displayif.svg" alt="displayif" width="112" height="112"></div>
     <span class="eyebrow">PyDevices / displayif</span>
-    <h1>Native display bus & framebuffer modules</h1>
-    <p>displayif is the native display-bus and framebuffer layer that sits under pydisplay on MicroPython. It talks to real panel interfaces — SPI, I80 parallel, RGB, and related buses — so blit and flush paths stay in C instead of bouncing through interpreted loops when bandwidth and latency matter.</p>
-    <p>If you are bringing up hardware, this is the module you wire into the firmware alongside pydisplay&apos;s pure-Python drivers. It is built as a user C module (often via the cmods workspace) and is meant to stay a thin, fast companion to the portable Python stack rather than a full GUI toolkit.</p>
+    <h1>displayif</h1>
+    <p>Native display-bus and framebuffer modules for MicroPython. Portable code lives in <code>ports/common/</code>; SoC-specific paths under <code>ports/&lt;mp-port&gt;/</code>. pydisplay board configs that raise <code>NotImplementedError</code> need firmware built with the matching module — natives register directly, with no Python re-export layer in this repo.</p>
+    <p>CircuitPython has its own display stack (<code>dotclockframebuffer</code>, <code>mipidsi</code>, <code>picodvi</code>, …). displayif does not ship CP bindings — use pydisplay <code>cp_*</code> board configs with CP firmware.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/PyDevices/displayif">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-1-2.6c3-.3 6-1.5 6-6.5a5 5 0 0 0-1.4-3.5 4.6 4.6 0 0 0-.1-3.5s-1.1-.3-3.5 1.3a12 12 0 0 0-6 0C6.6 1.7 5.5 2 5.5 2a4.6 4.6 0 0 0-.1 3.5A5 5 0 0 0 4 9c0 5 3 6.2 6 6.5a3.4 3.4 0 0 0-1 2.6V22"/></svg>
         Source on GitHub
       </a>
-      <a class="btn" href="https://pydevices.github.io/">PyDevices</a>
+      <a class="btn" href="https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md">Hardware bring-up</a>
+      <a class="btn" href="https://pydevices.github.io/cmods/">cmods</a>
     </div>
   </section>
 
   <main class="cards wrap">
     <div class="section-head">
-      <h2>Build as a sibling user C module</h2>
+      <h2>Native modules</h2>
+      <span class="hint">Accelerated on esp32, mimxrt, samd, and rp2</span>
     </div>
-    <div class="install-block">
-      <pre><code>git clone https://github.com/micropython/micropython.git
-git clone https://github.com/PyDevices/displayif.git
+    <div class="grid">
+      <div class="card">
+        <h3>BusDisplay</h3>
+        <p><code>spibus</code> / <code>i2cbus</code> (common) — SPI and I²C panel buses for pydisplay BusDisplay.</p>
+      </div>
+      <div class="card">
+        <h3>FBDisplay</h3>
+        <p><code>rgbframebuffer</code>, <code>mipidsi</code>, <code>picodvi</code>, <code>rgbmatrix</code> — framebuffer backends. Parallel RGB uses <code>rgbframebuffer.RGBFrameBuffer</code> (no <code>RGBDisplay</code>).</p>
+      </div>
+      <div class="card">
+        <h3>i80bus</h3>
+        <p>8080-style parallel bus on esp32 (S3), rp2 (PIO+DMA), mimxrt (1062 FlexIO), and samd (SAMD51 GPIO).</p>
+      </div>
+    </div>
 
-# Build the port with this cmod enabled -- see this repo's
-# README / HANDOFF for the exact USER_C_MODULES setup.</code></pre>
+    <div class="section-head" style="margin-top: 36px;">
+      <h2>Build into MicroPython</h2>
+      <span class="hint">Clone as a sibling of <code>micropython/</code></span>
     </div>
+    <div class="snippet-grid">
+      <div class="snippet-card">
+        <h3>CMake ports (esp32, rp2)</h3>
+        <p><code>USER_C_MODULES</code> points at this repo. CMake does not scan siblings the way Make does.</p>
+        <pre><code>cd micropython/ports/esp32
+make submodules BOARD=ESP32_GENERIC_S3
+make BOARD=ESP32_GENERIC_S3 \
+  USER_C_MODULES=../../../displayif
+
+# Plus other usermods (semicolon list):
+make BOARD=ESP32_GENERIC_S3 \
+  USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lv_micropython_cmod"</code></pre>
+      </div>
+      <div class="snippet-card">
+        <h3>Make ports (mimxrt, samd, …)</h3>
+        <p><code>USER_C_MODULES</code> is the workspace parent that contains <code>displayif/</code>.</p>
+        <pre><code>cd micropython/ports/mimxrt
+make USER_C_MODULES=../../.. BOARD=TEENSY41
+
+cd micropython/ports/samd
+make USER_C_MODULES=../../.. \
+  BOARD=ADAFRUIT_METRO_M4_EXPRESS</code></pre>
+      </div>
+    </div>
+
+    <div class="section-head" style="margin-top: 36px;">
+      <h2>ESP32 large framebuffers</h2>
+    </div>
+    <p style="max-width: 42rem; margin: 0 0 1rem; color: var(--ink-soft);">
+      RGB and DSI framebuffers prefer PSRAM (<code>MALLOC_CAP_SPIRAM</code>). Enable and size
+      <code>CONFIG_SPIRAM</code> in your board <code>sdkconfig</code> before building — see
+      <a href="https://github.com/PyDevices/displayif/blob/main/HANDOFF.md">HANDOFF.md</a>.
+      For a full ESP32-P4 + touch walkthrough, use
+      <a href="https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md">cmods MP_EXAMPLE.md</a>.
+    </p>
 
     <div class="section-head" style="margin-top: 36px;">
       <h2>Related</h2>
     </div>
     <ul class="linklist">
-      <li><a href="https://pydevices.github.io/cmods/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>cmods — the build workspace</a></li>
+      <li><a href="https://pydevices.github.io/cmods/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>cmods — optional build workspace</a></li>
+      <li><a href="https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>MP_EXAMPLE.md — ESP32-P4 hardware bring-up</a></li>
       <li><a href="https://pydevices.github.io/pydisplay/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>pydisplay</a></li>
-      <li><a href="https://github.com/PyDevices/graphics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>graphics — the sibling FrameBuffer cmod</a></li>
+      <li><a href="https://pydevices.github.io/graphics/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>graphics — native FrameBuffer / Area</a></li>
     </ul>
   </main>
 
