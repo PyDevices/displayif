@@ -25,9 +25,12 @@ On SAMD51, `rgbmatrix` uses the **Protomatter** backend (TC3 overflow ISR + PORT
 
 ## Build
 
+Make port — `USER_C_MODULES` is the workspace parent (sibling layout with `displayif/`):
+
 ```bash
-./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
-./build_mp.sh --port samd --board ADAFRUIT_FEATHER_M4_EXPRESS
+cd micropython/ports/samd
+make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
+make USER_C_MODULES=../../.. BOARD=ADAFRUIT_FEATHER_M4_EXPRESS
 ```
 
 ## pydisplay board configs

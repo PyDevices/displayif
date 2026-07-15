@@ -1,8 +1,10 @@
 # displayif — agent handoff (July 2026)
 
-Handoff for **pydevices/displayif**: native display **interface** cmods for **MicroPython** / pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/` (names from `micropython/ports/`).
+Handoff for **pydevices/displayif**: native display **interface** modules for pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/` (names from `micropython/ports/`).
 
-**Workspace:** clone as a sibling under [PyDevices/cmods](https://github.com/PyDevices/cmods).
+Several pydisplay MicroPython `board_config.py` files currently raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
+
+**Workspace:** clone as a sibling of `micropython/` (e.g. via [PyDevices/cmods](https://github.com/PyDevices/cmods), which is an optional convenience wrapper, not a requirement).
 
 **No Python re-export layer in this repo.** Native C modules register directly (e.g. `from rgbframebuffer import RGBFrameBuffer`). pydisplay board configs import those modules.
 
@@ -44,7 +46,6 @@ These configs import displayif modules when firmware is built with the matching 
 | `fbdisplay/mimxrt1060_evk_rk043_rgb` | `rgbframebuffer` |
 | `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` |
 | `fbdisplay/esp32-p4-wifi6-touch-lcd-4b` | `mipidsi` |
-| `fbdisplay/pimoroni_pico_dv_base_640x480` | `picodvi` |
 | `fbdisplay/pico2_dvi_sock_640x480` | `picodvi` |
 | `fbdisplay/t-rgb_480` | `rgbframebuffer` |
 | parallel RGB `fbdisplay/*` | `rgbframebuffer` |
@@ -94,16 +95,27 @@ Each `ports/<name>/` directory has `micropython.mk` and `micropython.cmake`. Roo
 
 ---
 
-## Build (cmods)
+## Build
+
+From a sibling `micropython/` checkout:
+
+**Make ports** — `USER_C_MODULES` = workspace parent (contains `displayif/`):
 
 ```bash
-./build_mp.sh --port rp2 --board RPI_PICO2_W
-./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
-./build_mp.sh --port esp32 --board ESP32_GENERIC_P4 --variant C6_WIFI
-./build_mp.sh --port mimxrt --board TEENSY41
-./build_mp.sh --port mimxrt --board MIMXRT1170_EVK
-./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
+cd micropython/ports/mimxrt && make USER_C_MODULES=../../.. BOARD=TEENSY41
+cd micropython/ports/samd && make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
 ```
+
+**CMake ports** — `USER_C_MODULES` = this repo (or a `;`-separated list of module paths):
+
+```bash
+cd micropython/ports/rp2 && make BOARD=RPI_PICO2_W USER_C_MODULES=../../../displayif
+cd micropython/ports/esp32 && make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
+```
+
+([cmods](https://github.com/PyDevices/cmods) `./build_mp.sh` is optional — e.g. `./build_mp.sh --port rp2 --board RPI_PICO2_W`.)
+
+No `manifest.py` frozen package required unless we later add pure-Python helpers (not planned).
 
 ---
 

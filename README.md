@@ -1,6 +1,6 @@
 # displayif
 
-Native display **interface** cmods for **MicroPython** / pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/`.
+Native display **interface** modules for pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/`.
 
 pydisplay MP board configs that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
 
@@ -26,19 +26,45 @@ Parallel dot-clock RGB uses `rgbframebuffer.RGBFrameBuffer` — no `RGBDisplay`.
 
 RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_SPIRAM` is enabled and sized in your board `sdkconfig` before building — see [HANDOFF.md](HANDOFF.md#esp32-psram--sdkconfig-large-framebuffers).
 
-## Build (cmods workspace)
+## 🚀 Build
+
+Clone as a sibling of `micropython/`:
+
+```
+workspace/
+  displayif/      ← this repo
+  micropython/
+```
+
+**Make ports** (mimxrt, samd, …): `USER_C_MODULES` is the **workspace parent** (directory that contains `displayif/` and any other `*/micropython.mk` siblings):
 
 ```bash
-cd ~/github/cmods
-git clone https://github.com/PyDevices/displayif.git displayif
-./build_mp.sh --port esp32 --board ESP32_GENERIC_S3
-./build_mp.sh --port mimxrt --board TEENSY41
-./build_mp.sh --port samd --board ADAFRUIT_METRO_M4_EXPRESS
-./build_mp.sh --port rp2 --board RPI_PICO
+cd micropython/ports/mimxrt && make USER_C_MODULES=../../.. BOARD=TEENSY41
+cd micropython/ports/samd && make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
 ```
+
+**CMake ports** (esp32, rp2): `USER_C_MODULES` points at **this repo** (or `displayif/micropython.cmake`). CMake does not scan siblings the way Make does:
+
+```bash
+cd micropython/ports/esp32
+make submodules BOARD=ESP32_GENERIC_S3
+make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
+
+cd micropython/ports/rp2
+make BOARD=RPI_PICO USER_C_MODULES=../../../displayif
+```
+
+To build this module **plus** other usermods on a CMake port, pass a semicolon-separated list (no aggregator file required):
+
+```bash
+make BOARD=ESP32_GENERIC_S3 \
+  USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lv_micropython_cmod"
+```
+
+([cmods](https://github.com/PyDevices/cmods) is an optional convenience workspace with `./build_mp.sh`; it is not required.)
 
 ## Related
 
 - [HANDOFF.md](HANDOFF.md) — port matrix, hardware validation, RP2350 DSI notes
 - [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
-- [PyDevices/cmods](https://github.com/PyDevices/cmods) — [`MP_EXAMPLE.md`](https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md) ESP32-P4 bring-up
+- [PyDevices/cmods](https://github.com/PyDevices/cmods) — optional build-shortcut workspace; see [`MP_EXAMPLE.md`](https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md) for ESP32-P4 bring-up

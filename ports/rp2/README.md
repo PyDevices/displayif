@@ -46,9 +46,12 @@ Stub modules (`rgbframebuffer`, `mipidsi`) import on all boards but raise `NotIm
 
 ## Build
 
+CMake port — point `USER_C_MODULES` at the `displayif` repo (sibling of `micropython/`):
+
 ```bash
-./build_mp.sh --port rp2 --board RPI_PICO       # RP2040 — picodvi (PIO/libdvi)
-./build_mp.sh --port rp2 --board RPI_PICO2_W    # RP2350 — picodvi (HSTX)
+cd micropython/ports/rp2
+make BOARD=RPI_PICO USER_C_MODULES=../../../displayif       # RP2040 — picodvi (PIO/libdvi)
+make BOARD=RPI_PICO2_W USER_C_MODULES=../../../displayif    # RP2350 — picodvi (HSTX)
 ```
 
-`build_mp.sh` fetches a prebuilt `picotool` from [pico-sdk-tools](https://github.com/raspberrypi/pico-sdk-tools/releases/tag/v2.1.1-0) when needed (CircuitPython avoids picotool entirely and uses `uf2conv.py`; MicroPython's cmake-based rp2 port still needs picotool for UF2 output). Override with `picotool_DIR` or `PICOTOOL_FETCH_FROM_GIT_PATH` if you already have one installed.
+MicroPython's rp2 port needs `picotool` for UF2 output. Fetch a prebuilt binary from [pico-sdk-tools](https://github.com/raspberrypi/pico-sdk-tools/releases/tag/v2.1.1-0) if needed, or override with `picotool_DIR` / `PICOTOOL_FETCH_FROM_GIT_PATH`.
