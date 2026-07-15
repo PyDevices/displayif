@@ -30,6 +30,7 @@
 
 #define I80BUS_DATA_WIDTH 8
 #define I80BUS_FLEXIO2_ALT PIN_AF_MODE_ALT4
+#define I80BUS_BULK_THRESHOLD 64
 
 typedef struct _i80bus_obj_t {
     mp_obj_base_t base;
@@ -233,7 +234,16 @@ static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
         mp_buffer_info_t bufinfo;
         mp_get_buffer_raise(data, &bufinfo, MP_BUFFER_READ);
         if (bufinfo.len > 0) {
-            FLEXIO_MCULCD_WriteDataArrayBlocking(&self->lcd, bufinfo.buf, bufinfo.len);
+            if (bufinfo.len >= I80BUS_BULK_THRESHOLD) {
+                flexio_mculcd_transfer_t xfer = {0};
+                xfer.dataAddrOrSameValue = (uint32_t)(uintptr_t)bufinfo.buf;
+                xfer.dataSize = bufinfo.len;
+                xfer.mode = kFLEXIO_MCULCD_WriteArray;
+                xfer.dataOnly = true;
+                FLEXIO_MCULCD_TransferBlocking(&self->lcd, &xfer);
+            } else {
+                FLEXIO_MCULCD_WriteDataArrayBlocking(&self->lcd, bufinfo.buf, bufinfo.len);
+            }
         }
     }
 

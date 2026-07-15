@@ -6,118 +6,73 @@ Several pydisplay MicroPython `board_config.py` files currently raise `NotImplem
 
 **Workspace:** clone as a sibling of `micropython/` (e.g. via [PyDevices/cmods](https://github.com/PyDevices/cmods), which is an optional convenience wrapper, not a requirement).
 
-**No Python re-export layer in this repo.** Native C modules register directly (e.g. `from rgbframebuffer import RGBFrameBuffer`). pydisplay board configs import those modules; see [pydisplay changes](#pydisplay-changes-unify-on-fbdisplay--rgbframebuffer) below.
+**No Python re-export layer in this repo.** Native C modules register directly (e.g. `from rgbframebuffer import RGBFrameBuffer`). pydisplay board configs import those modules.
+
+**CircuitPython:** displayif does **not** ship CP bindings. CircuitPython already provides `dotclockframebuffer`, `mipidsi`, `paralleldisplaybus`, `picodvi`, etc. — use those for CP board configs under `pydisplay/board_configs/fbdisplay/cp_*`.
 
 ---
 
 ## Mission
 
-| Location | Native module | pydisplay backend | Phase |
-|----------|---------------|-------------------|-------|
-| `ports/common` | `spibus` / `i2cbus` | **BusDisplay** | **1 — shipped** |
-| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | **2 — esp_lcd RGB scanout (SoCs with RGB LCD)** |
-| `ports/esp32` | `i80bus` | bus driver | **2 — esp_lcd I80 (ESP32-S3)** |
-| `ports/esp32` | `mipidsi` | **FBDisplay** | **2 — ESP32-P4 MIPI DSI** |
-| `ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter backends — verified** |
-| `ports/rp2` | `spibus` / `i2cbus` | **BusDisplay** |
-| `ports/rp2` | `i80bus` | bus driver | **2 — PIO+DMA (pico-sdk)** |
-| `ports/rp2` | `picodvi` | **FBDisplay** | **2 — RP2040 PIO (libdvi) / RP2350 HSTX** |
-| `ports/rp2` | `rgbmatrix` | **FBDisplay** | **3 — Protomatter** |
-| `ports/mimxrt` | `rgbframebuffer` | **FBDisplay** | **2 — eLCDIF on MIMXRT1062 (1060-EVK / RK043)** |
-| `ports/mimxrt` | `mipidsi` | **FBDisplay** | **2 — MIPI DSI on MIMXRT1176 (LCDIFV2 bridge)** |
-| `ports/mimxrt` | `i80bus` (stub) | bus driver | FlexIO I80 TBD |
-| `ports/samd` | stubs: `rgbframebuffer`, `i80bus`, `mipidsi` | import ok; ctor raises | API parity |
+| Location | Native module | pydisplay backend | Status |
+|----------|---------------|-------------------|--------|
+| `ports/common` | `spibus` / `i2cbus` | **BusDisplay** | shipped |
+| `ports/esp32` | `rgbframebuffer` | **FBDisplay** | esp_lcd RGB scanout |
+| `ports/esp32` | `i80bus` | bus driver | esp_lcd I80 (S3) |
+| `ports/esp32` | `mipidsi` | **FBDisplay** | ESP32-P4 MIPI DSI |
+| `ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | Protomatter backends |
+| `ports/rp2` | `i80bus` | bus driver | PIO+DMA |
+| `ports/rp2` | `picodvi` | **FBDisplay** | RP2040 PIO / RP2350 HSTX |
+| `ports/mimxrt` | `rgbframebuffer` | **FBDisplay** | eLCDIF on MIMXRT1062 |
+| `ports/mimxrt` | `mipidsi` | **FBDisplay** | MIPI DSI on MIMXRT1176 |
+| `ports/mimxrt` | `i80bus` | bus driver | FlexIO MCULCD 8080 on MIMXRT1062 |
+| `ports/samd` | `i80bus` | bus driver | GPIO bit-bang (SAMD51) via `common/i80bus` |
+| `ports/samd` | stubs | `rgbframebuffer`, `mipidsi` | import ok; ctor raises |
 
-All parallel dot-clock RGB panels (RGB-666 **and** 16-pin RGB565 wiring) use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
-
----
-
-## pydisplay changes (unify on FBDisplay + rgbframebuffer)
-
-These edits belong in **pydisplay**, not displayif. Track here until done.
-
-### 1. Remove `RGBDisplay`
-
-| Item | Action |
-|------|--------|
-| `src/lib/displaysys/rgbdisplay.py` | Delete |
-| `web/pyscript/src/lib/displaysys/rgbdisplay.py` | Delete |
-| `packages/rgbdisplay.json` | Delete |
-| `tests/test_rgbdisplay.py` | Delete |
-| `scripts/publish_micropython_lib.sh` | Remove `displaysys-rgbdisplay` entry |
-| `scripts/install_refresh_manifests.sh` | Remove `packages/rgbdisplay.json` |
-| `scripts/README.md` | Remove `rgbdisplay` from manual packages list |
-
-### 2. Update docs
-
-| File | Change |
-|------|--------|
-| `docs/hardware/display-interfaces.md` | Parallel RGB row: CP `dotclockframebuffer` → MP `rgbframebuffer`; backend **FBDisplay** only (drop RGBDisplay column) |
-| `docs/hardware/pydevices-roadmap.md` | Already lists `rgbframebuffer`; remove any `rgbdisplay` / RGB565-panel split |
-| `docs/handoff/display-ecosystem.md` | Remove `rgbdisplay.py`, `present()` protocol, `RGBDisplay` naming notes |
-| `docs/hardware/driver-inventory.md` | ST7701 / parallel RGB: `rgbframebuffer` + `FBDisplay`, not `RGBDisplay` |
-| `docs/concepts/displays.md` | Confirm dotclock parallel RGB uses FBDisplay only |
-
-### 3. Board configs
-
-| Config | Change |
-|--------|--------|
-| `board_configs/fbdisplay/qualia_tl040hds20/` | Already correct: `RGBFrameBuffer` + `FBDisplay` |
-| `board_configs/fbdisplay/t-rgb_480/` | Rewrite when displayif lands: drop `RGBDisplay` / `RGB565Panel` / `displayif.rgb565`; use `rgbframebuffer.RGBFrameBuffer` + `FBDisplay` (pin map and init sequence per hardware — fix known errors separately) |
-| `board_configs/fbdisplay/t-rgb_480/package.json` | Replace `rgbdisplay.json` dep with `rgbframebuffer` package when manifest exists |
-| Parallel RGB configs (future) | Same pattern as Qualia |
-
-**Target board_config pattern** (matches CP Qualia):
-
-```python
-from rgbframebuffer import RGBFrameBuffer
-from displaysys.fbdisplay import FBDisplay
-
-fb = RGBFrameBuffer(de=..., vsync=..., hsync=..., dclk=...,
-                    red=..., green=..., blue=...,   # RGB-666 pin layout
-                    # or data=...                     # 16-pin RGB565 layout
-                    frequency=..., width=..., height=..., ...)
-display_drv = FBDisplay(fb)
-```
-
-Chip init (ST7701, IO expander, backlight GPIO) stays in pydisplay drivers / board config — not in displayif.
-
-### 4. Naming rules (pydisplay + displayif)
-
-- Do **not** use `rgb565` as a module or class name (collides with `rgb565(r, g, b)` color helper).
-- Native module: **`rgbframebuffer`**, class **`RGBFrameBuffer`** — mirrors CP `dotclockframebuffer.DotClockFramebuffer`.
-- Pixel format (666 vs 565) is a **constructor / pin-layout** choice, not a separate displaysys backend.
-
-### 5. `FBDisplay` contract (unchanged)
-
-displayif `RGBFrameBuffer` must implement what `FBDisplay` already expects:
-
-- `.width`, `.height`
-- `memoryview(fb)` — draw buffer (typecode `"H"` for 16-bit pixels where applicable)
-- `.refresh()` — scan out to panel
-
-No `present()`, `bitmap()`, or `RGBPanel` API.
-
-### 6. New pydisplay MIP package (when displayif ships)
-
-Add `packages/rgbframebuffer.json` pointing at board configs that need it (Qualia, parallel RGB boards). Remove `rgbdisplay.json`.
+All parallel dot-clock RGB panels use **`rgbframebuffer.RGBFrameBuffer`** + **`FBDisplay`**. There is no separate `RGBDisplay` / `present()` path.
 
 ---
 
-## pydisplay board configs waiting on displayif
+## pydisplay board configs (MicroPython)
 
-| pydisplay MP board config | Native module | CP reference |
-|---------------------------|---------------|--------------|
-| `fbdisplay/matrixportal_s3_64x64` | `rgbmatrix` | `cp_matrixportal_s3_64x64` |
-| `fbdisplay/matrixportal_m4_64x32` | `rgbmatrix` | `cp_matrixportal_m4_64x32` |
-| `fbdisplay/rgb_matrix_featherwing_64x32` | `rgbmatrix` | `cp_rgb_matrix_featherwing_64x32` |
-| `fbdisplay/qualia_tl040hds20` | `rgbframebuffer` | `cp_qualia_tl040hds20` |
-| `fbdisplay/mimxrt1060_evk_rk043_rgb` | `rgbframebuffer` | `cp_mimxrt1060_evk_rk043_rgb` |
-| `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` | `cp_mimxrt1170_evk_waveshare_5dsi` (Waveshare 50H-800480-IPS via **TC358762** DSI bridge) |
-| `fbdisplay/pimoroni_pico_dv_base_640x480` | `picodvi` | `cp_pimoroni_pico_dv_base_640x480` |
-| `fbdisplay/pico2_dvi_sock_640x480` | `picodvi` | `cp_pico2_dvi_sock_640x480` |
-| `fbdisplay/feather_rp2040_rgb_matrix_64x32` | `rgbmatrix` | `cp_rgb_matrix_featherwing_64x32` |
-| parallel RGB `fbdisplay/*` | `rgbframebuffer` | CP `dotclockframebuffer` configs |
+These configs import displayif modules when firmware is built with the matching cmod:
+
+| pydisplay MP board config | Native module |
+|---------------------------|---------------|
+| `fbdisplay/matrixportal_s3_64x64` | `rgbmatrix` |
+| `fbdisplay/matrixportal_m4_64x32` | `rgbmatrix` |
+| `fbdisplay/rgb_matrix_featherwing_64x32` | `rgbmatrix` |
+| `fbdisplay/qualia_tl040hds20` | `rgbframebuffer` |
+| `fbdisplay/mimxrt1060_evk_rk043_rgb` | `rgbframebuffer` |
+| `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` |
+| `fbdisplay/esp32-p4-wifi6-touch-lcd-4b` | `mipidsi` |
+| `fbdisplay/pico2_dvi_sock_640x480` | `picodvi` |
+| `fbdisplay/t-rgb_480` | `rgbframebuffer` |
+| parallel RGB `fbdisplay/*` | `rgbframebuffer` |
+
+CP siblings live under `fbdisplay/cp_*` and use CircuitPython native modules — not displayif.
+
+---
+
+## RP2350 / MIPI DSI
+
+**RP2350 has no MIPI DSI host.** The chip provides **HSTX** (high-speed serial transmit) for DVI/TMDS — used by displayif `picodvi` and CircuitPython `picodvi`. CircuitPython’s `mipidsi` module is enabled only on SoCs with a DSI PHY (e.g. **ESP32-P4**, M5Stack Tab5) — not on Raspberry Pi Pico 2 / RP2350 boards.
+
+TFT_eSPI and similar Arduino stacks on RP2040/RP2350 use **SPI** or **8-bit parallel (I80)** bit-bang/PIO, not MIPI DSI. For DSI panels you need a bridge chip (e.g. TC358762 on MIMXRT1170) or a SoC with native DSI (ESP32-P4).
+
+---
+
+## ESP32 PSRAM / sdkconfig (large framebuffers)
+
+`rgbframebuffer` and `mipidsi` allocate framebuffers with `heap_caps_malloc(..., MALLOC_CAP_SPIRAM)` and set `fb_in_psram = 1` for esp_lcd RGB panels. If PSRAM is disabled or too small in `sdkconfig`, allocation falls back to internal RAM (may fail for 720×720+ panels).
+
+**Before building esp32 displayif firmware**, verify in `menuconfig` / board `sdkconfig`:
+
+- `CONFIG_SPIRAM` / `CONFIG_ESP32S3_SPIRAM_SUPPORT` enabled
+- PSRAM size matches your module (e.g. 8 MB OPI on S3)
+- `CONFIG_SPIRAM_MALLOC_ALWAYSINTERNAL` threshold — large display buffers should land in PSRAM
+
+If panels stay black or init fails with OOM, increase PSRAM allocation or reduce resolution. displayif logs a warning when RGB framebuffer SPIRAM allocation falls back to internal heap.
 
 ---
 
@@ -125,45 +80,18 @@ Add `packages/rgbframebuffer.json` pointing at board configs that need it (Quali
 
 ```
 displayif/
-├── micropython.mk / micropython.cmake / circuitpython.mk
+├── micropython.mk / micropython.cmake
 ├── include/displayif/
 ├── ports/
-│   ├── common/          # spi/ + micropython.mk / .cmake / circuitpython.mk
+│   ├── common/          # spi/, i2c/, rgbmatrix/, i80bus/gpio_bitbang.c
 │   ├── esp32/           # rgbframebuffer, i80bus, mipidsi, rgbmatrix (S3)
-│   ├── mimxrt/          # rgbmatrix Protomatter (1062); eLCDIF rgbframebuffer; RT1176 mipidsi; i80bus stub
-│   ├── samd/            # rgbmatrix Protomatter (SAMD51); stubs for rgbframebuffer/i80/mipidsi
-│   └── rp2/             # rgbmatrix Protomatter; i80bus PIO+DMA; picodvi (RP2040/RP2350)
+│   ├── mimxrt/          # rgbmatrix; eLCDIF rgbframebuffer; RT1176 mipidsi; FlexIO i80bus
+│   ├── samd/            # rgbmatrix; GPIO i80bus (SAMD51); stubs
+│   └── rp2/             # rgbmatrix; i80bus PIO+DMA; picodvi
 └── tests/
 ```
 
-Each `ports/<name>/` directory has the same build filenames (`micropython.mk`, `micropython.cmake`, `circuitpython.mk`). Root makefiles detect the active port and include `ports/common/` plus the matching port tree.
-
----
-
-## displayif native API — `rgbframebuffer`
-
-CP equivalent: `dotclockframebuffer.DotClockFramebuffer`.
-
-```python
-fb = RGBFrameBuffer(
-    de=Pin(...), vsync=Pin(...), hsync=Pin(...), dclk=Pin(...),
-    # RGB-666 (Qualia-style):
-    red=(...), green=(...), blue=(...),
-    # OR 16-pin RGB565 parallel:
-    # data=(...),
-    frequency=16_000_000,
-    width=720, height=720,
-    hsync_pulse_width=..., hsync_front_porch=..., hsync_back_porch=...,
-    vsync_pulse_width=..., vsync_front_porch=..., vsync_back_porch=...,
-    hsync_idle_low=False, vsync_idle_low=False,
-    de_idle_high=False, pclk_active_high=False, pclk_idle_high=False,
-    overscan_left=0,  # optional
-)
-mv = memoryview(fb)
-fb.refresh()
-```
-
-Framebuffer memory is allocated by the C driver (PSRAM on ESP32). pydisplay draws via `FBDisplay(fb)`; it does not call `alloc_buffer()` for scanout.
+Each `ports/<name>/` directory has `micropython.mk` and `micropython.cmake`. Root makefiles detect the active port and include `ports/common/` plus the matching port tree.
 
 ---
 
@@ -185,7 +113,7 @@ cd micropython/ports/rp2 && make BOARD=RPI_PICO2_W USER_C_MODULES=../../../displ
 cd micropython/ports/esp32 && make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
 ```
 
-([cmods](https://github.com/PyDevices/cmods) `./build_mp.sh` is optional.)
+([cmods](https://github.com/PyDevices/cmods) `./build_mp.sh` is optional — e.g. `./build_mp.sh --port rp2 --board RPI_PICO2_W`.)
 
 No `manifest.py` frozen package required unless we later add pure-Python helpers (not planned).
 
@@ -193,26 +121,18 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 
 ## Suggested work sequence
 
-1. Scaffold (done)
-2. pydisplay board configs on `rgbframebuffer` + `FBDisplay` (done)
-3. `ports/common/spi/mod_spibus.c` + smoke test (done)
-4. `ports/esp32/mod_rgbframebuffer.c` — buffer protocol + ESP-IDF `refresh()` scanout (done)
-5. `ports/esp32/mod_i80bus.c`, `mod_mipidsi.c` — accelerated bus/display drivers (done)
-6. `ports/mimxrt/mod_rgbframebuffer_elcdif.c` — eLCDIF scanout on MIMXRT1062 (done)
-7. `ports/mimxrt/mod_mipidsi.c` + `mimxrt1176_dsi_display.c` — MIPI DSI on RT1176 (done; TC358762 bridge for Waveshare 50H-800480-IPS)
-8. `ports/rp2/mod_picodvi.c` — RP2040 PIO (libdvi) + RP2350 HSTX (done)
-9. Qualia + parallel-RGB hardware validation
-10. `rgbmatrix` Protomatter backends on esp32-S3 / mimxrt-1062 / samd51 (done); extend to other SoCs as needed
-11. CP patch script (`apply_cp_displayif_patches.sh`)
+1. Scaffold — done
+2. pydisplay board configs on `rgbframebuffer` + `FBDisplay` — done
+3. `spibus` + smoke tests — done
+4. esp32 `rgbframebuffer`, `i80bus`, `mipidsi` — done
+5. mimxrt eLCDIF `rgbframebuffer`, RT1176 `mipidsi`, FlexIO `i80bus` — done
+6. rp2 `picodvi`, PIO `i80bus` — done
+7. samd GPIO `i80bus` via `common/i80bus/gpio_bitbang.c` — done
+8. `rgbmatrix` Protomatter backends — done
+9. **Hardware validation** on real panels (Qualia, RK043, RT1170 DSI, P4 4B, Pico DVI) — pending
+10. mimxrt i80bus: board-specific pydisplay config, optional DMA bulk path — pending
+11. pydisplay: remove legacy `RGBDisplay` package — see pydisplay repo
 
 ---
 
-## Open questions
-
-- SPI native module name (`spi` vs `displayif_spi` vs match viper `spibus` surface)
-- PSRAM / `sdkconfig` sizing for large framebuffers on ESP32
-- CP module registration pattern
-
----
-
-*Updated 2026-07-07 — SDK drivers shipped: mimxrt eLCDIF rgbframebuffer, RT1176 mipidsi (TC358762 DSI bridge), rp2 picodvi (RP2040/RP2350).*
+*Updated 2026-07-07 — MicroPython-only; common SAMD i80bus; CP glue removed.*

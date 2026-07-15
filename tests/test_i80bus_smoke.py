@@ -1,4 +1,4 @@
-"""Smoke test for i80bus import (esp32-S3 with I80 LCD peripheral)."""
+"""Smoke test for i80bus import."""
 
 import sys
 

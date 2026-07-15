@@ -7,6 +7,7 @@
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/binary.h"
+#include "py/printf.h"
 #include "displayif/mp_helpers.h"
 
 #define RGBFB_MAX_DATA_PINS 18
@@ -64,6 +65,10 @@ static const mp_obj_type_t rgbframebuffer_type;
 static uint8_t *rgbframebuffer_alloc(size_t nbytes) {
     uint8_t *ptr = heap_caps_malloc(nbytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (ptr == NULL) {
+        mp_printf(&mp_plat_print,
+            "displayif: SPIRAM alloc failed (%u bytes); trying internal heap. "
+            "Enable CONFIG_SPIRAM and size PSRAM in sdkconfig for large RGB panels.\n",
+            (unsigned)nbytes);
         ptr = heap_caps_malloc(nbytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     }
     return ptr;
