@@ -135,10 +135,19 @@ static void mipidsi_backlight_set(int pin, bool on_high, bool on) {
     gpio_set_level(pin, level);
 }
 
+#define MIPIDSI_CACHE_LINE 64
+
+static size_t mipidsi_align_up(size_t nbytes) {
+    return (nbytes + MIPIDSI_CACHE_LINE - 1) & ~(size_t)(MIPIDSI_CACHE_LINE - 1);
+}
+
 static uint8_t *mipidsi_alloc_framebuffer(size_t nbytes) {
-    uint8_t *ptr = heap_caps_malloc(nbytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    size_t alloc_size = mipidsi_align_up(nbytes);
+    uint8_t *ptr = heap_caps_aligned_alloc(
+        MIPIDSI_CACHE_LINE, alloc_size, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (ptr == NULL) {
-        ptr = heap_caps_malloc(nbytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+        ptr = heap_caps_aligned_alloc(
+            MIPIDSI_CACHE_LINE, alloc_size, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
     }
     return ptr;
 }
@@ -315,31 +324,21 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
 
 static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    mipidsi_raise_esp_err(esp_cache_msync(self->buf, self->buf_len, ESP_CACHE_MSYNC_FLAG_DIR_C2M));
+    /* Address and size must be cache-line aligned (see mipidsi_alloc_framebuffer). */
+    mipidsi_raise_esp_err(esp_cache_msync(
+        self->buf, mipidsi_align_up(self->buf_len), ESP_CACHE_MSYNC_FLAG_DIR_C2M));
     mipidsi_raise_esp_err(esp_lcd_panel_draw_bitmap(self->panel, 0, 0, self->width, self->height, self->buf));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_refresh_obj, mipidsi_display_refresh);
-
-static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
-    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (dest[0] == MP_OBJ_NULL) {
-        if (attr == MP_QSTR_width) {
-            dest[0] = mp_obj_new_int(self->width);
-        } else if (attr == MP_QSTR_height) {
-            dest[0] = mp_obj_new_int(self->height);
-        } else if (attr == MP_QSTR_row_stride) {
-            dest[0] = mp_obj_new_int(self->row_stride);
-        }
-    }
-}
 
 static mp_int_t mipidsi_display_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     bufinfo->buf = self->buf;
     bufinfo->len = self->buf_len;
-    bufinfo->typecode = 'H';
+    /* Byte-addressable for displaysys.FBDisplay (RGB565 packed). */
+    bufinfo->typecode = 'B';
     return 0;
 }
 
@@ -359,6 +358,26 @@ static mp_obj_t mipidsi_display_del(mp_obj_t self_in) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_del_obj, mipidsi_display_del);
+
+static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
+    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (dest[0] == MP_OBJ_NULL) {
+        /* Custom attr replaces locals_dict lookup on this port — expose methods here. */
+        if (attr == MP_QSTR_width) {
+            dest[0] = mp_obj_new_int(self->width);
+        } else if (attr == MP_QSTR_height) {
+            dest[0] = mp_obj_new_int(self->height);
+        } else if (attr == MP_QSTR_row_stride) {
+            dest[0] = mp_obj_new_int(self->row_stride);
+        } else if (attr == MP_QSTR_refresh) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_refresh_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR___del__) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_del_obj);
+            dest[1] = self_in;
+        }
+    }
+}
 
 static const mp_rom_map_elem_t mipidsi_display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&mipidsi_display_refresh_obj) },

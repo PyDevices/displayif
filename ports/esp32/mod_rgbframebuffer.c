@@ -7,7 +7,7 @@
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/binary.h"
-#include "py/printf.h"
+#include "py/mpprint.h"
 #include "displayif/mp_helpers.h"
 
 #define RGBFB_MAX_DATA_PINS 18
