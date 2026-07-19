@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // pydisplay-compatible SPI display bus (replaces viper spibus when displayif is built in).
+// Lifecycle: idempotent deinit/__del__ (machine.SPI owns hardware teardown on soft reset).
 
 #include <string.h>
 
@@ -27,6 +28,7 @@ typedef struct _spibus_obj_t {
     mp_obj_t buf1;
     bool has_cs;
     bool has_reset;
+    bool deinited;
 } spibus_obj_t;
 
 static const mp_obj_type_t spibus_type;
@@ -143,11 +145,15 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
 
     self->buf1 = mp_obj_new_bytearray(1, (byte[]){0});
+    self->deinited = false;
     return MP_OBJ_FROM_PTR(self);
 }
 
 static mp_obj_t spibus_reset(mp_obj_t self_in) {
     spibus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("spibus is deinited"));
+    }
     if (!self->has_reset) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("No reset pin defined"));
     }
@@ -161,6 +167,9 @@ static MP_DEFINE_CONST_FUN_OBJ_1(spibus_reset_obj, spibus_reset);
 
 static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
     spibus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("spibus is deinited"));
+    }
     mp_obj_t command = (n_args > 1) ? args[1] : mp_const_none;
     mp_obj_t data = (n_args > 2) ? args[2] : mp_const_none;
 
@@ -190,7 +199,11 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(spibus_send_obj, 1, 3, spibus_send);
 
 static mp_obj_t spibus_deinit(mp_obj_t self_in) {
     spibus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        return mp_const_none;
+    }
     displayif_obj_call_method0(self->spi, MP_QSTR_deinit);
+    self->deinited = true;
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(spibus_deinit_obj, spibus_deinit);
@@ -199,6 +212,7 @@ static const mp_rom_map_elem_t spibus_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&spibus_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&spibus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&spibus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&spibus_deinit_obj) },
 };
 static MP_DEFINE_CONST_DICT(spibus_locals_dict, spibus_locals_dict_table);
 

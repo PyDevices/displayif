@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // HUB75 RGB LED matrix — Protomatter (hardware timer) or portable GPIO bitbang fallback.
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 #include <stdlib.h>
@@ -10,6 +11,7 @@
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
 #include "displayif/rgbmatrix_pm.h"
+#include "displayif/soft_reset.h"
 
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
 #include "protomatter/core.h"
@@ -38,6 +40,7 @@ typedef struct _rgbmatrix_obj_t {
     uint8_t *draw_buf;
     uint8_t *scan_buf;
     size_t buf_len;
+    bool deinited;
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     Protomatter_core pm;
     void *pm_timer;
@@ -51,6 +54,17 @@ typedef struct _rgbmatrix_obj_t {
 } rgbmatrix_obj_t;
 
 static const mp_obj_type_t rgbmatrix_type;
+
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+typedef struct {
+    Protomatter_core pm;
+    void *pm_timer;
+    bool pm_started;
+} rgbmatrix_pm_host_t;
+
+static rgbmatrix_pm_host_t s_pm_host;
+#endif
+static bool s_soft_reset_registered;
 
 static uint8_t *rgbmatrix_alloc(size_t nbytes) {
     return m_malloc(nbytes);
@@ -135,6 +149,28 @@ static void rgbmatrix_shift_row(rgbmatrix_obj_t *self, uint8_t addr, uint8_t pla
 
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
 
+static void rgbmatrix_host_teardown(void) {
+    if (!s_pm_host.pm_started) {
+        return;
+    }
+    displayif_rgbmatrix_pm_timer_disable(s_pm_host.pm_timer);
+    displayif_rgbmatrix_pm_set_active(&s_pm_host.pm);
+    _PM_stop(&s_pm_host.pm);
+    _PM_deallocate(&s_pm_host.pm);
+    displayif_rgbmatrix_pm_timer_free(s_pm_host.pm_timer);
+    displayif_rgbmatrix_pm_set_active(NULL);
+    s_pm_host.pm_timer = NULL;
+    s_pm_host.pm_started = false;
+    memset(&s_pm_host.pm, 0, sizeof(s_pm_host.pm));
+}
+
+static void rgbmatrix_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(rgbmatrix_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
+
 static void rgbmatrix_pm_status_raise(ProtomatterStatus stat) {
     switch (stat) {
         case PROTOMATTER_ERR_PINS:
@@ -167,15 +203,20 @@ static void rgbmatrix_pm_start(rgbmatrix_obj_t *self) {
         return;
     }
 
+#if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+    rgbmatrix_host_teardown();
+    rgbmatrix_ensure_soft_reset_registered();
+#endif
+
     self->pm_timer = displayif_rgbmatrix_pm_timer_alloc();
     if (self->pm_timer == NULL) {
         mp_raise_ValueError(MP_ERROR_TEXT("no timer available for rgbmatrix"));
     }
 
-    memset(&self->pm, 0, sizeof(self->pm));
+    memset(&s_pm_host.pm, 0, sizeof(s_pm_host.pm));
     int8_t pm_tile = self->serpentine ? -(int8_t)self->tile : (int8_t)self->tile;
     ProtomatterStatus stat = _PM_init(
-        &self->pm,
+        &s_pm_host.pm,
         self->width,
         self->bit_depth,
         1,
@@ -194,34 +235,41 @@ static void rgbmatrix_pm_start(rgbmatrix_obj_t *self) {
         rgbmatrix_pm_status_raise(stat);
     }
 
-    displayif_rgbmatrix_pm_set_active(&self->pm);
+    displayif_rgbmatrix_pm_set_active(&s_pm_host.pm);
     displayif_rgbmatrix_pm_timer_enable(self->pm_timer);
-    stat = _PM_begin(&self->pm);
+    stat = _PM_begin(&s_pm_host.pm);
     if (stat != PROTOMATTER_OK) {
-        _PM_deallocate(&self->pm);
+        _PM_deallocate(&s_pm_host.pm);
         displayif_rgbmatrix_pm_timer_free(self->pm_timer);
         self->pm_timer = NULL;
         displayif_rgbmatrix_pm_set_active(NULL);
         rgbmatrix_pm_status_raise(stat);
     }
 
-    _PM_convert_565(&self->pm, (uint16_t *)self->draw_buf, self->width);
-    _PM_swapbuffer_maybe(&self->pm);
+    _PM_convert_565(&s_pm_host.pm, (uint16_t *)self->draw_buf, self->width);
+    _PM_swapbuffer_maybe(&s_pm_host.pm);
+    self->pm = s_pm_host.pm;
     self->pm_started = true;
+    s_pm_host.pm_timer = self->pm_timer;
+    s_pm_host.pm_started = true;
 }
 
 static void rgbmatrix_pm_stop(rgbmatrix_obj_t *self) {
     if (!self->pm_started) {
         return;
     }
-    displayif_rgbmatrix_pm_timer_disable(self->pm_timer);
-    _PM_stop(&self->pm);
-    _PM_deallocate(&self->pm);
-    displayif_rgbmatrix_pm_timer_free(self->pm_timer);
+    displayif_rgbmatrix_pm_timer_disable(s_pm_host.pm_timer);
+    displayif_rgbmatrix_pm_set_active(&s_pm_host.pm);
+    _PM_stop(&s_pm_host.pm);
+    _PM_deallocate(&s_pm_host.pm);
+    displayif_rgbmatrix_pm_timer_free(s_pm_host.pm_timer);
     self->pm_timer = NULL;
     displayif_rgbmatrix_pm_set_active(NULL);
     self->pm_started = false;
     memset(&self->pm, 0, sizeof(self->pm));
+    s_pm_host.pm_started = false;
+    s_pm_host.pm_timer = NULL;
+    memset(&s_pm_host.pm, 0, sizeof(s_pm_host.pm));
 }
 
 #endif /* DISPLAYIF_RGBMATRIX_USE_PROTOMATTER */
@@ -315,6 +363,7 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
     self->external_fb = false;
     self->draw_buf = NULL;
     self->scan_buf = NULL;
+    self->deinited = false;
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     self->pm_timer = NULL;
     self->pm_started = false;
@@ -391,11 +440,14 @@ static mp_obj_t rgbmatrix_make(const mp_obj_type_t *type, size_t n_args, size_t 
 
 static mp_obj_t rgbmatrix_refresh(mp_obj_t self_in) {
     rgbmatrix_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->draw_buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("rgbmatrix is deinited"));
+    }
 
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     if (self->pm_started) {
-        _PM_convert_565(&self->pm, (uint16_t *)self->draw_buf, self->width);
-        _PM_swapbuffer_maybe(&self->pm);
+        _PM_convert_565(&s_pm_host.pm, (uint16_t *)self->draw_buf, self->width);
+        _PM_swapbuffer_maybe(&s_pm_host.pm);
         return mp_const_none;
     }
 #endif
@@ -445,14 +497,22 @@ static void rgbmatrix_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 static mp_int_t rgbmatrix_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
     rgbmatrix_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->draw_buf == NULL) {
+        bufinfo->buf = NULL;
+        bufinfo->len = 0;
+        bufinfo->typecode = 'H';
+        return 0;
+    }
     bufinfo->buf = self->draw_buf;
     bufinfo->len = self->buf_len;
     bufinfo->typecode = 'H';
     return 0;
 }
 
-static mp_obj_t rgbmatrix_del(mp_obj_t self_in) {
-    rgbmatrix_obj_t *self = MP_OBJ_TO_PTR(self_in);
+static void rgbmatrix_deinit_internal(rgbmatrix_obj_t *self) {
+    if (self->deinited) {
+        return;
+    }
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     rgbmatrix_pm_stop(self);
 #endif
@@ -464,12 +524,19 @@ static mp_obj_t rgbmatrix_del(mp_obj_t self_in) {
     }
     self->draw_buf = NULL;
     self->scan_buf = NULL;
+    self->deinited = true;
+}
+
+static mp_obj_t rgbmatrix_del(mp_obj_t self_in) {
+    rgbmatrix_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    rgbmatrix_deinit_internal(self);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(rgbmatrix_del_obj, rgbmatrix_del);
 
 static const mp_rom_map_elem_t rgbmatrix_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&rgbmatrix_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&rgbmatrix_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&rgbmatrix_del_obj) },
 };
 static MP_DEFINE_CONST_DICT(rgbmatrix_locals_dict, rgbmatrix_locals_dict_table);

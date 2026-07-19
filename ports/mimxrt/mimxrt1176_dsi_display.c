@@ -381,10 +381,6 @@ status_t displayif_mimxrt1176_dsi_display_start(const displayif_mimxrt1176_dsi_t
     if (!s_dsi_bus_ready || timings == NULL) {
         return kStatus_Fail;
     }
-    if (s_dsi_display_ready) {
-        return kStatus_Success;
-    }
-
     s_timings = *timings;
     displayif_init_lcdifv2_clock(timings->pixel_clock_hz);
     displayif_set_mipi_dsi_config(timings->num_lanes, timings);

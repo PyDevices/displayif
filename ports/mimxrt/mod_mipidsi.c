@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // MIPI DSI host for MIMXRT1176 (LCDIFV2 + NXP mipi_dsi_split).
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 
 #if defined(MIMXRT1176_SERIES) || defined(CPU_MIMXRT1176) || defined(CPU_MIMXRT1176DVMAA_cm7)
 
@@ -20,6 +22,7 @@ typedef struct _mipidsi_bus_obj_t {
     uint8_t num_lanes;
     uint32_t lane_bit_rate_hz;
     bool ready;
+    bool deinited;
 } mipidsi_bus_obj_t;
 
 typedef struct _mipidsi_display_obj_t {
@@ -33,7 +36,10 @@ typedef struct _mipidsi_display_obj_t {
     int backlight_pin;
     bool backlight_on_high;
     bool lcdif_ready;
+    bool deinited;
 } mipidsi_display_obj_t;
+
+static bool s_soft_reset_registered;
 
 static const mp_obj_type_t mipidsi_bus_type;
 static const mp_obj_type_t mipidsi_display_type;
@@ -43,6 +49,46 @@ static void mipidsi_raise_status(status_t status) {
         return;
     }
     mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("NXP SDK status %d"), (int)status);
+}
+
+/* Complete host teardown. Safe if already clean. Does not touch GC memory. */
+static void mipidsi_host_teardown(void) {
+    displayif_mimxrt1176_dsi_display_stop();
+    displayif_mimxrt1176_dsi_bus_deinit();
+}
+
+static void mipidsi_host_display_teardown(void) {
+    displayif_mimxrt1176_dsi_display_stop();
+}
+
+static void mipidsi_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(mipidsi_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
+
+static void mipidsi_bus_deinit_internal(mipidsi_bus_obj_t *self) {
+    mipidsi_host_teardown();
+    if (self != NULL) {
+        self->ready = false;
+        self->deinited = true;
+    }
+}
+
+static void mipidsi_display_deinit_internal(mipidsi_display_obj_t *self) {
+    if (self != NULL && self->deinited) {
+        return;
+    }
+    mipidsi_host_display_teardown();
+    if (self != NULL) {
+        if (self->buf != NULL) {
+            m_free(self->buf);
+            self->buf = NULL;
+        }
+        self->lcdif_ready = false;
+        self->deinited = true;
+    }
 }
 
 static mp_obj_t mipidsi_bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -64,15 +110,29 @@ static mp_obj_t mipidsi_bus_make(const mp_obj_type_t *type, size_t n_args, size_
         mp_raise_ValueError(MP_ERROR_TEXT("num_lanes out of range"));
     }
 
+    mipidsi_host_teardown();
+    mipidsi_ensure_soft_reset_registered();
+
     mipidsi_bus_obj_t *self = mp_obj_malloc(mipidsi_bus_obj_t, type);
     self->num_lanes = vals[ARG_num_lanes].u_int;
     self->lane_bit_rate_hz = (uint32_t)vals[ARG_frequency].u_int;
     self->ready = false;
+    self->deinited = false;
 
     mipidsi_raise_status(displayif_mimxrt1176_dsi_bus_init(self->num_lanes, self->lane_bit_rate_hz));
     self->ready = true;
     return MP_OBJ_FROM_PTR(self);
 }
+
+static mp_obj_t mipidsi_bus_deinit(mp_obj_t self_in) {
+    mipidsi_bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        return mp_const_none;
+    }
+    mipidsi_bus_deinit_internal(self);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_bus_deinit_obj, mipidsi_bus_deinit);
 
 static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     if (n_args < 1) {
@@ -119,7 +179,7 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     if (!mp_obj_is_type(bus_obj, &mipidsi_bus_type)) {
         mp_raise_TypeError(MP_ERROR_TEXT("bus must be mipidsi.Bus"));
     }
-    if (!bus->ready) {
+    if (bus->deinited || !bus->ready) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("MIPI DSI bus is not initialized"));
     }
     if (vals[ARG_color_depth].u_int != 16) {
@@ -135,6 +195,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     mp_buffer_info_t init_bufinfo;
     mp_get_buffer_raise(vals[ARG_init_sequence].u_obj, &init_bufinfo, MP_BUFFER_READ);
 
+    mipidsi_host_display_teardown();
+
     mipidsi_display_obj_t *self = mp_obj_malloc(mipidsi_display_obj_t, type);
     self->bus = bus;
     self->width = vals[ARG_width].u_int;
@@ -149,6 +211,7 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     self->backlight_pin = vals[ARG_backlight_pin].u_int;
     self->backlight_on_high = vals[ARG_backlight_on_high].u_bool;
     self->lcdif_ready = false;
+    self->deinited = false;
 
     displayif_mimxrt1176_dsi_timings_t timings = {
         .width = self->width,
@@ -176,11 +239,21 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
 
 static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("MIPI DSI display is deinited"));
+    }
     DCACHE_CleanByRange((uint32_t)self->buf, self->buf_len);
     displayif_mimxrt1176_dsi_set_framebuffer(self->buf);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_refresh_obj, mipidsi_display_refresh);
+
+static mp_obj_t mipidsi_display_del(mp_obj_t self_in) {
+    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    mipidsi_display_deinit_internal(self);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_del_obj, mipidsi_display_del);
 
 static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
@@ -191,6 +264,15 @@ static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
             dest[0] = mp_obj_new_int(self->height);
         } else if (attr == MP_QSTR_row_stride) {
             dest[0] = mp_obj_new_int(self->row_stride);
+        } else if (attr == MP_QSTR_refresh) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_refresh_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR_deinit) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_del_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR___del__) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_del_obj);
+            dest[1] = self_in;
         }
     }
 }
@@ -198,28 +280,27 @@ static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 static mp_int_t mipidsi_display_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        bufinfo->buf = NULL;
+        bufinfo->len = 0;
+        bufinfo->typecode = 'H';
+        return 0;
+    }
     bufinfo->buf = self->buf;
     bufinfo->len = self->buf_len;
     bufinfo->typecode = 'H';
     return 0;
 }
 
-static mp_obj_t mipidsi_display_del(mp_obj_t self_in) {
-    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->lcdif_ready) {
-        displayif_mimxrt1176_dsi_display_stop();
-        self->lcdif_ready = false;
-    }
-    if (self->buf != NULL) {
-        m_free(self->buf);
-        self->buf = NULL;
-    }
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_del_obj, mipidsi_display_del);
+static const mp_rom_map_elem_t mipidsi_bus_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mipidsi_bus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mipidsi_bus_deinit_obj) },
+};
+static MP_DEFINE_CONST_DICT(mipidsi_bus_locals_dict, mipidsi_bus_locals_dict_table);
 
 static const mp_rom_map_elem_t mipidsi_display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&mipidsi_display_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mipidsi_display_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mipidsi_display_del_obj) },
 };
 static MP_DEFINE_CONST_DICT(mipidsi_display_locals_dict, mipidsi_display_locals_dict_table);
@@ -238,7 +319,8 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     mipidsi_bus_type,
     MP_QSTR_Bus,
     MP_TYPE_FLAG_NONE,
-    make_new, mipidsi_bus_make
+    make_new, mipidsi_bus_make,
+    locals_dict, &mipidsi_bus_locals_dict
 );
 
 static const mp_rom_map_elem_t mipidsi_module_globals_table[] = {

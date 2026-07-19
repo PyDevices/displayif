@@ -6,10 +6,14 @@ target_include_directories(displayif_common INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/common
 )
 target_compile_options(displayif_common INTERFACE -Wno-unused-function)
+target_compile_definitions(displayif_common INTERFACE DISPLAYIF_WRAP_MP_DEINIT=1)
+# Soft-reset: wrap mp_deinit so displayif can release DMA/IRQ/SDK handles.
+target_link_options(displayif_common INTERFACE -Wl,--wrap=mp_deinit)
 target_link_libraries(usermod INTERFACE displayif_common)
 
 target_sources(displayif_common INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/common/mp_helpers.c
+    ${DISPLAYIF_MOD_DIR}/ports/common/soft_reset.c
     ${DISPLAYIF_MOD_DIR}/ports/common/spi/mod_spibus.c
     ${DISPLAYIF_MOD_DIR}/ports/common/i2c/mod_i2cbus.c
     ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/mod_rgbmatrix.c

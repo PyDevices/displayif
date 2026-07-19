@@ -5,6 +5,7 @@
 
 #include "py/runtime.h"
 #include "py/mphal.h"
+#include "displayif/soft_reset.h"
 #include "picodvi_rp2040.h"
 
 #if defined(PICO_RP2040) && !defined(PICO_RP2350)
@@ -25,6 +26,19 @@
 #include "picodvi/libdvi/tmds_encode.h"
 
 static picodvi_framebuffer_obj_t *active_picodvi;
+
+typedef struct {
+    bool hw_live;
+    int8_t pin_pair[4];
+    uint pwm_slice;
+    uint tmds_lock;
+    uint colour_lock;
+    int dma_data[N_TMDS_LANES];
+    int dma_ctrl[N_TMDS_LANES];
+} picodvi_hw_shadow_t;
+
+static picodvi_hw_shadow_t s_hw;
+static bool s_soft_reset_registered;
 
 uint8_t dvi_vertical_repeat;
 bool dvi_monochrome_tmds;
@@ -107,17 +121,58 @@ static void picodvi_turn_off_dma(uint8_t channel) {
     dma_channel_unclaim(channel);
 }
 
+static void picodvi_hw_stop(void) {
+    if (!s_hw.hw_live) {
+        return;
+    }
+    spin_lock_t *tmds_lock = spin_lock_instance(s_hw.tmds_lock);
+    spin_lock_t *colour_lock = spin_lock_instance(s_hw.colour_lock);
+    uint32_t tmds_save = spin_lock_blocking(tmds_lock);
+    uint32_t colour_save = spin_lock_blocking(colour_lock);
+    multicore_reset_core1();
+    spin_unlock(colour_lock, colour_save);
+    spin_unlock(tmds_lock, tmds_save);
+
+    for (int i = 0; i < N_TMDS_LANES; ++i) {
+        picodvi_turn_off_dma(s_hw.dma_data[i]);
+        picodvi_turn_off_dma(s_hw.dma_ctrl[i]);
+    }
+
+    pwm_set_enabled(s_hw.pwm_slice, false);
+    for (size_t i = 0; i < 4; i++) {
+        gpio_deinit(s_hw.pin_pair[i]);
+        gpio_deinit(s_hw.pin_pair[i] + 1);
+    }
+
+    spin_lock_unclaim(s_hw.tmds_lock);
+    spin_lock_unclaim(s_hw.colour_lock);
+    active_picodvi = NULL;
+    s_hw.hw_live = false;
+}
+
+static void picodvi_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(picodvi_hw_stop);
+        s_soft_reset_registered = true;
+    }
+}
+
+void picodvi_rp2040_force_teardown(void) {
+    picodvi_hw_stop();
+}
+
 bool picodvi_rp2040_active(void) {
-    return active_picodvi != NULL;
+    return s_hw.hw_live;
 }
 
 bool picodvi_rp2040_construct(picodvi_framebuffer_obj_t *self, uint16_t width, uint16_t height,
     int clk_dp, int clk_dn, int red_dp, int red_dn, int green_dp, int green_dn, int blue_dp, int blue_dn,
     uint8_t color_depth) {
 
-    if (active_picodvi != NULL) {
-        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("%q in use"), MP_QSTR_picodvi);
+    if (s_hw.hw_live) {
+        picodvi_hw_stop();
     }
+    picodvi_ensure_soft_reset_registered();
 
     bool color_framebuffer = color_depth >= 8;
     const struct dvi_timing *timing = NULL;
@@ -243,6 +298,19 @@ bool picodvi_rp2040_construct(picodvi_framebuffer_obj_t *self, uint16_t width, u
     active_picodvi = self;
     multicore_launch_core1(picodvi_core1_main);
 
+    s_hw.pin_pair[0] = self->pin_pair[0];
+    s_hw.pin_pair[1] = self->pin_pair[1];
+    s_hw.pin_pair[2] = self->pin_pair[2];
+    s_hw.pin_pair[3] = self->pin_pair[3];
+    s_hw.pwm_slice = self->pwm_slice;
+    s_hw.tmds_lock = self->tmds_lock;
+    s_hw.colour_lock = self->colour_lock;
+    for (int i = 0; i < N_TMDS_LANES; ++i) {
+        s_hw.dma_data[i] = self->dvi.dma_cfg[i].chan_data;
+        s_hw.dma_ctrl[i] = self->dvi.dma_cfg[i].chan_ctrl;
+    }
+    s_hw.hw_live = true;
+
     self->next_scanline = 0;
     uint32_t *next_scanline_buf = self->framebuffer + (self->pitch * self->next_scanline);
     queue_add_blocking_u32(&self->dvi.q_colour_valid, &next_scanline_buf);
@@ -261,28 +329,7 @@ void picodvi_rp2040_deinit(picodvi_framebuffer_obj_t *self) {
         return;
     }
 
-    spin_lock_t *tmds_lock = spin_lock_instance(self->tmds_lock);
-    spin_lock_t *colour_lock = spin_lock_instance(self->colour_lock);
-    uint32_t tmds_save = spin_lock_blocking(tmds_lock);
-    uint32_t colour_save = spin_lock_blocking(colour_lock);
-    multicore_reset_core1();
-    spin_unlock(colour_lock, colour_save);
-    spin_unlock(tmds_lock, tmds_save);
-
-    for (int i = 0; i < N_TMDS_LANES; ++i) {
-        picodvi_turn_off_dma(self->dvi.dma_cfg[i].chan_data);
-        picodvi_turn_off_dma(self->dvi.dma_cfg[i].chan_ctrl);
-    }
-
-    pwm_set_enabled(self->pwm_slice, false);
-    for (size_t i = 0; i < 4; i++) {
-        gpio_deinit(self->pin_pair[i]);
-        gpio_deinit(self->pin_pair[i] + 1);
-    }
-
-    spin_lock_unclaim(self->tmds_lock);
-    spin_lock_unclaim(self->colour_lock);
-    active_picodvi = NULL;
+    picodvi_hw_stop();
     m_free(self->framebuffer);
     self->framebuffer = NULL;
 }

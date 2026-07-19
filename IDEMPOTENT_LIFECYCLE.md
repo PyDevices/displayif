@@ -80,19 +80,21 @@ Ports tree: `ports/common`, `ports/esp32`, `ports/mimxrt`, `ports/rp2`, `ports/s
 
 ## Current gaps (inventory for agents)
 
-Snapshot at time of writing — verify with grep; do not assume this table stays frozen.
+Updated after lifecycle implementation (2026-07) — verify with grep if unsure.
 
 | Module / port | `deinit()` | `__del__` | Soft-reset hook | Notes |
 |---------------|------------|-----------|-----------------|-------|
-| `spibus` (common) | yes (calls SPI `.deinit`) | no | no | Relatively soft; still should be idempotent + soft-reset safe |
-| `i2cbus` (common) | **no** | **no** | no | Needs lifecycle |
-| `i80bus` esp32/rp2/mimxrt/samd | yes | varies | no | Ensure deinit frees bus/DMA/PIO and ctor is idempotent |
-| `rgbframebuffer` esp32 | via `__del__` | yes (`esp_lcd_panel_del`) | no | Soft reset leaves panel/IRQ; need hook + idempotent ctor |
-| `rgbframebuffer` mimxrt eLCDIF | via `__del__` | yes | no | Same class of bug |
-| `mipidsi` esp32 | Display `__del__` only (panel+IO) | Display yes; **Bus no** | no | **Primary incident**; Bus never `esp_lcd_del_dsi_bus` |
-| `mipidsi` mimxrt | Display `__del__`; helpers `displayif_mimxrt1176_dsi_bus_deinit` / `_display_stop` exist | partial | no | Wire helpers through public deinit + soft-reset + idempotent ctor |
-| `picodvi` rp2 | internal `*_deinit` | `__del__` | no | `picodvi_rp2350_deinit` already idempotent-ish — expose + soft-reset |
-| `rgbmatrix` | via `__del__` | yes | no | Stop timers/IRQs/PIO; soft-reset hook |
+| `spibus` (common) | yes | yes | n/a (Python SPI) | Idempotent `deinited` guard |
+| `i2cbus` (common) | yes | yes | n/a (Python I2C) | Clears `vstr`; thin wrapper |
+| `i80bus` esp32/rp2/mimxrt/samd | yes | yes | yes (hw ports) | Static host handles; SAMD GPIO is thin |
+| `rgbframebuffer` esp32 | yes | yes | yes | Panel + SPIRAM buf in BSS host |
+| `rgbframebuffer` mimxrt eLCDIF | yes | yes | yes | Stops eLCDIF; GC buf not `m_free`'d on soft reset |
+| `mipidsi` esp32 | Bus + Display | yes | yes | Primary fix: `esp_lcd_del_dsi_bus` + LDO release |
+| `mipidsi` mimxrt | Bus + Display | yes | yes | Wires `*_bus_deinit` / `*_display_stop` |
+| `picodvi` rp2 | yes | yes | yes | Static HW shadow; no dangling `active_picodvi` |
+| `rgbmatrix` | yes | yes | yes (Protomatter) | PM core in BSS; bitbang path has no host IRQs |
+
+Shared: `include/displayif/soft_reset.h` + `ports/common/soft_reset.c` (`--wrap=mp_deinit`).
 
 ---
 

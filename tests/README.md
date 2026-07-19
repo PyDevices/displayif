@@ -11,6 +11,7 @@
 | `test_picodvi_smoke.py` | `rp2` | import `Framebuffer`; smallest mode (320x240); full DVI needs Pico DV hardware |
 | `test_rgbmatrix_smoke.py` | MCU with `rgbmatrix` (Protomatter on S3 / 1062 / SAMD51 / rp2) | buffer + tile height |
 | `test_i2cbus_smoke.py` | MCU with I2C | native `i2cbus` |
+| `test_lifecycle_api.py` | any port with displayif linked | import-only: types expose `deinit` / `__del__`; hardware soft-reset/idempotent ctor needs board (see `IDEMPOTENT_LIFECYCLE.md`) |
 
 ```bash
 # After a build with displayif linked in (flash uf2 to board for rp2):

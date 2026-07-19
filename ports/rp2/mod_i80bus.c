@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Intel 8080 parallel display bus for RP2040/RP2350 (PIO + DMA via pico-sdk).
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 
@@ -7,6 +8,7 @@
 #include "py/obj.h"
 #include "py/binary.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 #include "machine_pin.h"
 
 #include "hardware/clocks.h"
@@ -31,7 +33,21 @@ typedef struct _i80bus_obj_t {
     uint8_t wr_pin;
     uint8_t data_base;
     uint32_t freq;
+    bool deinited;
 } i80bus_obj_t;
+
+typedef struct {
+    PIO pio;
+    int sm;
+    int dma_channel;
+    bool live;
+} i80bus_host_t;
+
+static i80bus_host_t s_host = {
+    .sm = -1,
+    .dma_channel = -1,
+};
+static bool s_soft_reset_registered;
 
 static const mp_obj_type_t i80bus_type;
 
@@ -46,6 +62,39 @@ static bool i80bus_offsets_ready;
 #if NUM_PIOS > 0
 static int i80bus_prog_offset[NUM_PIOS];
 #endif
+
+static void i80bus_host_teardown(void) {
+    if (s_host.sm >= 0) {
+        pio_sm_set_enabled(s_host.pio, s_host.sm, false);
+        pio_sm_unclaim(s_host.pio, s_host.sm);
+        s_host.sm = -1;
+    }
+    if (s_host.dma_channel >= 0) {
+        dma_channel_abort(s_host.dma_channel);
+        dma_channel_unclaim(s_host.dma_channel);
+        s_host.dma_channel = -1;
+    }
+    s_host.live = false;
+}
+
+static void i80bus_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(i80bus_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
+
+static void i80bus_deinit_internal(i80bus_obj_t *self) {
+    if (self != NULL && self->deinited) {
+        return;
+    }
+    i80bus_host_teardown();
+    if (self != NULL) {
+        self->sm = -1;
+        self->dma_channel = -1;
+        self->deinited = true;
+    }
+}
 
 static void i80bus_prepare_program(void) {
     if (!i80bus_offsets_ready) {
@@ -158,6 +207,8 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         cs_pin = i80bus_pin_num(vals[ARG_cs].u_obj);
     }
 
+    i80bus_host_teardown();
+    i80bus_ensure_soft_reset_registered();
     i80bus_prepare_program();
 
     PIO pio = pio1;
@@ -231,11 +282,19 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->wr_pin = wr_pin;
     self->data_base = data_base;
     self->freq = vals[ARG_freq].u_int;
+    self->deinited = false;
+    s_host.pio = pio;
+    s_host.sm = sm;
+    s_host.dma_channel = dma_channel;
+    s_host.live = true;
     return MP_OBJ_FROM_PTR(self);
 }
 
 static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->sm < 0) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
+    }
     mp_obj_t command = (n_args > 1) ? args[1] : mp_const_none;
     mp_obj_t data = (n_args > 2) ? args[2] : mp_const_none;
 
@@ -268,16 +327,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->sm >= 0) {
-        pio_sm_set_enabled(self->pio, self->sm, false);
-        pio_sm_unclaim(self->pio, self->sm);
-        self->sm = -1;
-    }
-    if (self->dma_channel >= 0) {
-        dma_channel_abort(self->dma_channel);
-        dma_channel_unclaim(self->dma_channel);
-        self->dma_channel = -1;
-    }
+    i80bus_deinit_internal(self);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
@@ -285,6 +335,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 static const mp_rom_map_elem_t i80bus_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i80bus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i80bus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i80bus_deinit_obj) },
 };
 static MP_DEFINE_CONST_DICT(i80bus_locals_dict, i80bus_locals_dict_table);
 
