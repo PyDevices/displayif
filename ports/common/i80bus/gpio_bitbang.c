@@ -62,7 +62,7 @@ bool displayif_i80bus_gpio_init_data(displayif_i80bus_gpio_t *bus,
     bus->sequential = false;
     memset(bus->lut_table, 0, sizeof(bus->lut_table));
 
-    if (displayif_i80bus_gpio_pins_sequential(pin_ids)) {
+    if (displayif_i80bus_gpio_pins_sequential(pin_ids, pin_count)) {
         uint8_t port_idx = (uint8_t)(pin_ids[0] / 32);
         bus->sequential = true;
         bus->seq_shift = (uint8_t)(pin_ids[0] & 31);
