@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Dot-clock RGB framebuffer for esp32 port (ESP-IDF esp_lcd RGB panel).
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 #include <stdlib.h>
@@ -9,6 +10,7 @@
 #include "py/binary.h"
 #include "py/mpprint.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 
 #define RGBFB_MAX_DATA_PINS 18
 
@@ -53,11 +55,23 @@ typedef struct _rgbframebuffer_obj_t {
     int overscan_left;
     uint8_t bits_per_pixel;
     bool rgb666_layout;
+    bool deinited;
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     esp_lcd_panel_handle_t panel;
     bool panel_ready;
 #endif
 } rgbframebuffer_obj_t;
+
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+typedef struct {
+    esp_lcd_panel_handle_t panel;
+    uint8_t *buf;
+    bool panel_ready;
+} rgbfb_host_t;
+
+static rgbfb_host_t s_host;
+#endif
+static bool s_soft_reset_registered;
 
 static const mp_obj_type_t rgbframebuffer_type;
 
@@ -86,6 +100,25 @@ static uint8_t *rgbframebuffer_alloc(size_t nbytes) {
 
 static void rgbframebuffer_free(uint8_t *ptr) {
     free(ptr);
+}
+#endif
+
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+static void rgbfb_host_teardown(void) {
+    if (s_host.panel_ready && s_host.panel != NULL) {
+        esp_lcd_panel_del(s_host.panel);
+        s_host.panel = NULL;
+        s_host.panel_ready = false;
+    }
+    rgbframebuffer_free(s_host.buf);
+    s_host.buf = NULL;
+}
+
+static void rgbfb_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(rgbfb_host_teardown);
+        s_soft_reset_registered = true;
+    }
 }
 #endif
 
@@ -174,8 +207,33 @@ static void rgbframebuffer_init_panel(rgbframebuffer_obj_t *self) {
 
     self->panel = panel;
     self->panel_ready = true;
+    s_host.panel = panel;
+    s_host.panel_ready = true;
 }
 #endif
+
+static void rgbframebuffer_deinit_internal(rgbframebuffer_obj_t *self) {
+    if (self->deinited) {
+        return;
+    }
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    if (s_host.panel_ready && s_host.panel != NULL) {
+        esp_lcd_panel_del(s_host.panel);
+        s_host.panel = NULL;
+        s_host.panel_ready = false;
+        self->panel = NULL;
+        self->panel_ready = false;
+    }
+#endif
+    if (self->buf != NULL) {
+        rgbframebuffer_free(self->buf);
+        self->buf = NULL;
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+        s_host.buf = NULL;
+#endif
+    }
+    self->deinited = true;
+}
 
 static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
@@ -246,6 +304,11 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
         mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
     }
 
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    rgbfb_host_teardown();
+    rgbfb_ensure_soft_reset_registered();
+#endif
+
     rgbframebuffer_obj_t *self = mp_obj_malloc(rgbframebuffer_obj_t, type);
     self->width = vals[ARG_width].u_int;
     self->height = vals[ARG_height].u_int;
@@ -256,6 +319,9 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("RGB framebuffer allocation failed"));
     }
     memset(self->buf, 0, self->buf_len);
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    s_host.buf = self->buf;
+#endif
 
     self->de_pin = displayif_esp32_pin_gpio(vals[ARG_de].u_obj);
     self->vsync_pin = displayif_esp32_pin_gpio(vals[ARG_vsync].u_obj);
@@ -276,6 +342,7 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     self->overscan_left = vals[ARG_overscan_left].u_int;
     self->rgb666_layout = rgb666;
     self->bits_per_pixel = 16;
+    self->deinited = false;
 
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     self->panel = NULL;
@@ -294,6 +361,9 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
 
 static mp_obj_t rgbframebuffer_refresh(mp_obj_t self_in) {
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
+    }
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     rgbframebuffer_init_panel(self);
     rgbframebuffer_raise_esp_err(esp_cache_msync(self->buf, self->buf_len, ESP_CACHE_MSYNC_FLAG_DIR_C2M));
@@ -322,6 +392,12 @@ static void rgbframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        bufinfo->buf = NULL;
+        bufinfo->len = 0;
+        bufinfo->typecode = 'H';
+        return 0;
+    }
     bufinfo->buf = self->buf;
     bufinfo->len = self->buf_len;
     bufinfo->typecode = 'H';
@@ -330,23 +406,14 @@ static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bu
 
 static mp_obj_t rgbframebuffer_del(mp_obj_t self_in) {
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
-#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
-    if (self->panel_ready && self->panel != NULL) {
-        esp_lcd_panel_del(self->panel);
-        self->panel = NULL;
-        self->panel_ready = false;
-    }
-#endif
-    if (self->buf != NULL) {
-        rgbframebuffer_free(self->buf);
-        self->buf = NULL;
-    }
+    rgbframebuffer_deinit_internal(self);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(rgbframebuffer_del_obj, rgbframebuffer_del);
 
 static const mp_rom_map_elem_t rgbframebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&rgbframebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&rgbframebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&rgbframebuffer_del_obj) },
 };
 static MP_DEFINE_CONST_DICT(rgbframebuffer_locals_dict, rgbframebuffer_locals_dict_table);

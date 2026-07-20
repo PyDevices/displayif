@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Intel 8080 parallel display bus for ESP32-S3 (pydisplay i80bus contract).
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 
@@ -7,6 +8,7 @@
 #include "py/obj.h"
 #include "py/binary.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 #include "displayif_esp32_pins.h"
 
 #include "soc/soc_caps.h"
@@ -25,10 +27,49 @@ typedef struct _i80bus_obj_t {
     esp_lcd_i80_bus_handle_t bus;
     esp_lcd_panel_io_handle_t io;
     bool has_cs;
+    bool deinited;
     mp_obj_t buf1;
 } i80bus_obj_t;
 
+typedef struct {
+    esp_lcd_i80_bus_handle_t bus;
+    esp_lcd_panel_io_handle_t io;
+} i80bus_host_t;
+
+static i80bus_host_t s_host;
+static bool s_soft_reset_registered;
+
 static const mp_obj_type_t i80bus_type;
+
+static void i80bus_host_teardown(void) {
+    if (s_host.io != NULL) {
+        esp_lcd_panel_io_del(s_host.io);
+        s_host.io = NULL;
+    }
+    if (s_host.bus != NULL) {
+        esp_lcd_del_i80_bus(s_host.bus);
+        s_host.bus = NULL;
+    }
+}
+
+static void i80bus_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(i80bus_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
+
+static void i80bus_deinit_internal(i80bus_obj_t *self) {
+    if (self != NULL && self->deinited) {
+        return;
+    }
+    i80bus_host_teardown();
+    if (self != NULL) {
+        self->bus = NULL;
+        self->io = NULL;
+        self->deinited = true;
+    }
+}
 
 static void i80bus_raise_esp_err(esp_err_t err) {
     if (err == ESP_OK) {
@@ -72,10 +113,14 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     int cs_pin = (vals[ARG_cs].u_obj == MP_OBJ_NULL) ? -1 : displayif_esp32_pin_gpio(vals[ARG_cs].u_obj);
     int wr_pin = displayif_esp32_pin_gpio(vals[ARG_wr].u_obj);
 
+    i80bus_host_teardown();
+    i80bus_ensure_soft_reset_registered();
+
     i80bus_obj_t *self = mp_obj_malloc(i80bus_obj_t, type);
     self->bus = NULL;
     self->io = NULL;
     self->has_cs = cs_pin >= 0;
+    self->deinited = false;
 
     esp_lcd_i80_bus_config_t bus_config = {
         .clk_src = LCD_CLK_SRC_DEFAULT,
@@ -106,12 +151,17 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     };
 
     i80bus_raise_esp_err(esp_lcd_new_panel_io_i80(self->bus, &io_config, &self->io));
+    s_host.bus = self->bus;
+    s_host.io = self->io;
     self->buf1 = mp_obj_new_bytearray(1, (byte[]){0});
     return MP_OBJ_FROM_PTR(self);
 }
 
 static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->io == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
+    }
     mp_obj_t command = (n_args > 1) ? args[1] : mp_const_none;
     mp_obj_t data = (n_args > 2) ? args[2] : mp_const_none;
 
@@ -134,14 +184,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->io != NULL) {
-        esp_lcd_panel_io_del(self->io);
-        self->io = NULL;
-    }
-    if (self->bus != NULL) {
-        esp_lcd_del_i80_bus(self->bus);
-        self->bus = NULL;
-    }
+    i80bus_deinit_internal(self);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
@@ -149,6 +192,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 static const mp_rom_map_elem_t i80bus_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i80bus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i80bus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i80bus_deinit_obj) },
 };
 static MP_DEFINE_CONST_DICT(i80bus_locals_dict, i80bus_locals_dict_table);
 

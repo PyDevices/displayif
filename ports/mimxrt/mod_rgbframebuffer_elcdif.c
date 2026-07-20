@@ -4,6 +4,7 @@
 // Constructor pin arguments are validated against the EVK LCDIF pad routing
 // (BOARD_InitLCDPins / RK043 shield). IOMUX is applied from mimxrt1060_lcd_pins.c
 // and is not configurable for arbitrary pins.
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 #include <stdlib.h>
@@ -14,6 +15,7 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 #include "displayif_mimxrt.h"
 #include "pin.h"
 
@@ -42,9 +44,41 @@ typedef struct _rgbframebuffer_obj_t {
     uint16_t vsync_back_porch;
     uint32_t polarity_flags;
     bool elcdif_ready;
+    bool deinited;
 } rgbframebuffer_obj_t;
 
+static bool s_elcdif_live;
+static bool s_soft_reset_registered;
+
 static const mp_obj_type_t rgbframebuffer_type;
+
+static void rgbfb_host_teardown(void) {
+    if (s_elcdif_live) {
+        ELCDIF_RgbModeStop(LCDIF);
+        ELCDIF_Deinit(LCDIF);
+        s_elcdif_live = false;
+    }
+}
+
+static void rgbfb_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(rgbfb_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
+
+static void rgbframebuffer_deinit_internal(rgbframebuffer_obj_t *self) {
+    if (self->deinited) {
+        return;
+    }
+    rgbfb_host_teardown();
+    if (self->buf != NULL) {
+        m_free(self->buf);
+        self->buf = NULL;
+    }
+    self->elcdif_ready = false;
+    self->deinited = true;
+}
 
 static uint32_t rgbframebuffer_build_polarity(bool hsync_idle_low, bool vsync_idle_low,
     bool de_idle_high, bool pclk_active_high) {
@@ -175,6 +209,7 @@ static void rgbframebuffer_init_elcdif(rgbframebuffer_obj_t *self) {
     ELCDIF_RgbModeInit(LCDIF, &config);
     ELCDIF_RgbModeStart(LCDIF);
     self->elcdif_ready = true;
+    s_elcdif_live = true;
 }
 
 static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -251,6 +286,9 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     (void)vals[ARG_overscan_left];
     (void)vals[ARG_pclk_idle_high];
 
+    rgbfb_host_teardown();
+    rgbfb_ensure_soft_reset_registered();
+
     rgbframebuffer_obj_t *self = mp_obj_malloc(rgbframebuffer_obj_t, type);
     self->width = vals[ARG_width].u_int;
     self->height = vals[ARG_height].u_int;
@@ -275,6 +313,7 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
         vals[ARG_de_idle_high].u_bool,
         vals[ARG_pclk_active_high].u_bool);
     self->elcdif_ready = false;
+    self->deinited = false;
 
     rgbframebuffer_init_elcdif(self);
     return MP_OBJ_FROM_PTR(self);
@@ -282,6 +321,9 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
 
 static mp_obj_t rgbframebuffer_refresh(mp_obj_t self_in) {
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
+    }
     rgbframebuffer_init_elcdif(self);
     ELCDIF_SetNextBufferAddr(LCDIF, ELCDIF_ADDR_CPU_2_IP((uint32_t)self->buf));
     return mp_const_none;
@@ -304,6 +346,12 @@ static void rgbframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
 static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        bufinfo->buf = NULL;
+        bufinfo->len = 0;
+        bufinfo->typecode = 'H';
+        return 0;
+    }
     bufinfo->buf = self->buf;
     bufinfo->len = self->buf_len;
     bufinfo->typecode = 'H';
@@ -312,21 +360,14 @@ static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bu
 
 static mp_obj_t rgbframebuffer_del(mp_obj_t self_in) {
     rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->elcdif_ready) {
-        ELCDIF_RgbModeStop(LCDIF);
-        ELCDIF_Deinit(LCDIF);
-        self->elcdif_ready = false;
-    }
-    if (self->buf != NULL) {
-        m_free(self->buf);
-        self->buf = NULL;
-    }
+    rgbframebuffer_deinit_internal(self);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(rgbframebuffer_del_obj, rgbframebuffer_del);
 
 static const mp_rom_map_elem_t rgbframebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&rgbframebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&rgbframebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&rgbframebuffer_del_obj) },
 };
 static MP_DEFINE_CONST_DICT(rgbframebuffer_locals_dict, rgbframebuffer_locals_dict_table);

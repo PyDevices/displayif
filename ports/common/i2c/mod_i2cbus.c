@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // pydisplay-compatible I2C display bus (SSD1306-class OLED controllers).
+// Lifecycle: idempotent deinit/__del__ (I2C bus is Python-owned).
 
 #include <string.h>
 
@@ -16,6 +17,7 @@ typedef struct _i2cbus_obj_t {
     mp_obj_t i2c;
     uint8_t address;
     vstr_t vstr;
+    bool deinited;
 } i2cbus_obj_t;
 
 static const mp_obj_type_t i2cbus_type;
@@ -35,6 +37,7 @@ static mp_obj_t i2cbus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     i2cbus_obj_t *self = mp_obj_malloc(i2cbus_obj_t, type);
     self->i2c = vals[ARG_i2c].u_obj;
     self->address = vals[ARG_address].u_int;
+    self->deinited = false;
     vstr_init(&self->vstr, 32);
     return MP_OBJ_FROM_PTR(self);
 }
@@ -49,6 +52,9 @@ static void i2cbus_writeto(i2cbus_obj_t *self, const uint8_t *data, size_t len) 
 
 static mp_obj_t i2cbus_send(size_t n_args, const mp_obj_t *args) {
     i2cbus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i2cbus is deinited"));
+    }
     mp_obj_t command = (n_args > 1) ? args[1] : mp_const_none;
     mp_obj_t data = (n_args > 2) ? args[2] : mp_const_none;
 
@@ -80,6 +86,9 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i2cbus_send_obj, 1, 3, i2cbus_send);
 
 static mp_obj_t i2cbus_send_data(mp_obj_t self_in, mp_obj_t data_in) {
     i2cbus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i2cbus is deinited"));
+    }
     mp_buffer_info_t datainfo;
     mp_get_buffer_raise(data_in, &datainfo, MP_BUFFER_READ);
 
@@ -93,9 +102,22 @@ static mp_obj_t i2cbus_send_data(mp_obj_t self_in, mp_obj_t data_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(i2cbus_send_data_obj, i2cbus_send_data);
 
+static mp_obj_t i2cbus_deinit(mp_obj_t self_in) {
+    i2cbus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        return mp_const_none;
+    }
+    vstr_clear(&self->vstr);
+    self->deinited = true;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(i2cbus_deinit_obj, i2cbus_deinit);
+
 static const mp_rom_map_elem_t i2cbus_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i2cbus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_send_data), MP_ROM_PTR(&i2cbus_send_data_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i2cbus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i2cbus_deinit_obj) },
 };
 static MP_DEFINE_CONST_DICT(i2cbus_locals_dict, i2cbus_locals_dict_table);
 

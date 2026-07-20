@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Intel 8080 parallel display bus for SAMD51 (GPIO bit-bang via common backend).
+// Lifecycle: idempotent deinit/__del__ (thin GPIO backend; no host teardown on soft reset).
 
 #include <string.h>
 
@@ -23,6 +24,7 @@ typedef struct _i80bus_obj_t {
     mp_obj_t dc_pin;
     mp_obj_t cs_pin;
     bool has_cs;
+    bool deinited;
 } i80bus_obj_t;
 
 static const mp_obj_type_t i80bus_type;
@@ -151,11 +153,15 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         self->cs_pin = MP_OBJ_NULL;
     }
     displayif_pin_set(self->dc_pin, 0);
+    self->deinited = false;
     return MP_OBJ_FROM_PTR(self);
 }
 
 static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
+    }
     mp_obj_t command = (n_args > 1) ? args[1] : mp_const_none;
     mp_obj_t data = (n_args > 2) ? args[2] : mp_const_none;
 
@@ -187,7 +193,11 @@ static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
-    (void)self_in;
+    i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        return mp_const_none;
+    }
+    self->deinited = true;
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
@@ -195,6 +205,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 static const mp_rom_map_elem_t i80bus_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i80bus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i80bus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i80bus_deinit_obj) },
 };
 static MP_DEFINE_CONST_DICT(i80bus_locals_dict, i80bus_locals_dict_table);
 

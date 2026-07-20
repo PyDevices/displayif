@@ -5,6 +5,7 @@
 
 #include "py/runtime.h"
 #include "py/mphal.h"
+#include "displayif/soft_reset.h"
 #include "picodvi_rp2350.h"
 
 #if defined(PICO_RP2350)
@@ -138,6 +139,19 @@ static uint32_t vactive_line720[VACTIVE_LEN] = {
 
 picodvi_framebuffer_obj_t *active_picodvi = NULL;
 
+typedef struct {
+    bool hw_live;
+    int dma_pixel_channel;
+    int dma_command_channel;
+} picodvi_hw_shadow_t;
+
+static picodvi_hw_shadow_t s_hw;
+static bool s_soft_reset_registered;
+
+static void picodvi_hw_stop(void);
+static void picodvi_ensure_soft_reset_registered(void);
+static void _turn_off_dma(int channel);
+
 static void __not_in_flash_func(dma_irq_handler)(void) {
     if (active_picodvi == NULL) {
         return;
@@ -190,9 +204,10 @@ void picodvi_rp2350_construct(picodvi_framebuffer_obj_t *self,
     uint16_t width, uint16_t height,
     int clk_dp, int clk_dn, int red_dp, int red_dn, int green_dp, int green_dn, int blue_dp, int blue_dn,
     uint8_t color_depth) {
-    if (active_picodvi != NULL) {
-        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("%q in use"), MP_QSTR_picodvi);
+    if (s_hw.hw_live) {
+        picodvi_hw_stop();
     }
+    picodvi_ensure_soft_reset_registered();
 
     if (!picodvi_rp2350_preflight(width, height, color_depth)) {
         mp_raise_ValueError(MP_ERROR_TEXT("Invalid width and height"));
@@ -538,6 +553,9 @@ void picodvi_rp2350_construct(picodvi_framebuffer_obj_t *self,
     // For the output.
     self->framebuffer_len = framebuffer_size;
 
+    s_hw.dma_pixel_channel = self->dma_pixel_channel;
+    s_hw.dma_command_channel = self->dma_command_channel;
+    s_hw.hw_live = true;
     active_picodvi = self;
     dma_irq_handler();
 }
@@ -557,6 +575,36 @@ static void _turn_off_dma(int channel) {
     dma_channel_unclaim(channel);
 }
 
+static void picodvi_hw_stop(void) {
+    if (!s_hw.hw_live) {
+        return;
+    }
+    for (int i = 12; i <= 19; ++i) {
+        gpio_deinit(i);
+    }
+    _turn_off_dma(s_hw.dma_pixel_channel);
+    _turn_off_dma(s_hw.dma_command_channel);
+    irq_set_enabled(DMA_IRQ_1, false);
+    hstx_ctrl_hw->csr = 0;
+    active_picodvi = NULL;
+    s_hw.hw_live = false;
+}
+
+static void picodvi_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(picodvi_hw_stop);
+        s_soft_reset_registered = true;
+    }
+}
+
+void picodvi_rp2350_force_teardown(void) {
+    picodvi_hw_stop();
+}
+
+bool picodvi_rp2350_active(void) {
+    return s_hw.hw_live;
+}
+
 static bool picodvi_rp2350_deinited(picodvi_framebuffer_obj_t *self) {
     return self->framebuffer == NULL;
 }
@@ -566,16 +614,9 @@ void picodvi_rp2350_deinit(picodvi_framebuffer_obj_t *self) {
         return;
     }
 
-    for (int i = 12; i <= 19; ++i) {
-        gpio_deinit(i);
-    }
-
-    _turn_off_dma(self->dma_pixel_channel);
-    _turn_off_dma(self->dma_command_channel);
+    picodvi_hw_stop();
     self->dma_pixel_channel = -1;
     self->dma_command_channel = -1;
-
-    active_picodvi = NULL;
 
     m_free(self->framebuffer);
     self->framebuffer = NULL;

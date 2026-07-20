@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Intel 8080 parallel display bus for MIMXRT1062 (NXP FlexIO MCULCD, 8-bit).
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 #include <stdlib.h>
@@ -8,6 +9,7 @@
 #include "py/obj.h"
 #include "py/binary.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 #include "pin.h"
 
 #if defined(MIMXRT1062) || defined(CPU_MIMXRT1062) || defined(__IMXRT1062__)
@@ -39,11 +41,42 @@ typedef struct _i80bus_obj_t {
     mp_obj_t cs_pin;
     bool has_cs;
     bool initialized;
+    bool deinited;
 } i80bus_obj_t;
 
 static const mp_obj_type_t i80bus_type;
 static i80bus_obj_t *s_callback_bus;
 static bool s_flexio_in_use;
+static FLEXIO_MCULCD_Type s_shadow_lcd;
+static bool s_soft_reset_registered;
+
+static void i80bus_host_teardown(void) {
+    if (!s_flexio_in_use) {
+        return;
+    }
+    FLEXIO_MCULCD_Deinit(&s_shadow_lcd);
+    FLEXIO_Deinit(FLEXIO2);
+    s_flexio_in_use = false;
+    s_callback_bus = NULL;
+}
+
+static void i80bus_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(i80bus_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
+
+static void i80bus_deinit_internal(i80bus_obj_t *self) {
+    if (self != NULL && self->deinited) {
+        return;
+    }
+    i80bus_host_teardown();
+    if (self != NULL) {
+        self->initialized = false;
+        self->deinited = true;
+    }
+}
 
 static void i80bus_raise_status(status_t status) {
     if (status == kStatus_Success) {
@@ -128,8 +161,9 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
 
     if (s_flexio_in_use) {
-        mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("only one FlexIO i80bus instance supported"));
+        i80bus_host_teardown();
     }
+    i80bus_ensure_soft_reset_registered();
 
     mp_obj_t data_pins[I80BUS_DATA_WIDTH];
     size_t data_count = displayif_pin_seq_to_objs(vals[ARG_data].u_obj, data_pins, I80BUS_DATA_WIDTH);
@@ -174,6 +208,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
     displayif_pin_set(self->dc_pin, 0);
     self->initialized = false;
+    self->deinited = false;
 
     for (size_t i = 0; i < I80BUS_DATA_WIDTH; i++) {
         i80bus_mux_flexio2(data_pin_objs[i]);
@@ -205,6 +240,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     uint32_t flexio_hz = BOARD_BOOTCLOCKRUN_FLEXIO2_CLK_ROOT;
     i80bus_raise_status(FLEXIO_MCULCD_Init(&self->lcd, &config, flexio_hz));
 
+    s_shadow_lcd = self->lcd;
     self->initialized = true;
     s_flexio_in_use = true;
     return MP_OBJ_FROM_PTR(self);
@@ -215,7 +251,7 @@ static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
     mp_obj_t command = (n_args > 1) ? args[1] : mp_const_none;
     mp_obj_t data = (n_args > 2) ? args[2] : mp_const_none;
 
-    if (!self->initialized) {
+    if (self->deinited || !self->initialized) {
         mp_raise_msg(&mp_type_OSError, MP_ERROR_TEXT("i80bus not initialized"));
     }
 
@@ -257,15 +293,7 @@ static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->initialized) {
-        FLEXIO_MCULCD_Deinit(&self->lcd);
-        FLEXIO_Deinit(FLEXIO2);
-        self->initialized = false;
-        s_flexio_in_use = false;
-        if (s_callback_bus == self) {
-            s_callback_bus = NULL;
-        }
-    }
+    i80bus_deinit_internal(self);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
@@ -273,6 +301,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 static const mp_rom_map_elem_t i80bus_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i80bus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i80bus_deinit_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i80bus_deinit_obj) },
 };
 static MP_DEFINE_CONST_DICT(i80bus_locals_dict, i80bus_locals_dict_table);
 

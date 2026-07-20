@@ -125,6 +125,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(picodvi_framebuffer_del_obj, picodvi_framebuffe
 
 static const mp_rom_map_elem_t picodvi_framebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&picodvi_framebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&picodvi_framebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&picodvi_framebuffer_del_obj) },
 };
 static MP_DEFINE_CONST_DICT(picodvi_framebuffer_locals_dict, picodvi_framebuffer_locals_dict_table);
