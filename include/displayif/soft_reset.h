@@ -6,8 +6,14 @@
  *   2. Register a teardown fn via displayif_register_soft_reset()
  *   3. Call the same teardown from deinit/__del__/idempotent ctors
  *
- * displayif_soft_reset_all() is invoked from a usermod --wrap of mp_deinit
- * (see ports/common/soft_reset.c) so it runs even when no Python refs remain.
+ * On MCU ports, ports/common/soft_reset.c --wrap=gc_sweep_all so
+ * displayif_soft_reset_all() runs before the heap is swept (every registered
+ * interface: mipidsi, rgbframebuffer, i80bus, picodvi, rgbmatrix, …).
+ * --wrap=mp_deinit still calls it again as an idempotent safety net.
+ *
+ * Ports may also implement displayif_port_pre_gc_sweep() (strong symbol) for
+ * non-displayif work that must happen before the sweep — e.g. esp32 stops
+ * machine.Timer so armed esp_timer callbacks cannot fire into freed heap.
  */
 
 #ifndef DISPLAYIF_SOFT_RESET_H
@@ -27,6 +33,10 @@ void displayif_unregister_soft_reset(displayif_soft_reset_fn_t fn);
 
 /* Tear down all registered displayif host resources. Idempotent. */
 void displayif_soft_reset_all(void);
+
+/* Optional port hook (weak default is empty). Called from __wrap_gc_sweep_all
+ * before displayif_soft_reset_all() and the real sweep. */
+void displayif_port_pre_gc_sweep(void);
 
 #ifdef __cplusplus
 }

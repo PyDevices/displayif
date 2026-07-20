@@ -54,10 +54,26 @@ void displayif_soft_reset_all(void) {
     }
 }
 
+/* Weak default: ports may override (e.g. esp32 machine.Timer stop). */
+__attribute__((weak)) void displayif_port_pre_gc_sweep(void) {
+}
+
+#if defined(DISPLAYIF_WRAP_GC_SWEEP)
+/* Linker --wrap=gc_sweep_all: stop timers / DMA / IRQ / SDK handles before
+ * MicroPython sweeps the heap. Soft-reset order on MCU ports is typically
+ * gc_sweep_all() then mp_deinit(); host teardown must not wait for the latter.
+ * Teardowns must not m_free GC memory — only release non-GC host resources. */
+extern void __real_gc_sweep_all(void);
+
+void __wrap_gc_sweep_all(void) {
+    displayif_port_pre_gc_sweep();
+    displayif_soft_reset_all();
+    __real_gc_sweep_all();
+}
+#endif
+
 #if defined(DISPLAYIF_WRAP_MP_DEINIT)
-/* Linker --wrap=mp_deinit: run displayif teardown before MicroPython deinit.
- * On soft-reset paths this is after gc_sweep_all(), so teardowns must not
- * m_free GC memory — only release non-GC host resources (ESP-IDF, DMA, PIO). */
+/* Linker --wrap=mp_deinit: idempotent second pass after the sweep. */
 extern void __real_mp_deinit(void);
 
 void __wrap_mp_deinit(void) {

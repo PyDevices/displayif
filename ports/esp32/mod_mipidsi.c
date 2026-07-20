@@ -434,9 +434,27 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     self->deinited = false;
     s_host.backlight_pin = self->backlight_pin;
     s_host.backlight_on_high = self->backlight_on_high;
+    /* Point DPI engine at the FB once; later updates are CPU write + msync. */
+    mipidsi_raise_esp_err(esp_cache_msync(
+        self->buf, mipidsi_align_up(self->buf_len), ESP_CACHE_MSYNC_FLAG_DIR_C2M));
+    mipidsi_raise_esp_err(esp_lcd_panel_draw_bitmap(panel, 0, 0, self->width, self->height, self->buf));
     mipidsi_backlight_set(self->backlight_pin, self->backlight_on_high, true);
 
     return MP_OBJ_FROM_PTR(self);
+}
+
+static void mipidsi_msync_rows(mipidsi_display_obj_t *self, int y, int h) {
+    /* DPI DMA reads SPIRAM; sync the dirty row range (cache-line aligned). */
+    size_t start = (size_t)y * self->row_stride;
+    size_t end = start + (size_t)h * self->row_stride;
+    size_t align_mask = (size_t)MIPIDSI_CACHE_LINE - 1;
+    size_t synced = start & ~align_mask;
+    size_t sync_end = (end + align_mask) & ~align_mask;
+    if (sync_end > self->buf_len) {
+        sync_end = mipidsi_align_up(self->buf_len);
+    }
+    mipidsi_raise_esp_err(esp_cache_msync(
+        self->buf + synced, sync_end - synced, ESP_CACHE_MSYNC_FLAG_DIR_C2M));
 }
 
 static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
@@ -451,6 +469,39 @@ static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_refresh_obj, mipidsi_display_refresh);
+
+/* blit(buf, x, y, w, h) — fast RGB565 copy; Python memoryview row slices into
+ * this SPIRAM FB are ~25ms/row on ESP32-P4 (LVGL partial flushes WDT). */
+static mp_obj_t mipidsi_display_blit(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("MIPI DSI display is deinited"));
+    }
+    mp_buffer_info_t srcinfo;
+    mp_get_buffer_raise(args[1], &srcinfo, MP_BUFFER_READ);
+    int x = mp_obj_get_int(args[2]);
+    int y = mp_obj_get_int(args[3]);
+    int w = mp_obj_get_int(args[4]);
+    int h = mp_obj_get_int(args[5]);
+    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > self->width || y + h > self->height) {
+        mp_raise_ValueError(MP_ERROR_TEXT("blit rect out of range"));
+    }
+    size_t row_bytes = (size_t)w * sizeof(uint16_t);
+    if (srcinfo.len < row_bytes * (size_t)h) {
+        mp_raise_ValueError(MP_ERROR_TEXT("blit buffer too small"));
+    }
+    const uint8_t *src = srcinfo.buf;
+    uint8_t *dst = self->buf + (size_t)y * self->row_stride + (size_t)x * sizeof(uint16_t);
+    for (int row = 0; row < h; row++) {
+        memcpy(dst, src, row_bytes);
+        dst += self->row_stride;
+        src += row_bytes;
+    }
+    mipidsi_msync_rows(self, y, h);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_display_blit_obj, 6, 6, mipidsi_display_blit);
 
 static mp_int_t mipidsi_display_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
@@ -488,6 +539,9 @@ static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
         } else if (attr == MP_QSTR_refresh) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_refresh_obj);
             dest[1] = self_in;
+        } else if (attr == MP_QSTR_blit) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_blit_obj);
+            dest[1] = self_in;
         } else if (attr == MP_QSTR_deinit) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_deinit_obj);
             dest[1] = self_in;
@@ -506,6 +560,7 @@ static MP_DEFINE_CONST_DICT(mipidsi_bus_locals_dict, mipidsi_bus_locals_dict_tab
 
 static const mp_rom_map_elem_t mipidsi_display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&mipidsi_display_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&mipidsi_display_blit_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mipidsi_display_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mipidsi_display_deinit_obj) },
 };

@@ -2,6 +2,8 @@
 
 Handoff for **pydevices/displayif**: native display **interface** modules for pydisplay. Portable code in `ports/common/`; SoC-specific code under `ports/<mp-port>/` (names from `micropython/ports/`).
 
+**Start here for agents:** [AGENTS.md](AGENTS.md) → [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) → [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) (soft-reset wraps, symptom table, bring-up methods).
+
 Several pydisplay MicroPython `board_config.py` files currently raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
 
 **Workspace:** clone as a sibling of `micropython/` (e.g. via [PyDevices/cmods](https://github.com/PyDevices/cmods), which is an optional convenience wrapper, not a requirement).
@@ -129,10 +131,10 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 6. rp2 `picodvi`, PIO `i80bus` — done
 7. samd GPIO `i80bus` via `common/i80bus/gpio_bitbang.c` — done
 8. `rgbmatrix` Protomatter backends — done
-9. **Hardware validation** on real panels (Qualia, RK043, RT1170 DSI, P4 4B, Pico DVI) — pending
+9. **Hardware validation** on real panels (Qualia, RK043, RT1170 DSI, P4 4B, Pico DVI) — in progress (P4 mipidsi + LVGL soft-reset bring-up: see [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md))
 10. mimxrt i80bus: board-specific pydisplay config, optional DMA bulk path — pending
 11. pydisplay: remove legacy `RGBDisplay` package — see pydisplay repo
 
 ---
 
-*Updated 2026-07-07 — MicroPython-only; common SAMD i80bus; CP glue removed.*
+*Updated 2026-07-20 — soft-reset wraps / P4 bring-up notes; MicroPython-only.*

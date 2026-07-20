@@ -8,6 +8,10 @@ pydisplay MP board configs that raise `NotImplementedError` on import need firmw
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [HANDOFF.md](HANDOFF.md).
 
+**Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset contract:
+[IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md). Bring-up / failure modes:
+[SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md).
+
 ## Native modules
 
 

@@ -2,7 +2,7 @@
 
 **Audience:** Cloud or local coding agent implementing lifecycle teardown across displayif.  
 **Repo:** [PyDevices/displayif](https://github.com/PyDevices/displayif) (also present under `cmods/displayif`).  
-**Companion docs:** [HANDOFF.md](HANDOFF.md) (port matrix), [README.md](README.md) (module table).  
+**Companion docs:** [AGENTS.md](AGENTS.md) (entry), [HANDOFF.md](HANDOFF.md) (port matrix), [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) (troubleshooting / symptom table), [README.md](README.md) (module table).  
 **Related pydisplay:** `displaysys` already expects displays to support idempotent `deinit()` at the Python layer — native modules must match.
 
 ---
@@ -54,7 +54,7 @@ Tools such as **mpftp** (and Thonny-style workflows) soft-reset into a clean hea
 | `__del__` | **Unreliable** — must not be the only teardown path |
 | ESP-IDF / NXP SDK / PIO / DMA | **Still live** unless C code tears them down |
 
-Therefore each module that owns host resources must register a **soft-reset teardown hook** (or a shared displayif soft-reset dispatcher) that runs **before** the heap is wiped.
+Therefore each module that owns host resources must register a **soft-reset teardown hook** (or a shared displayif soft-reset dispatcher) that runs **before** the heap is wiped (`--wrap=gc_sweep_all` in `ports/common/soft_reset.c`; all registered interfaces share that path).
 
 ---
 
@@ -94,7 +94,7 @@ Updated after lifecycle implementation (2026-07) — verify with grep if unsure.
 | `picodvi` rp2 | yes | yes | yes | Static HW shadow; no dangling `active_picodvi` |
 | `rgbmatrix` | yes | yes | yes (Protomatter) | PM core in BSS; bitbang path has no host IRQs |
 
-Shared: `include/displayif/soft_reset.h` + `ports/common/soft_reset.c` (`--wrap=mp_deinit`).
+Shared: `include/displayif/soft_reset.h` + `ports/common/soft_reset.c` (`--wrap=gc_sweep_all` primary; `--wrap=mp_deinit` idempotent second pass). ESP32 also implements `displayif_port_pre_gc_sweep()` to stop `machine.Timer` before the sweep.
 
 ---
 

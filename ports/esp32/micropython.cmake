@@ -5,10 +5,13 @@ target_include_directories(displayif_esp32 INTERFACE ${DISPLAYIF_MOD_DIR}/ports/
 target_compile_options(displayif_esp32 INTERFACE -Wno-unused-function)
 target_link_libraries(usermod INTERFACE displayif_esp32)
 
+# Soft-reset: common wraps gc_sweep_all; this file supplies displayif_port_pre_gc_sweep
+# (stop machine.Timer). See ports/esp32/soft_reset_gc_sweep.c.
 target_sources(displayif_esp32 INTERFACE
     ${DISPLAYIF_MOD_DIR}/ports/esp32/mod_rgbframebuffer.c
     ${DISPLAYIF_MOD_DIR}/ports/esp32/mod_mipidsi.c
     ${DISPLAYIF_MOD_DIR}/ports/esp32/mod_i80bus.c
+    ${DISPLAYIF_MOD_DIR}/ports/esp32/soft_reset_gc_sweep.c
 )
 
 # esp_lcd symbols for RGB, I80, and MIPI DSI backends.
