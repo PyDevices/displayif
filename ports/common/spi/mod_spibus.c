@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT
-// pydisplay-compatible SPI display bus (replaces viper spibus when displayif is built in).
-// Lifecycle: idempotent deinit/__del__ (machine.SPI owns hardware teardown on soft reset).
+// Native SPIBus matching pydisplay/drivers/bus/spibus.py (keyword-only ctor).
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>
 
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/mphal.h"
+#include "py/mpprint.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/soft_reset.h"
 
 #define DC_CMD 0
 #define DC_DATA 1
@@ -20,6 +22,10 @@ typedef struct _spibus_obj_t {
     mp_obj_t dc;
     mp_obj_t cs;
     mp_obj_t reset;
+    // Keep SPI pin objs so reinit can re-apply mux (ESP32-S3 drops pins on init() without them).
+    mp_obj_t sck_pin;
+    mp_obj_t mosi_pin;
+    mp_obj_t miso_pin;
     mp_int_t baudrate;
     mp_int_t polarity;
     mp_int_t phase;
@@ -28,10 +34,39 @@ typedef struct _spibus_obj_t {
     mp_obj_t buf1;
     bool has_cs;
     bool has_reset;
+    bool has_spi_pins;
     bool deinited;
 } spibus_obj_t;
 
 static const mp_obj_type_t spibus_type;
+
+// Active instance for soft-reset / idempotent ctor (pointer valid until gc_sweep).
+static spibus_obj_t *s_active;
+static bool s_soft_reset_registered;
+
+static void spibus_deinit_internal(spibus_obj_t *self) {
+    if (self == NULL || self->deinited) {
+        return;
+    }
+    // Release ESP-IDF SPI host while the Python SPI object is still alive.
+    displayif_obj_call_method0(self->spi, MP_QSTR_deinit);
+    self->deinited = true;
+    if (s_active == self) {
+        s_active = NULL;
+    }
+}
+
+static void spibus_host_teardown(void) {
+    spibus_deinit_internal(s_active);
+    s_active = NULL;
+}
+
+static void spibus_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(spibus_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
 
 static void spibus_cs_set(spibus_obj_t *self, int level) {
     if (self->has_cs) {
@@ -40,50 +75,88 @@ static void spibus_cs_set(spibus_obj_t *self, int level) {
 }
 
 static void spibus_reinit_spi(spibus_obj_t *self) {
+    // Match Python baud restore, but also re-pass pins — required on ESP32-S3 where
+    // SPI.init(baudrate=...) without sck/mosi clears the GPIO matrix.
     mp_obj_t kwargs = mp_obj_new_dict(0);
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_baudrate), mp_obj_new_int(self->baudrate));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_polarity), mp_obj_new_int(self->polarity));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_phase), mp_obj_new_int(self->phase));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_bits), mp_obj_new_int(self->bits));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
+    if (self->has_spi_pins) {
+        mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sck), self->sck_pin);
+        mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_mosi), self->mosi_pin);
+        mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso), self->miso_pin);
+    }
     displayif_obj_call_method_kw(self->spi, MP_QSTR_init, kwargs);
 }
 
+// Parse keyword-only args to match:
+//   SPIBus(*, id=2, baudrate=24_000_000, polarity=0, phase=0, bits=8,
+//           lsb_first=False, sck=-1, mosi=-1, miso=-1, dc=-1, cs=-1, reset=-1)
 static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    enum {
-        ARG_id,
-        ARG_baudrate,
-        ARG_polarity,
-        ARG_phase,
-        ARG_bits,
-        ARG_lsb_first,
-        ARG_sck,
-        ARG_mosi,
-        ARG_miso,
-        ARG_dc,
-        ARG_cs,
-        ARG_reset,
-    };
-    static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_id, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 2 } },
-        { MP_QSTR_baudrate, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 24000000 } },
-        { MP_QSTR_polarity, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_phase, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_bits, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 8 } },
-        { MP_QSTR_lsb_first, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
-        { MP_QSTR_sck, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_mosi, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_miso, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_dc, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_cs, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_reset, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-    };
-    mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
+    if (n_args != 0) {
+        mp_raise_TypeError(MP_ERROR_TEXT("extra positional arguments given"));
+    }
 
-    if (vals[ARG_dc].u_int < 0) {
+    mp_int_t id = 2;
+    mp_int_t baudrate = 24000000;
+    mp_int_t polarity = 0;
+    mp_int_t phase = 0;
+    mp_int_t bits = 8;
+    bool lsb_first = false;
+    mp_int_t sck = -1;
+    mp_int_t mosi = -1;
+    mp_int_t miso = -1;
+    mp_int_t dc = -1;
+    mp_int_t cs = -1;
+    mp_int_t reset = -1;
+
+    for (size_t i = 0; i < n_kw; i++) {
+        mp_obj_t key = args[2 * i];
+        mp_obj_t val = args[2 * i + 1];
+        if (!mp_obj_is_qstr(key)) {
+            mp_raise_TypeError(MP_ERROR_TEXT("keywords must be strings"));
+        }
+        qstr q = MP_OBJ_QSTR_VALUE(key);
+        if (q == MP_QSTR_id) {
+            id = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_baudrate) {
+            baudrate = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_polarity) {
+            polarity = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_phase) {
+            phase = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_bits) {
+            bits = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_lsb_first) {
+            lsb_first = mp_obj_is_true(val);
+        } else if (q == MP_QSTR_sck) {
+            sck = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_mosi) {
+            mosi = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_miso) {
+            miso = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_dc) {
+            dc = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_cs) {
+            cs = mp_obj_get_int(val);
+        } else if (q == MP_QSTR_reset) {
+            reset = mp_obj_get_int(val);
+        } else {
+            mp_raise_TypeError(MP_ERROR_TEXT("extra keyword arguments given"));
+        }
+    }
+
+    if (dc == -1) {
         mp_raise_ValueError(MP_ERROR_TEXT("DC pin must be specified"));
     }
+
+    // Tear down any prior SPIBus (soft-reset survivor or leaked instance) before recreate.
+    spibus_ensure_soft_reset_registered();
+    spibus_host_teardown();
+
+    mp_printf(&mp_plat_print, "SPIBus loading...\n");
 
     spibus_obj_t *self = mp_obj_malloc(spibus_obj_t, type);
 
@@ -91,53 +164,55 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     mp_obj_t pin_cls = mp_load_attr(machine_mod, MP_QSTR_Pin);
     mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
     mp_int_t pin_in = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_IN));
-    mp_obj_t spi_mod = mp_load_attr(machine_mod, MP_QSTR_SPI);
-    mp_int_t spi_lsb = mp_obj_get_int(mp_load_attr(spi_mod, MP_QSTR_LSB));
-    mp_int_t spi_msb = mp_obj_get_int(mp_load_attr(spi_mod, MP_QSTR_MSB));
+    mp_obj_t spi_cls = mp_load_attr(machine_mod, MP_QSTR_SPI);
+    mp_int_t spi_lsb = mp_obj_get_int(mp_load_attr(spi_cls, MP_QSTR_LSB));
+    mp_int_t spi_msb = mp_obj_get_int(mp_load_attr(spi_cls, MP_QSTR_MSB));
 
-    self->baudrate = vals[ARG_baudrate].u_int;
-    self->polarity = vals[ARG_polarity].u_int;
-    self->phase = vals[ARG_phase].u_int;
-    self->bits = vals[ARG_bits].u_int;
-    self->firstbit = vals[ARG_lsb_first].u_bool ? spi_lsb : spi_msb;
+    self->baudrate = baudrate;
+    self->polarity = polarity;
+    self->phase = phase;
+    self->bits = bits;
+    self->firstbit = lsb_first ? spi_lsb : spi_msb;
 
+    // Match Python SPI(...) construction
     mp_obj_t spi_kwargs = mp_obj_new_dict(0);
-    mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_id), mp_obj_new_int(vals[ARG_id].u_int));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_baudrate), mp_obj_new_int(self->baudrate));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_polarity), mp_obj_new_int(self->polarity));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_phase), mp_obj_new_int(self->phase));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_bits), mp_obj_new_int(self->bits));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
 
-    if (vals[ARG_sck].u_int >= 0 || vals[ARG_mosi].u_int >= 0 || vals[ARG_miso].u_int >= 0) {
-        if (vals[ARG_sck].u_int >= 0) {
-            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sck),
-                displayif_machine_pin(vals[ARG_sck].u_int, pin_out, 0));
-        }
-        if (vals[ARG_mosi].u_int >= 0) {
-            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_mosi),
-                displayif_machine_pin(vals[ARG_mosi].u_int, pin_out, 0));
-        }
-        if (vals[ARG_miso].u_int >= 0) {
-            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso),
-                displayif_machine_pin(vals[ARG_miso].u_int, pin_in, 0));
-        }
+    self->has_spi_pins = !(mosi == -1 && miso == -1 && sck == -1);
+    if (self->has_spi_pins) {
+        // Python always passes sck/mosi Pin; miso is Pin or None
+        self->sck_pin = displayif_machine_pin(sck, pin_out, 0);
+        self->mosi_pin = displayif_machine_pin(mosi, pin_out, 0);
+        self->miso_pin = (miso > -1) ? displayif_machine_pin(miso, pin_in, 0) : mp_const_none;
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sck), self->sck_pin);
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_mosi), self->mosi_pin);
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso), self->miso_pin);
+    } else {
+        self->sck_pin = mp_const_none;
+        self->mosi_pin = mp_const_none;
+        self->miso_pin = mp_const_none;
     }
 
+    mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_id), mp_obj_new_int(id));
     self->spi = displayif_machine_spi(spi_kwargs);
 
-    self->dc = displayif_machine_pin(vals[ARG_dc].u_int, pin_out, DC_DATA);
+    // DC/CS after SPI init (same comment as Python)
+    self->dc = displayif_machine_pin(dc, pin_out, DC_DATA);
 
-    if (vals[ARG_cs].u_int >= 0) {
-        self->cs = displayif_machine_pin(vals[ARG_cs].u_int, pin_out, CS_INACTIVE);
+    if (cs != -1) {
+        self->cs = displayif_machine_pin(cs, pin_out, CS_INACTIVE);
         self->has_cs = true;
     } else {
         self->cs = mp_const_none;
         self->has_cs = false;
     }
 
-    if (vals[ARG_reset].u_int >= 0) {
-        self->reset = displayif_machine_pin(vals[ARG_reset].u_int, pin_out, 1);
+    if (reset != -1) {
+        self->reset = displayif_machine_pin(reset, pin_out, 1);
         self->has_reset = true;
     } else {
         self->reset = mp_const_none;
@@ -146,6 +221,8 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
 
     self->buf1 = mp_obj_new_bytearray(1, (byte[]){0});
     self->deinited = false;
+    s_active = self;
+    mp_printf(&mp_plat_print, "SPIBus loaded\n");
     return MP_OBJ_FROM_PTR(self);
 }
 
@@ -177,18 +254,23 @@ static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
     spibus_cs_set(self, CS_ACTIVE);
 
     if (command != mp_const_none) {
-        uint8_t cmd = mp_obj_get_int(command);
-        ((uint8_t *)MP_OBJ_TO_PTR(self->buf1))[0] = cmd;
+        // Must write via buffer protocol — MP_OBJ_TO_PTR(bytearray) is not payload.
+        uint8_t cmd = (uint8_t)mp_obj_get_int(command);
+        mp_buffer_info_t bufinfo;
+        mp_get_buffer_raise(self->buf1, &bufinfo, MP_BUFFER_WRITE);
+        ((uint8_t *)bufinfo.buf)[0] = cmd;
         displayif_pin_set(self->dc, DC_CMD);
         displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
     }
 
-    if (data != mp_const_none && data != mp_const_empty_bytes) {
+    // Match Python: `if data and len(data):`
+    if (data != mp_const_none && data != mp_const_false && data != mp_const_empty_bytes) {
         mp_buffer_info_t bufinfo;
-        mp_get_buffer_raise(data, &bufinfo, MP_BUFFER_READ);
-        if (bufinfo.len > 0) {
-            displayif_pin_set(self->dc, DC_DATA);
-            displayif_obj_call_method1(self->spi, MP_QSTR_write, data);
+        if (mp_get_buffer(data, &bufinfo, MP_BUFFER_READ)) {
+            if (bufinfo.len > 0) {
+                displayif_pin_set(self->dc, DC_DATA);
+                displayif_obj_call_method1(self->spi, MP_QSTR_write, data);
+            }
         }
     }
 
@@ -198,12 +280,7 @@ static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(spibus_send_obj, 1, 3, spibus_send);
 
 static mp_obj_t spibus_deinit(mp_obj_t self_in) {
-    spibus_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->deinited) {
-        return mp_const_none;
-    }
-    displayif_obj_call_method0(self->spi, MP_QSTR_deinit);
-    self->deinited = true;
+    spibus_deinit_internal(MP_OBJ_TO_PTR(self_in));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(spibus_deinit_obj, spibus_deinit);
