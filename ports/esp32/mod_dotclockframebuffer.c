@@ -2,10 +2,11 @@
 // Dot-clock RGB framebuffer for esp32 port (ESP-IDF esp_lcd RGB panel).
 //
 // Python: displayif.DotClockFramebuffer (module name "displayif").
-// CircuitPython equivalent: dotclockframebuffer.DotClockFramebuffer — same
-// continuous DMA scanout + bounce, but MP presents via double panel FBs
-// (paint back, swap on refresh) because LVGL blits directly into the FB;
-// CP paints a separate Bitmap and FramebufferDisplay composites.
+// CircuitPython equivalent: dotclockframebuffer.DotClockFramebuffer — continuous
+// DMA scanout + bounce into a single live panel FB (auto_refresh=True), matching
+// CP Qualia ``FramebufferDisplay(..., auto_refresh=True)``: blit/fill are visible
+// without an explicit refresh()/show(). (An earlier tear-free double-FB path left
+// LVGL painting a back buffer the panel never scanned.)
 //
 // Buffer typecode 'B', native blit/fill_rect. Reference: Qualia S3 + TL040HDS20.
 // Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown
@@ -23,7 +24,8 @@
 #include "displayif/soft_reset.h"
 
 #define DCFB_MAX_DATA_PINS 18
-#define DCFB_NUM_FBS 2
+// Single live panel FB — matches CP Qualia auto_refresh=True (paint == scanout).
+#define DCFB_NUM_FBS 1
 #define DCFB_PRESENT_TIMEOUT_US 100000
 
 #if defined(ESP_PLATFORM)
@@ -79,9 +81,8 @@ typedef struct _dotclockframebuffer_obj_t {
     // esp_cache_msync on every blit contends on SPI0 with that ISR and causes
     // faint flicker (IDF draw_bitmap also skips FB msync when bb_size != 0).
     bool bounce_enabled;
-    // Tear-free present: blit into fbs[draw_index]; refresh() promotes it and
-    // switches draw to the other panel FB after bounce adopts the new front.
-    uint8_t *fbs[DCFB_NUM_FBS];
+    // Live panel FB(s). With DCFB_NUM_FBS==1, blit paints the scanned buffer.
+    uint8_t *fbs[2];
     uint8_t draw_index;
     uint8_t num_fbs;
 #endif
@@ -226,8 +227,7 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
         .clk_src = LCD_CLK_SRC_DEFAULT,
         .data_width = 16,
         .bits_per_pixel = 16,
-        // Two panel FBs: blit into the back; refresh() promotes and waits for
-        // bounce to adopt it so LVGL never paints the live scanout buffer.
+        // One live panel FB (CP Qualia auto_refresh=True model).
         .num_fbs = DCFB_NUM_FBS,
         // PSRAM cannot sustain 16bpp@720x720 DPI alone — bounce through DRAM
         // (ESP-IDF rgb_panel example / Qualia-class panels). Without this the
@@ -287,32 +287,29 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
     dotclockframebuffer_raise_esp_err(esp_lcd_panel_draw_bitmap(panel, 0, 0, 1, 1, &kick));
 
     void *fb0 = NULL;
-    void *fb1 = NULL;
-    dotclockframebuffer_raise_esp_err(esp_lcd_rgb_panel_get_frame_buffer(panel, 2, &fb0, &fb1));
-    if (fb0 == NULL || fb1 == NULL) {
+    dotclockframebuffer_raise_esp_err(esp_lcd_rgb_panel_get_frame_buffer(panel, 1, &fb0));
+    if (fb0 == NULL) {
         esp_lcd_panel_del(panel);
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("RGB panel frame buffer missing"));
     }
 
-    // Drop any provisional malloc; panel owns the scanout buffers.
+    // Drop any provisional malloc; panel owns the scanout buffer.
     if (self->buf_owned && self->buf != NULL) {
         dotclockframebuffer_free(self->buf);
     }
     self->fbs[0] = (uint8_t *)fb0;
-    self->fbs[1] = (uint8_t *)fb1;
+    self->fbs[1] = NULL;
     self->num_fbs = DCFB_NUM_FBS;
-    // Kick starts scanning fb0; paint the other until first refresh().
-    self->draw_index = 1;
-    self->buf = self->fbs[self->draw_index];
+    // Paint the live scanned FB (auto_refresh=True).
+    self->draw_index = 0;
+    self->buf = self->fbs[0];
     self->buf_owned = false;
     self->row_stride = (uint16_t)(2 * h_res);
     self->buf_len = (size_t)self->row_stride * self->height;
     self->bounce_enabled = (panel_config.bounce_buffer_size_px != 0);
     memset(self->fbs[0], 0, self->buf_len);
-    memset(self->fbs[1], 0, self->buf_len);
     // One-time writeback so the first bounce refill sees zeros.
     esp_cache_msync(self->fbs[0], self->buf_len, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
-    esp_cache_msync(self->fbs[1], self->buf_len, ESP_CACHE_MSYNC_FLAG_DIR_C2M);
 
     self->panel = panel;
     self->panel_ready = true;
@@ -482,34 +479,11 @@ static mp_obj_t dotclockframebuffer_refresh(mp_obj_t self_in) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
     }
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
-    if (!self->panel_ready || self->panel == NULL || self->num_fbs < 2) {
-        // Single-FB / stub: cache writeback only (no tear-free swap).
+    // auto_refresh=True / single live FB: optional cache writeback only.
+    // Bounce mode already refills from PSRAM without per-blit msync.
+    if (!self->bounce_enabled) {
         dotclockframebuffer_msync_rows(self, 0, self->height);
-        return mp_const_none;
     }
-
-    // Promote the back buffer. IDF draw_bitmap with a panel-FB pointer only
-    // updates cur_fb_index; bounce adopts it on the next frame wrap.
-    uint8_t presented = self->draw_index;
-    uint32_t start_frames = s_dcfb_frame_count;
-    dotclockframebuffer_raise_esp_err(
-        esp_lcd_panel_draw_bitmap(self->panel, 0, 0, self->width, self->height, self->fbs[presented]));
-
-    // Wait until bounce wraps onto the new front so the old front is idle.
-    int64_t deadline = esp_timer_get_time() + DCFB_PRESENT_TIMEOUT_US;
-    while (s_dcfb_frame_count == start_frames) {
-        if (esp_timer_get_time() >= deadline) {
-            // Keep painting the same back buffer; next show() retries present.
-            return mp_const_none;
-        }
-        vTaskDelay(1);
-    }
-
-    uint8_t next = (uint8_t)(1 - presented);
-    // Keep both FBs identical for LVGL PARTIAL updates into the new back.
-    memcpy(self->fbs[next], self->fbs[presented], self->buf_len);
-    self->draw_index = next;
-    self->buf = self->fbs[next];
     return mp_const_none;
 #else
     mp_raise_msg(&mp_type_NotImplementedError, MP_ERROR_TEXT("ESP-IDF dotclock scanout not supported on this target"));
@@ -615,10 +589,10 @@ static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest
         } else if (attr == MP_QSTR_row_stride) {
             dest[0] = mp_obj_new_int(self->row_stride);
         } else if (attr == MP_QSTR_auto_refresh) {
-            // False: FBDisplay.show() must call refresh() to promote the back
-            // buffer. (CP Qualia uses True because displayio composites a
-            // separate Bitmap; MP LVGL paints this FB directly.)
-            dest[0] = mp_const_false;
+            // True: paint the live scanout FB (CP Qualia FramebufferDisplay
+            // auto_refresh=True). FBDisplay.show() is a no-op; blit/fill show up
+            // on the next bounce/DMA frame.
+            dest[0] = mp_const_true;
         } else if (attr == MP_QSTR_refresh) {
             dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_refresh_obj);
             dest[1] = self_in;
