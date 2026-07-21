@@ -1,17 +1,48 @@
 # Soft-reset & board bring-up — agent notes
 
-Lessons from two hardware bring-ups with pydisplay + LVGL (`lv_test_timer`)
-under mpftp soft-reset (July 2026):
-
-| Interface | Board | SoC |
-|-----------|-------|-----|
-| `mipidsi` | ESP32-P4-WIFI6-Touch-LCD-4B | ESP32-P4 |
-| `displayif.DotClockFramebuffer` | Adafruit Qualia S3 + TL040HDS20 | ESP32-S3 (octal PSRAM) |
+Lessons from hardware bring-ups with pydisplay + LVGL (`lv_test_timer`)
+under mpftp soft-reset (July 2026).
 
 Patterns apply when porting **any** displayif interface on **any** MCU port
 (esp32 / rp2 / mimxrt / samd). Lifecycle contract:
 [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md). Matrix:
 [HANDOFF.md](HANDOFF.md). Entry: [AGENTS.md](AGENTS.md).
+
+### Board matrix (this chat / July 2026)
+
+| Interface | Board (pydisplay `fbdisplay/…`) | Panel | Notes |
+|-----------|----------------------------------|-------|-------|
+| `mipidsi` | `esp32-p4-wifi6-touch-lcd-4b` | MIPI DSI | Soft-reset / timer lifecycle reference |
+| `DotClockFramebuffer` | `qualia_tl040hds20` (+ CP `cp_qualia_tl040hds20`) | 720×720 RGB-666→565 | First MP DotClock bring-up; bounce + double-FB |
+| `DotClockFramebuffer` | `esp32-s3-touch-lcd-4_3` | 800×480 ST7262 | Same RGB pin map family as LCD-7; GT911 diagonal touch map |
+| `DotClockFramebuffer` | `t-rgb_480` | 480×480 ST7701 | XL9535 + CST820; verified with bounce + double-FB + `show()` |
+| `DotClockFramebuffer` | `esp32-s3-touch-lcd-7` | 800×480 ST7262 | Same timings/pins as 4.3″; identity GT911 coords |
+
+### DotClock: bounce vs panel double-FB vs `auto_refresh` (do not conflate)
+
+These are **three** knobs. Agents repeatedly mixed them up.
+
+| Mechanism | What it is | Why | Policy |
+|-----------|------------|-----|--------|
+| **Bounce buffer** | DRAM refill from PSRAM FB (`bounce_buffer_size_px = 20 * h_res`) | Without it, large DPI panels **slide horizontally** under load (PSRAM underrun) | **Always on** for esp32 DotClock — never remove when debugging tear |
+| **Panel double-FB** (`num_fbs = 2`) | Paint back; `refresh()`/`show()` promotes after bounce adopts | LVGL blits the FB directly; painting the **live** bounce source mid-scan → flicker / black strips. CP Qualia paints a separate `Bitmap` instead | **Required for MP LVGL**; `auto_refresh=False` so `FBDisplay.show` presents |
+| **`auto_refresh`** | Whether `FBDisplay.show()` skips `refresh()` | Coupled to double-FB, **not** to bounce | `False` on MP DotClock; CP `FramebufferDisplay(auto_refresh=True)` is a different architecture |
+
+**History (same day, this campaign):** Qualia black → continuous scanout; Qualia slide → **add bounce** (kept); Qualia flicker → **double-FB + `auto_refresh=False`** (`623dc04`); T-RGB black while FB had color → probes skipped `show()` on double-FB, then mistakenly switched to **single-FB + `auto_refresh=True`** (`0e3de1a`) — bounce was **not** removed; LCD-7 UI then black-with-edge under LVGL → restore double-FB + present via `show()`.
+
+**Trap:** with double-FB, `fill_rect` without `show()` leaves the panel on the old front (often black). Smoke tests must call `display_drv.show()` after paint. LVGL via `display_driver` already sets `refresh_cb=display_drv.show`.
+
+**Why not `auto_refresh=True` on MP?** On CircuitPython Qualia, the app paints a
+separate `displayio.Bitmap`; `FramebufferDisplay(..., auto_refresh=True)`
+composites into the DotClock FB. Paint ≠ scanout buffer, so the panel can keep
+DMA-scanning while you draw elsewhere. On MicroPython, LVGL flush/`blit` write
+**this** panel framebuffer. With a single live FB (`auto_refresh=True`), you
+edit the buffer DMA is reading → mid-scan tear, flicker, or black-with-edge
+under animation. Double-FB fixes that (paint back, `show()`/`refresh()`
+promotes after bounce adopts the new front), which only works if
+`auto_refresh=False` so `FBDisplay.show()` actually calls `refresh()`. Bounce
+stays either way; do not copy CP’s `auto_refresh=True` onto MP DotClock without
+a Bitmap-style paint surface split.
 
 ---
 
@@ -128,31 +159,37 @@ approach. Do not stack silent fallbacks.
 | Touch down never seen / stuck pressed | indev `read_cb` polls but does not always write PRESSED/RELEASED | Always call the touch callback after poll so LVGL sees edges |
 | Touch mirrored / inverted | GT911 (or similar) axis flags wrong for panel orientation | `board_config` `reverse_axis` / `reverse_y` (validate by tapping known UI targets) |
 | Flicker only while “debugging” | Flash writes from agent NDJSON / probe files on the hot path | Delete instrumentation; keep functional fixes |
-| Faint flicker while UI animates (DotClock / Qualia) | Painting the live bounce-source FB mid-scan (LVGL `blit` into single panel FB); full-frame msync / per-blit msync fighting bounce on SPI0 | Double panel FBs: blit back buffer, `refresh()`/`show()` promotes + waits for bounce adopt + copies for PARTIAL; skip FB msync when bounce on; `auto_refresh=False` so `FBDisplay.show` presents |
+| Faint flicker / black with one edge while UI animates (DotClock + LVGL) | Painting the **live** bounce-source FB mid-scan (single panel FB); or full-frame / per-blit msync fighting bounce on SPI0 | Keep bounce; **double panel FBs** + `refresh()`/`show()` present; skip FB msync when bounce on; `auto_refresh=False`. Do **not** “fix” by dropping bounce |
+| Black / white panel but FB memory has color (DotClock) | Double-FB: paint hit back buffer; panel still scanning front; no `show()`/`refresh()` | Call `display_drv.show()` after paint; LVGL must use `refresh_cb=show` (`display_driver`) |
+| LVGL seconds stuck at 0 after `import display_driver` then `import lv_test_timer` | `lv_test_timer` top-level `runtime.stop_timer()` wipes `on_tick` subs; `event_loop._timer_sub` left dangling so `_arm_sync_timer` no-ops | Only `stop_timer` before first `display_driver` import; `_arm_sync_timer` must re-arm if `runtime._timer` is gone |
 
 ---
 
-## Reference: `displayif.DotClockFramebuffer` on Qualia (ESP32-S3)
+## Reference: `displayif.DotClockFramebuffer` (ESP32-S3)
 
-Proven on Adafruit Qualia S3 + TL040HDS20 (720×720 RGB-666 wired as RGB565).
-CP sibling: pydisplay `fbdisplay/cp_qualia_tl040hds20`. MP:
-`fbdisplay/qualia_tl040hds20`. Native: `ports/esp32/mod_dotclockframebuffer.c`.
+Reference board: Adafruit Qualia S3 + TL040HDS20 (720×720). Same native module
+serves Waveshare 4.3″/7″ ST7262 and LILYGO T-RGB (see matrix above).
+CP sibling: `fbdisplay/cp_qualia_tl040hds20`. Native:
+`ports/esp32/mod_dotclockframebuffer.c`.
 
-### Scanout model (match CircuitPython + tear-free MP present)
+### Scanout model (MP LVGL vs CircuitPython)
 
 - **Continuous DMA** (`refresh_on_demand = 0`), not on-demand draw_bitmap of a
   separate malloc buffer.
 - Use the **panel’s own framebuffers** (`esp_lcd_rgb_panel_get_frame_buffer`);
   start the panel at construct (kick + init).
 - **Bounce buffer** (`bounce_buffer_size_px = 20 * h_res`) required for large
-  PSRAM panels; without it the image walks horizontally under load (Adafruit
-  learn-guide notes the same class of underrun). Skip per-blit `esp_cache_msync`
-  when bounce is on (IDF does the same).
+  PSRAM panels; without it the image walks horizontally under load. Skip
+  per-blit `esp_cache_msync` when bounce is on (IDF does the same). **Do not
+  remove bounce** when debugging present/tear issues.
 - **Double panel FBs** (`num_fbs = 2`): LVGL/`blit` paint the back buffer;
   `refresh()` promotes via `draw_bitmap` of that FB pointer, waits for bounce
   `on_frame_buf_complete`, then copies front→new back for PARTIAL updates.
-  (`auto_refresh=False` so `FBDisplay.show` drives present.) CP Qualia instead
-  paints a separate `displayio.Bitmap` with `FramebufferDisplay(auto_refresh=True)`.
+  (`auto_refresh=False` so `FBDisplay.show` drives present.)
+- **CP Qualia** paints a separate `displayio.Bitmap` with
+  `FramebufferDisplay(auto_refresh=True)` — paint ≠ panel FB, so CP can use
+  live scanout without MP’s double-FB present path. Do not copy CP’s
+  `auto_refresh=True` onto MP DotClock without that Bitmap split.
 - `vsync_idle_low` follows `hsync_idle_low` (CP `DotClockFramebuffer` behavior).
 
 ### Python / FBDisplay contract
@@ -190,7 +227,8 @@ When adding or porting a backend that owns host resources:
 9. [ ] If custom `attr` is set: export `refresh` / `blit` / `fill_rect` /
       `deinit` / `__del__` there (locals_dict alone is skipped)
 10. [ ] Dot-clock RGB: continuous scanout + panel FB (not malloc + on-demand);
-      bounce buffer on large PSRAM panels; buffer typecode `'B'`
+      bounce **and** double panel FBs for MP LVGL; `auto_refresh=False`;
+      buffer typecode `'B'`; smoke with `show()` after paint
 
 Stubs under `ports/common/notimpl/` stay stubs — no soft-reset registration.
 
@@ -230,6 +268,6 @@ is busy.
 
 ---
 
-*Seeded from ESP32-P4-WIFI6-Touch-LCD-4B (`mipidsi`) and Qualia S3 TL040HDS20
-(`displayif.DotClockFramebuffer`) + `lv_test_timer` bring-ups, 2026-07-20.
-Update this file when a new port/interface reveals a durable failure mode.*
+*Seeded 2026-07-20 from ESP32-P4 `mipidsi` and ESP32-S3 DotClock boards in the
+matrix above (`lv_test_timer`). Update when a new port/interface reveals a
+durable failure mode — especially if bounce vs double-FB tradeoffs change.*
