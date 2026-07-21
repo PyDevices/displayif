@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MIT
-// MIPI DSI host for ESP32-P4 (FBDisplay / pydisplay mipidsi contract).
-// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
+// MIPI DSI host for ESP32-P4 (ESP-IDF esp_lcd DSI + DPI; FBDisplay / pydisplay).
+//
+// Bus + Display with SPIRAM framebuffer, native blit (Python row slices WDT),
+// buffer typecode 'B', custom attr for methods. Soft-reset must del DSI bus /
+// DPI panel / LDO or second board_config import fails with ESP_ERR_NOT_FOUND.
+// Reference board: ESP32-P4-WIFI6-Touch-LCD-4B + LVGL.
+//
+// Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown
+// (see include/displayif/soft_reset.h, IDEMPOTENT_LIFECYCLE.md,
+// SOFT_RESET_AND_BRINGUP.md).
 
 #include <string.h>
 #include <stdlib.h>

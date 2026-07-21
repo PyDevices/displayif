@@ -14,7 +14,11 @@
 #include "displayif/soft_reset.h"
 
 #if defined(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
+// core.h gates _PM_convert_565 behind CIRCUITPY/ARDUINO. Scope the define to
+// this include only — do not set CIRCUITPY for the whole MicroPython firmware.
+#define CIRCUITPY 1
 #include "protomatter/core.h"
+#undef CIRCUITPY
 #endif
 
 #define RGBMATRIX_MAX_ADDR_PINS 6

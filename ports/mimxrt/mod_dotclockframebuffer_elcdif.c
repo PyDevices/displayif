@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Dot-clock RGB framebuffer for mimxrt (NXP eLCDIF) — MIMXRT1060-EVK / RK043 shield.
 //
+// Python: displayif.DotClockFramebuffer (module name "displayif").
 // Constructor pin arguments are validated against the EVK LCDIF pad routing
 // (BOARD_InitLCDPins / RK043 shield). IOMUX is applied from mimxrt1060_lcd_pins.c
 // and is not configurable for arbitrary pins.
@@ -22,13 +23,13 @@
 #include "fsl_elcdif.h"
 #include "fsl_clock.h"
 
-#define RGBFB_LCDIF_FREQ_MIN_HZ 1000000u
-#define RGBFB_LCDIF_FREQ_MAX_HZ 65000000u
-#define RGBFB_LCDIF_DATA_PIN_COUNT 16u
+#define DCFB_LCDIF_FREQ_MIN_HZ 1000000u
+#define DCFB_LCDIF_FREQ_MAX_HZ 65000000u
+#define DCFB_LCDIF_DATA_PIN_COUNT 16u
 
 #if defined(MIMXRT1062) || defined(CPU_MIMXRT1062) || defined(__IMXRT1062__)
 
-typedef struct _rgbframebuffer_obj_t {
+typedef struct _dotclockframebuffer_obj_t {
     mp_obj_base_t base;
     uint16_t width;
     uint16_t height;
@@ -45,14 +46,14 @@ typedef struct _rgbframebuffer_obj_t {
     uint32_t polarity_flags;
     bool elcdif_ready;
     bool deinited;
-} rgbframebuffer_obj_t;
+} dotclockframebuffer_obj_t;
 
 static bool s_elcdif_live;
 static bool s_soft_reset_registered;
 
-static const mp_obj_type_t rgbframebuffer_type;
+static const mp_obj_type_t dotclockframebuffer_type;
 
-static void rgbfb_host_teardown(void) {
+static void dcfb_host_teardown(void) {
     if (s_elcdif_live) {
         ELCDIF_RgbModeStop(LCDIF);
         ELCDIF_Deinit(LCDIF);
@@ -60,18 +61,18 @@ static void rgbfb_host_teardown(void) {
     }
 }
 
-static void rgbfb_ensure_soft_reset_registered(void) {
+static void dcfb_ensure_soft_reset_registered(void) {
     if (!s_soft_reset_registered) {
-        displayif_register_soft_reset(rgbfb_host_teardown);
+        displayif_register_soft_reset(dcfb_host_teardown);
         s_soft_reset_registered = true;
     }
 }
 
-static void rgbframebuffer_deinit_internal(rgbframebuffer_obj_t *self) {
+static void dotclockframebuffer_deinit_internal(dotclockframebuffer_obj_t *self) {
     if (self->deinited) {
         return;
     }
-    rgbfb_host_teardown();
+    dcfb_host_teardown();
     if (self->buf != NULL) {
         m_free(self->buf);
         self->buf = NULL;
@@ -80,7 +81,7 @@ static void rgbframebuffer_deinit_internal(rgbframebuffer_obj_t *self) {
     self->deinited = true;
 }
 
-static uint32_t rgbframebuffer_build_polarity(bool hsync_idle_low, bool vsync_idle_low,
+static uint32_t dotclockframebuffer_build_polarity(bool hsync_idle_low, bool vsync_idle_low,
     bool de_idle_high, bool pclk_active_high) {
     uint32_t flags = 0;
     if (hsync_idle_low) {
@@ -106,14 +107,14 @@ static uint32_t rgbframebuffer_build_polarity(bool hsync_idle_low, bool vsync_id
     return flags;
 }
 
-static void rgbframebuffer_raise_status(status_t status) {
+static void dotclockframebuffer_raise_status(status_t status) {
     if (status == kStatus_Success) {
         return;
     }
     mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("NXP SDK status %d"), (int)status);
 }
 
-static const clock_name_t rgbframebuffer_lcdif_mux_sources[] = {
+static const clock_name_t dotclockframebuffer_lcdif_mux_sources[] = {
     kCLOCK_SysPllClk,
     kCLOCK_Usb1PllPfd3Clk,
     kCLOCK_VideoPllClk,
@@ -122,30 +123,30 @@ static const clock_name_t rgbframebuffer_lcdif_mux_sources[] = {
     kCLOCK_Usb1PllPfd1Clk,
 };
 
-static void rgbframebuffer_validate_evk_pin(const machine_pin_obj_t *pin, GPIO_Type *exp_gpio, uint32_t exp_bit) {
+static void dotclockframebuffer_validate_evk_pin(const machine_pin_obj_t *pin, GPIO_Type *exp_gpio, uint32_t exp_bit) {
     if (pin->gpio != exp_gpio || pin->pin != exp_bit) {
         mp_raise_ValueError(MP_ERROR_TEXT(
             "pin does not match MIMXRT1060-EVK LCDIF routing; IOMUX is EVK-fixed"));
     }
 }
 
-static void rgbframebuffer_validate_evk_pins(mp_obj_t de, mp_obj_t vsync, mp_obj_t hsync, mp_obj_t dclk, mp_obj_t data) {
-    rgbframebuffer_validate_evk_pin(pin_find(de), GPIO2, 1);
-    rgbframebuffer_validate_evk_pin(pin_find(vsync), GPIO2, 3);
-    rgbframebuffer_validate_evk_pin(pin_find(hsync), GPIO2, 2);
-    rgbframebuffer_validate_evk_pin(pin_find(dclk), GPIO2, 0);
+static void dotclockframebuffer_validate_evk_pins(mp_obj_t de, mp_obj_t vsync, mp_obj_t hsync, mp_obj_t dclk, mp_obj_t data) {
+    dotclockframebuffer_validate_evk_pin(pin_find(de), GPIO2, 1);
+    dotclockframebuffer_validate_evk_pin(pin_find(vsync), GPIO2, 3);
+    dotclockframebuffer_validate_evk_pin(pin_find(hsync), GPIO2, 2);
+    dotclockframebuffer_validate_evk_pin(pin_find(dclk), GPIO2, 0);
 
-    mp_obj_t data_pins[RGBFB_LCDIF_DATA_PIN_COUNT];
-    size_t count = displayif_pin_seq_to_objs(data, data_pins, RGBFB_LCDIF_DATA_PIN_COUNT);
-    if (count != RGBFB_LCDIF_DATA_PIN_COUNT) {
+    mp_obj_t data_pins[DCFB_LCDIF_DATA_PIN_COUNT];
+    size_t count = displayif_pin_seq_to_objs(data, data_pins, DCFB_LCDIF_DATA_PIN_COUNT);
+    if (count != DCFB_LCDIF_DATA_PIN_COUNT) {
         mp_raise_ValueError(MP_ERROR_TEXT("data must be a 16-pin sequence for RGB565"));
     }
-    for (size_t i = 0; i < RGBFB_LCDIF_DATA_PIN_COUNT; i++) {
-        rgbframebuffer_validate_evk_pin(pin_find(data_pins[i]), GPIO2, 4 + i);
+    for (size_t i = 0; i < DCFB_LCDIF_DATA_PIN_COUNT; i++) {
+        dotclockframebuffer_validate_evk_pin(pin_find(data_pins[i]), GPIO2, 4 + i);
     }
 }
 
-static void rgbframebuffer_init_lcdif_clock(uint32_t target_hz) {
+static void dotclockframebuffer_init_lcdif_clock(uint32_t target_hz) {
     CLOCK_DisableClock(kCLOCK_LcdPixel);
 
     uint32_t best_diff = UINT32_MAX;
@@ -153,8 +154,8 @@ static void rgbframebuffer_init_lcdif_clock(uint32_t target_hz) {
     uint32_t best_pre = 1;
     uint32_t best_div = 3;
 
-    for (size_t mux = 0; mux < MP_ARRAY_SIZE(rgbframebuffer_lcdif_mux_sources); mux++) {
-        uint32_t src_hz = CLOCK_GetFreq(rgbframebuffer_lcdif_mux_sources[mux]);
+    for (size_t mux = 0; mux < MP_ARRAY_SIZE(dotclockframebuffer_lcdif_mux_sources); mux++) {
+        uint32_t src_hz = CLOCK_GetFreq(dotclockframebuffer_lcdif_mux_sources[mux]);
         if (src_hz == 0) {
             continue;
         }
@@ -183,13 +184,13 @@ static void rgbframebuffer_init_lcdif_clock(uint32_t target_hz) {
     CLOCK_EnableClock(kCLOCK_LcdPixel);
 }
 
-static void rgbframebuffer_init_elcdif(rgbframebuffer_obj_t *self) {
+static void dotclockframebuffer_init_elcdif(dotclockframebuffer_obj_t *self) {
     if (self->elcdif_ready) {
         return;
     }
 
     displayif_mimxrt1060_init_lcd_pins();
-    rgbframebuffer_init_lcdif_clock(self->frequency);
+    dotclockframebuffer_init_lcdif_clock(self->frequency);
 
     elcdif_rgb_mode_config_t config;
     ELCDIF_RgbModeGetDefaultConfig(&config);
@@ -212,7 +213,7 @@ static void rgbframebuffer_init_elcdif(rgbframebuffer_obj_t *self) {
     s_elcdif_live = true;
 }
 
-static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
+static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
         ARG_de,
         ARG_vsync,
@@ -277,19 +278,19 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     if (vals[ARG_width].u_int <= 0 || vals[ARG_height].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("width and height must be positive"));
     }
-    if (vals[ARG_frequency].u_int < RGBFB_LCDIF_FREQ_MIN_HZ
-        || vals[ARG_frequency].u_int > RGBFB_LCDIF_FREQ_MAX_HZ) {
+    if (vals[ARG_frequency].u_int < DCFB_LCDIF_FREQ_MIN_HZ
+        || vals[ARG_frequency].u_int > DCFB_LCDIF_FREQ_MAX_HZ) {
         mp_raise_ValueError(MP_ERROR_TEXT("frequency out of range (1-65 MHz)"));
     }
-    rgbframebuffer_validate_evk_pins(vals[ARG_de].u_obj, vals[ARG_vsync].u_obj,
+    dotclockframebuffer_validate_evk_pins(vals[ARG_de].u_obj, vals[ARG_vsync].u_obj,
         vals[ARG_hsync].u_obj, vals[ARG_dclk].u_obj, vals[ARG_data].u_obj);
     (void)vals[ARG_overscan_left];
     (void)vals[ARG_pclk_idle_high];
 
-    rgbfb_host_teardown();
-    rgbfb_ensure_soft_reset_registered();
+    dcfb_host_teardown();
+    dcfb_ensure_soft_reset_registered();
 
-    rgbframebuffer_obj_t *self = mp_obj_malloc(rgbframebuffer_obj_t, type);
+    dotclockframebuffer_obj_t *self = mp_obj_malloc(dotclockframebuffer_obj_t, type);
     self->width = vals[ARG_width].u_int;
     self->height = vals[ARG_height].u_int;
     self->row_stride = self->width * sizeof(uint16_t);
@@ -307,7 +308,7 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     self->vsync_pulse_width = vals[ARG_vsync_pulse_width].u_int;
     self->vsync_front_porch = vals[ARG_vsync_front_porch].u_int;
     self->vsync_back_porch = vals[ARG_vsync_back_porch].u_int;
-    self->polarity_flags = rgbframebuffer_build_polarity(
+    self->polarity_flags = dotclockframebuffer_build_polarity(
         vals[ARG_hsync_idle_low].u_bool,
         vals[ARG_vsync_idle_low].u_bool,
         vals[ARG_de_idle_high].u_bool,
@@ -315,23 +316,23 @@ static mp_obj_t rgbframebuffer_make(const mp_obj_type_t *type, size_t n_args, si
     self->elcdif_ready = false;
     self->deinited = false;
 
-    rgbframebuffer_init_elcdif(self);
+    dotclockframebuffer_init_elcdif(self);
     return MP_OBJ_FROM_PTR(self);
 }
 
-static mp_obj_t rgbframebuffer_refresh(mp_obj_t self_in) {
-    rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+static mp_obj_t dotclockframebuffer_refresh(mp_obj_t self_in) {
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (self->deinited || self->buf == NULL) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
     }
-    rgbframebuffer_init_elcdif(self);
+    dotclockframebuffer_init_elcdif(self);
     ELCDIF_SetNextBufferAddr(LCDIF, ELCDIF_ADDR_CPU_2_IP((uint32_t)self->buf));
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(rgbframebuffer_refresh_obj, rgbframebuffer_refresh);
+static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_refresh_obj, dotclockframebuffer_refresh);
 
-static void rgbframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
-    rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (dest[0] == MP_OBJ_NULL) {
         if (attr == MP_QSTR_width) {
             dest[0] = mp_obj_new_int(self->width);
@@ -339,13 +340,16 @@ static void rgbframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
             dest[0] = mp_obj_new_int(self->height);
         } else if (attr == MP_QSTR_row_stride) {
             dest[0] = mp_obj_new_int(self->row_stride);
+        } else if (attr == MP_QSTR_auto_refresh) {
+            // Continuous eLCDIF scanout — same contract as esp32 DotClock.
+            dest[0] = mp_const_true;
         }
     }
 }
 
-static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
+static mp_int_t dotclockframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
-    rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (self->deinited || self->buf == NULL) {
         bufinfo->buf = NULL;
         bufinfo->len = 0;
@@ -358,41 +362,41 @@ static mp_int_t rgbframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bu
     return 0;
 }
 
-static mp_obj_t rgbframebuffer_del(mp_obj_t self_in) {
-    rgbframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    rgbframebuffer_deinit_internal(self);
+static mp_obj_t dotclockframebuffer_del(mp_obj_t self_in) {
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    dotclockframebuffer_deinit_internal(self);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(rgbframebuffer_del_obj, rgbframebuffer_del);
+static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_del_obj, dotclockframebuffer_del);
 
-static const mp_rom_map_elem_t rgbframebuffer_locals_dict_table[] = {
-    { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&rgbframebuffer_refresh_obj) },
-    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&rgbframebuffer_del_obj) },
-    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&rgbframebuffer_del_obj) },
+static const mp_rom_map_elem_t dotclockframebuffer_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&dotclockframebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
+    { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
 };
-static MP_DEFINE_CONST_DICT(rgbframebuffer_locals_dict, rgbframebuffer_locals_dict_table);
+static MP_DEFINE_CONST_DICT(dotclockframebuffer_locals_dict, dotclockframebuffer_locals_dict_table);
 
 static MP_DEFINE_CONST_OBJ_TYPE(
-    rgbframebuffer_type,
-    MP_QSTR_RGBFrameBuffer,
+    dotclockframebuffer_type,
+    MP_QSTR_DotClockFramebuffer,
     MP_TYPE_FLAG_NONE,
-    make_new, rgbframebuffer_make,
-    attr, rgbframebuffer_attr,
-    locals_dict, &rgbframebuffer_locals_dict,
-    buffer, rgbframebuffer_get_buffer
+    make_new, dotclockframebuffer_make,
+    attr, dotclockframebuffer_attr,
+    locals_dict, &dotclockframebuffer_locals_dict,
+    buffer, dotclockframebuffer_get_buffer
 );
 
-static const mp_rom_map_elem_t rgbframebuffer_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_rgbframebuffer) },
-    { MP_ROM_QSTR(MP_QSTR_RGBFrameBuffer), MP_ROM_PTR(&rgbframebuffer_type) },
+static const mp_rom_map_elem_t dotclockframebuffer_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_displayif) },
+    { MP_ROM_QSTR(MP_QSTR_DotClockFramebuffer), MP_ROM_PTR(&dotclockframebuffer_type) },
 };
-static MP_DEFINE_CONST_DICT(rgbframebuffer_module_globals, rgbframebuffer_module_globals_table);
+static MP_DEFINE_CONST_DICT(dotclockframebuffer_module_globals, dotclockframebuffer_module_globals_table);
 
-const mp_obj_module_t rgbframebuffer_user_cmodule = {
+const mp_obj_module_t dotclockframebuffer_user_cmodule = {
     .base = { &mp_type_module },
-    .globals = (mp_obj_dict_t *)&rgbframebuffer_module_globals,
+    .globals = (mp_obj_dict_t *)&dotclockframebuffer_module_globals,
 };
 
-MP_REGISTER_MODULE(MP_QSTR_rgbframebuffer, rgbframebuffer_user_cmodule);
+MP_REGISTER_MODULE(MP_QSTR_displayif, dotclockframebuffer_user_cmodule);
 
 #endif /* MIMXRT1062 */

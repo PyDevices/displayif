@@ -13,6 +13,7 @@ SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/mod_rgbmatrix.c
 
 ifeq ($(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER),1)
-CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter -DDISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1 -DCIRCUITPY=1
-SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter/core.c
+CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter -DDISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1
+# CIRCUITPY is scoped inside protomatter_mp.c — do not set it CFLAGS-wide.
+SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/ports/common/rgbmatrix/protomatter_mp.c
 endif

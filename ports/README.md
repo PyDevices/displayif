@@ -10,7 +10,7 @@ All interface code and **per-port build glue** live here. Folder names match **M
 | `samd/` | samd builds | `samd` |
 | `rp2/` | rp2 builds | `rp2` |
 
-Hardware-specific interfaces (`spibus`, `rgbframebuffer`, …) do **not** build on desktop MicroPython ports (`unix`, `windows`, …).
+Hardware-specific interfaces (`spibus`, `displayif`, …) do **not** build on desktop MicroPython ports (`unix`, `windows`, …).
 
 ## Build files in every port tree
 

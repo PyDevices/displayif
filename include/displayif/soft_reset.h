@@ -8,7 +8,7 @@
  *
  * On MCU ports, ports/common/soft_reset.c --wrap=gc_sweep_all so
  * displayif_soft_reset_all() runs before the heap is swept (every registered
- * interface: mipidsi, rgbframebuffer, i80bus, picodvi, rgbmatrix, …).
+ * interface: mipidsi, displayif/DotClock, i80bus, picodvi, rgbmatrix, …).
  * --wrap=mp_deinit still calls it again as an idempotent safety net.
  *
  * Ports may also implement displayif_port_pre_gc_sweep() (strong symbol) for

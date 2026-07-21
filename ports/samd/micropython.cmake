@@ -8,13 +8,13 @@ target_include_directories(displayif_samd INTERFACE
 target_link_libraries(usermod INTERFACE displayif_samd)
 
 target_sources(displayif_samd INTERFACE
-    ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_rgbframebuffer.c
+    ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_dotclockframebuffer.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_mipidsi.c
     ${DISPLAYIF_MOD_DIR}/ports/common/i80bus/gpio_bitbang.c
 )
 
 target_compile_definitions(displayif_samd INTERFACE
-    DISPLAYIF_STUB_RGBFRAMEBUFFER_MSG="SAMD has no native RGB LCD scanout"
+    DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="SAMD has no native RGB LCD scanout"
     DISPLAYIF_STUB_MIPIDSI_MSG="MIPI DSI not available on SAMD"
 )
 

@@ -37,7 +37,7 @@
     <span class="eyebrow">PyDevices / displayif</span>
     <h1>displayif</h1>
     <p>Native display-bus and framebuffer modules for MicroPython. Portable code lives in <code>ports/common/</code>; SoC-specific paths under <code>ports/&lt;mp-port&gt;/</code>. pydisplay board configs that raise <code>NotImplementedError</code> need firmware built with the matching module — natives register directly, with no Python re-export layer in this repo.</p>
-    <p>CircuitPython has its own display stack (<code>dotclockframebuffer</code>, <code>mipidsi</code>, <code>picodvi</code>, …). displayif does not ship CP bindings — use pydisplay <code>cp_*</code> board configs with CP firmware.</p>
+    <p>CircuitPython has its own display stack (<code>displayif</code> (DotClockFramebuffer), <code>mipidsi</code>, <code>picodvi</code>, …). displayif does not ship CP bindings — use pydisplay <code>cp_*</code> board configs with CP firmware.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/PyDevices/displayif">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-1-2.6c3-.3 6-1.5 6-6.5a5 5 0 0 0-1.4-3.5 4.6 4.6 0 0 0-.1-3.5s-1.1-.3-3.5 1.3a12 12 0 0 0-6 0C6.6 1.7 5.5 2 5.5 2a4.6 4.6 0 0 0-.1 3.5A5 5 0 0 0 4 9c0 5 3 6.2 6 6.5a3.4 3.4 0 0 0-1 2.6V22"/></svg>
@@ -60,7 +60,7 @@
       </div>
       <div class="card">
         <h3>FBDisplay</h3>
-        <p><code>rgbframebuffer</code>, <code>mipidsi</code>, <code>picodvi</code>, <code>rgbmatrix</code> — framebuffer backends. Parallel RGB uses <code>rgbframebuffer.RGBFrameBuffer</code> (no <code>RGBDisplay</code>).</p>
+        <p><code>displayif</code> (DotClockFramebuffer), <code>mipidsi</code>, <code>picodvi</code>, <code>rgbmatrix</code> — framebuffer backends. Parallel RGB uses <code>displayif.DotClockFramebuffer</code> (no <code>RGBDisplay</code>).</p>
       </div>
       <div class="card">
         <h3>i80bus</h3>

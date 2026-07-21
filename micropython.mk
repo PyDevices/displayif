@@ -2,7 +2,7 @@
 #
 # Discovered via USER_C_MODULES pointing at the workspace directory that
 # contains this repo (its parent), e.g. `make USER_C_MODULES=../../..`.
-# Hardware interfaces (spibus, rgbframebuffer, …) build only on MCU ports —
+# Hardware interfaces (spibus, dotclockframebuffer, …) build only on MCU ports —
 # not unix, windows, or other desktop targets.
 
 DISPLAYIF_MOD_DIR := $(USERMOD_DIR)

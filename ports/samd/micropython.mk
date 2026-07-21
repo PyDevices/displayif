@@ -4,7 +4,7 @@ CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/samd
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/include
 
 SRC_USERMOD_C += \
-    $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_rgbframebuffer.c \
+    $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_dotclockframebuffer.c \
     $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_mipidsi.c \
     $(DISPLAYIF_MOD_DIR)/ports/common/i80bus/gpio_bitbang.c
 

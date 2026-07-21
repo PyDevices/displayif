@@ -32,9 +32,9 @@ if(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
     )
     target_compile_definitions(displayif_common INTERFACE
         DISPLAYIF_RGBMATRIX_USE_PROTOMATTER=1
-        CIRCUITPY=1
     )
+    # CIRCUITPY is scoped inside protomatter_mp.c — do not set it INTERFACE-wide.
     target_sources(displayif_common INTERFACE
-        ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/protomatter/core.c
+        ${DISPLAYIF_MOD_DIR}/ports/common/rgbmatrix/protomatter_mp.c
     )
 endif()

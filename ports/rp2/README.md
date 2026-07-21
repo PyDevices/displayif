@@ -12,7 +12,7 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | RP2040 / RP2350 | **FBDisplay** |
 | `mod_picodvi.c` + `picodvi_rp2040.c` | `picodvi.Framebuffer` | RP2040 | **FBDisplay** |
 | `mod_picodvi.c` + `picodvi_rp2350.c` | `picodvi.Framebuffer` | RP2350 | **FBDisplay** |
-| `ports/common/notimpl/mod_rgbframebuffer.c` | `rgbframebuffer.RGBFrameBuffer` | stub | **FBDisplay** (N/A) |
+| `ports/common/notimpl/mod_dotclockframebuffer.c` | `displayif.DotClockFramebuffer` | stub | **FBDisplay** (N/A) |
 | `ports/common/notimpl/mod_mipidsi.c` | `mipidsi.Bus` / `Display` | stub | **FBDisplay** (N/A) |
 
 ### `picodvi`
@@ -32,7 +32,7 @@ Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DM
 
 Uses the **Protomatter** backend (PWM slice 7 wrap IRQ + GPIO set/clr). Pin arguments accept `machine.Pin` objects, integers, or board pin names.
 
-Stub modules (`rgbframebuffer`, `mipidsi`) import on all boards but raise `NotImplementedError` from the constructor. **RP2350 has no MIPI DSI host** — use `picodvi` (HSTX/DVI) or SPI/I80 buses instead. CircuitPython `mipidsi` is not available on Pico 2; it targets SoCs like ESP32-P4.
+Stub modules (`displayif`, `mipidsi`) import on all boards but raise `NotImplementedError` from the constructor. **RP2350 has no MIPI DSI host** — use `picodvi` (HSTX/DVI) or SPI/I80 buses instead. CircuitPython `mipidsi` is not available on Pico 2; it targets SoCs like ESP32-P4.
 
 ## pydisplay board configs
 

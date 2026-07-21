@@ -47,7 +47,7 @@ print("displayif lifecycle API test on", sys.platform)
 _try_import("spibus", [("SPIBus", ("deinit", "__del__"))])
 _try_import("i2cbus", [("I2CBus", ("deinit", "__del__"))])
 _try_import("i80bus", [("I80Bus", ("deinit", "__del__"))])
-_try_import("rgbframebuffer", [("RGBFrameBuffer", ("deinit", "__del__"))])
+_try_import("displayif", [("DotClockFramebuffer", ("deinit", "__del__"))])
 _try_import("rgbmatrix", [("RGBMatrix", ("deinit", "__del__"))])
 _try_import("picodvi", [("Framebuffer", ("deinit", "__del__"))])
 _try_import("mipidsi", [

@@ -1,12 +1,12 @@
-"""Smoke test for rgbframebuffer import and buffer protocol (esp32)."""
+"""Smoke test for displayif.DotClockFramebuffer import and buffer protocol (esp32)."""
 
 import sys
 
-print("displayif rgbframebuffer smoke test")
+print("displayif.DotClockFramebuffer smoke test")
 
-from rgbframebuffer import RGBFrameBuffer
+import displayif
 
-fb = RGBFrameBuffer(
+fb = displayif.DotClockFramebuffer(
     de=17,
     vsync=3,
     hsync=46,
@@ -33,8 +33,8 @@ fb = RGBFrameBuffer(
 assert fb.width == 4
 assert fb.height == 4
 mv = memoryview(fb)
-assert len(mv) == 4 * 4
-assert mv.format == "H"
+assert len(mv) == 4 * 4 * 2  # RGB565 bytes (typecode 'B')
+assert mv.format == "B"
 
 try:
     fb.refresh()
@@ -43,4 +43,4 @@ except (NotImplementedError, OSError) as exc:
 else:
     print("refresh ok")
 
-print("rgbframebuffer ok on", sys.platform)
+print("displayif.DotClockFramebuffer ok on", sys.platform)

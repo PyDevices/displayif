@@ -8,8 +8,9 @@ pydisplay MP board configs that raise `NotImplementedError` on import need firmw
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [HANDOFF.md](HANDOFF.md).
 
-**Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset contract:
-[IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md). Bring-up / failure modes:
+**Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
+(**implemented**): [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md). Bring-up /
+failure modes (P4 `mipidsi`, Qualia `displayif.DotClockFramebuffer`):
 [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md).
 
 ## Native modules
@@ -18,15 +19,16 @@ pydisplay MP board configs that raise `NotImplementedError` on import need firmw
 | Module              | Port tree                                                                                       | pydisplay backend |
 | ------------------- | ----------------------------------------------------------------------------------------------- | ----------------- |
 | `spibus` / `i2cbus` | `common`                                                                                        | **BusDisplay**    |
-| `rgbframebuffer`    | `esp32` (RGB LCD), `mimxrt` (1062 eLCDIF)                                                       | **FBDisplay**     |
+| `displayif` (`DotClockFramebuffer`) | `esp32` (RGB LCD), `mimxrt` (1062 eLCDIF)                                              | **FBDisplay**     |
 | `i80bus`            | `esp32` (S3), `rp2` (PIO+DMA), `mimxrt` (1062 FlexIO), `samd` (SAMD51 GPIO)                     | **BusDisplay**    |
 | `mipidsi`           | `esp32` (P4), `mimxrt` (1176)                                                                   | **FBDisplay**     |
 | `picodvi`           | `rp2` (RP2040 PIO / RP2350 HSTX)                                                                | **FBDisplay**     |
 | `rgbmatrix`         | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2`                                        | **FBDisplay**     |
-| stubs               | `samd` (`rgbframebuffer`, `mipidsi`); `rp2` (`rgbframebuffer`, `mipidsi`); non-1062/1176 mimxrt | ctor raises       |
+| stubs               | `samd` / `rp2` / non-1062 mimxrt (`displayif.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`) | ctor raises |
 
 
-Parallel dot-clock RGB uses `rgbframebuffer.RGBFrameBuffer` — no `RGBDisplay`.
+Parallel dot-clock RGB uses **`displayif.DotClockFramebuffer`** (not CircuitPython’s
+`dotclockframebuffer` module name) — no `RGBDisplay`.
 
 ## ESP32 large framebuffers
 
@@ -72,6 +74,7 @@ make BOARD=ESP32_GENERIC_S3 \
 ## Related
 
 - [HANDOFF.md](HANDOFF.md) — port matrix, hardware validation, RP2350 DSI notes
+- [ports/esp32/README.md](ports/esp32/README.md) — Qualia DotClock + P4 mipidsi behavioral notes
 - [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
 - [PyDevices/cmods](https://github.com/PyDevices/cmods) — optional build-shortcut workspace; see `[MP_EXAMPLE.md](https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md)` for ESP32-P4 bring-up
 

@@ -5,9 +5,12 @@ Portable code in `ports/common/`; SoC code under `ports/<mp-port>/`.
 
 **Before editing lifecycle / soft-reset / a new board bring-up**, read:
 
-1. [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) — required `deinit` / soft-reset contract for every real backend
-2. [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) — proven troubleshooting methods and failure modes (ESP32-P4 mipidsi + LVGL; applies to other ports/interfaces)
+1. [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) — required `deinit` / soft-reset contract (**implemented** for all real backends)
+2. [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) — proven failure modes and methods from **ESP32-P4 `mipidsi`** and **Qualia S3 `displayif.DotClockFramebuffer`** (+ LVGL); applies to other ports/interfaces
 3. [HANDOFF.md](HANDOFF.md) — module/port matrix and pydisplay board-config map
+
+Those two interfaces are the reference bring-ups: keep their scanout / blit /
+attr / soft-reset patterns when changing siblings.
 
 ## Hard rules
 

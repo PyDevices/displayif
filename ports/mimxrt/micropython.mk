@@ -5,14 +5,14 @@ DISPLAYIF_NXP_SDK ?= $(TOP)/lib/nxp_driver/sdk
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/ports/mimxrt
 
 SRC_USERMOD_C += \
-    $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_rgbframebuffer.c \
+    $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_dotclockframebuffer.c \
     $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_mipidsi.c \
     $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_i80bus.c
 
 ifeq ($(MCU_SERIES),MIMXRT1062)
-SRC_USERMOD_C := $(filter-out $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_rgbframebuffer.c,$(SRC_USERMOD_C))
+SRC_USERMOD_C := $(filter-out $(DISPLAYIF_MOD_DIR)/ports/common/notimpl/mod_dotclockframebuffer.c,$(SRC_USERMOD_C))
 SRC_USERMOD_C += \
-    $(DISPLAYIF_MOD_DIR)/ports/mimxrt/mod_rgbframebuffer_elcdif.c \
+    $(DISPLAYIF_MOD_DIR)/ports/mimxrt/mod_dotclockframebuffer_elcdif.c \
     $(DISPLAYIF_MOD_DIR)/ports/mimxrt/mimxrt1060_lcd_pins.c
 CFLAGS_USERMOD += -I$(DISPLAYIF_NXP_SDK)/drivers/elcdif
 SRC_USERMOD_C += $(DISPLAYIF_NXP_SDK)/drivers/elcdif/fsl_elcdif.c

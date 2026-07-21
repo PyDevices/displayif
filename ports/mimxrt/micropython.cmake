@@ -7,13 +7,13 @@ target_link_libraries(usermod INTERFACE displayif_mimxrt)
 set(DISPLAYIF_NXP_SDK "${MICROPY_DIR}/lib/nxp_driver/sdk")
 
 target_sources(displayif_mimxrt INTERFACE
-    ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_rgbframebuffer.c
+    ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_dotclockframebuffer.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_mipidsi.c
     ${DISPLAYIF_MOD_DIR}/ports/common/notimpl/mod_i80bus.c
 )
 
 target_compile_definitions(displayif_mimxrt INTERFACE
-    DISPLAYIF_STUB_RGBFRAMEBUFFER_MSG="LCDIF rgbframebuffer not implemented on mimxrt"
+    DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="LCDIF dotclockframebuffer not implemented on mimxrt"
     DISPLAYIF_STUB_I80BUS_MSG="FlexIO i80bus not implemented on mimxrt"
 )
 
@@ -37,7 +37,7 @@ endif()
 
 if(BOARD MATCHES "MIMXRT1060_EVK")
     target_sources(displayif_mimxrt INTERFACE
-        ${DISPLAYIF_MOD_DIR}/ports/mimxrt/mod_rgbframebuffer_elcdif.c
+        ${DISPLAYIF_MOD_DIR}/ports/mimxrt/mod_dotclockframebuffer_elcdif.c
         ${DISPLAYIF_MOD_DIR}/ports/mimxrt/mimxrt1060_lcd_pins.c
         ${DISPLAYIF_NXP_SDK}/drivers/elcdif/fsl_elcdif.c
     )
