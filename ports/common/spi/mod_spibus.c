@@ -75,19 +75,23 @@ static void spibus_cs_set(spibus_obj_t *self, int level) {
 }
 
 static void spibus_reinit_spi(spibus_obj_t *self) {
-    // Match Python baud restore, but also re-pass pins — required on ESP32-S3 where
-    // SPI.init(baudrate=...) without sck/mosi clears the GPIO matrix.
+    // Restore SPI params before each transfer. On ESP32-S3, SPI.init without
+    // sck/mosi clears the GPIO matrix — re-pass pins there. On rp2 (and most
+    // other ports), machine.SPI.init rejects pin kwargs ("extra keyword
+    // arguments given"), so only pass baud/mode fields.
     mp_obj_t kwargs = mp_obj_new_dict(0);
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_baudrate), mp_obj_new_int(self->baudrate));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_polarity), mp_obj_new_int(self->polarity));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_phase), mp_obj_new_int(self->phase));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_bits), mp_obj_new_int(self->bits));
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
+#if defined(ESP_PLATFORM)
     if (self->has_spi_pins) {
         mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sck), self->sck_pin);
         mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_mosi), self->mosi_pin);
         mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso), self->miso_pin);
     }
+#endif
     displayif_obj_call_method_kw(self->spi, MP_QSTR_init, kwargs);
 }
 
