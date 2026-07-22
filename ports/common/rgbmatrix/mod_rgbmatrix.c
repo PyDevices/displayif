@@ -67,8 +67,8 @@ typedef struct {
 } rgbmatrix_pm_host_t;
 
 static rgbmatrix_pm_host_t s_pm_host;
-#endif
 static bool s_soft_reset_registered;
+#endif
 
 static uint8_t *rgbmatrix_alloc(size_t nbytes) {
     return m_malloc(nbytes);

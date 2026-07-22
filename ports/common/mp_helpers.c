@@ -11,6 +11,17 @@ bool displayif_obj_is_pin(mp_obj_t obj) {
     return mp_obj_is_type(obj, displayif_pin_type());
 }
 
+bool displayif_pin_spec_unset(mp_obj_t pin_spec) {
+    // Match pydisplay sentinels: omitted / None / -1 mean "no pin".
+    if (pin_spec == MP_OBJ_NULL || pin_spec == mp_const_none) {
+        return true;
+    }
+    if (mp_obj_is_small_int(pin_spec) || mp_obj_is_int(pin_spec)) {
+        return mp_obj_get_int(pin_spec) == -1;
+    }
+    return false;
+}
+
 mp_obj_t displayif_pin_resolve(mp_obj_t pin_or_int) {
     if (displayif_obj_is_pin(pin_or_int)) {
         return pin_or_int;
@@ -107,16 +118,25 @@ static mp_obj_t displayif_call_pos_kwdict(mp_obj_t fun, size_t n_pos, const mp_o
     return res;
 }
 
-mp_obj_t displayif_machine_pin(mp_int_t pin_id, mp_int_t mode, mp_int_t value) {
-    // Match pydisplay: Pin(id, mode, value=value)
+mp_obj_t displayif_machine_pin_cfg(mp_obj_t pin_spec, mp_int_t mode, mp_int_t value) {
+    // Match pydisplay: Pin(id|name|Pin, mode, value=value)
+    // mimxrt accepts board names ("D9") and Pin.board.* objects; esp/rp2 use ints.
+    if (displayif_pin_spec_unset(pin_spec)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("pin must be specified"));
+    }
     mp_obj_t pin_type = displayif_pin_type();
     mp_obj_t pos[2] = {
-        mp_obj_new_int(pin_id),
+        pin_spec,
         mp_obj_new_int(mode),
     };
     mp_obj_t kwargs = mp_obj_new_dict(0);
     mp_obj_dict_store(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_value), mp_obj_new_int(value));
     return displayif_call_pos_kwdict(pin_type, 2, pos, kwargs);
+}
+
+mp_obj_t displayif_machine_pin(mp_int_t pin_id, mp_int_t mode, mp_int_t value) {
+    // Match pydisplay: Pin(id, mode, value=value)
+    return displayif_machine_pin_cfg(mp_obj_new_int(pin_id), mode, value);
 }
 
 mp_obj_t displayif_machine_spi(mp_obj_t kwargs) {
@@ -129,6 +149,13 @@ mp_obj_t displayif_machine_spi(mp_obj_t kwargs) {
         mp_obj_dict_delete(kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_id));
     }
     return displayif_call_pos_kwdict(spi_type, 1, &id, kwargs);
+}
+
+mp_obj_t displayif_machine_softspi(mp_obj_t kwargs) {
+    // Match pydisplay: SoftSPI(baudrate=..., sck=..., mosi=..., ...) — no bus id.
+    mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
+    mp_obj_t softspi_type = mp_load_attr(machine_mod, MP_QSTR_SoftSPI);
+    return displayif_call_pos_kwdict(softspi_type, 0, NULL, kwargs);
 }
 
 mp_obj_t displayif_obj_call_method0(mp_obj_t obj, qstr method) {

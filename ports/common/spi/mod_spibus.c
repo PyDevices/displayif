@@ -35,6 +35,7 @@ typedef struct _spibus_obj_t {
     bool has_cs;
     bool has_reset;
     bool has_spi_pins;
+    bool soft; // machine.SoftSPI (bitbang) — do not reinit every send
     bool deinited;
 } spibus_obj_t;
 
@@ -75,6 +76,11 @@ static void spibus_cs_set(spibus_obj_t *self, int level) {
 }
 
 static void spibus_reinit_spi(spibus_obj_t *self) {
+    // SoftSPI: reinit every transfer corrupts window cmds / pixel streams
+    // (diagonal noise, misplaced fill_rect columns). Leave the bitbang bus alone.
+    if (self->soft) {
+        return;
+    }
     // Restore SPI params before each transfer. On ESP32-S3, SPI.init without
     // sck/mosi clears the GPIO matrix — re-pass pins there. On rp2 (and most
     // other ports), machine.SPI.init rejects pin kwargs ("extra keyword
@@ -97,7 +103,10 @@ static void spibus_reinit_spi(spibus_obj_t *self) {
 
 // Parse keyword-only args to match:
 //   SPIBus(*, id=2, baudrate=24_000_000, polarity=0, phase=0, bits=8,
-//           lsb_first=False, sck=-1, mosi=-1, miso=-1, dc=-1, cs=-1, reset=-1)
+//           lsb_first=False, soft=False, sck=-1, mosi=-1, miso=-1,
+//           dc=-1, cs=-1, reset=-1)
+// Pin kwargs accept int, board name str ("D9"), or machine.Pin (mimxrt / samd).
+// soft=True uses machine.SoftSPI and requires sck + mosi.
 static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     if (n_args != 0) {
         mp_raise_TypeError(MP_ERROR_TEXT("extra positional arguments given"));
@@ -109,12 +118,13 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     mp_int_t phase = 0;
     mp_int_t bits = 8;
     bool lsb_first = false;
-    mp_int_t sck = -1;
-    mp_int_t mosi = -1;
-    mp_int_t miso = -1;
-    mp_int_t dc = -1;
-    mp_int_t cs = -1;
-    mp_int_t reset = -1;
+    bool soft = false;
+    mp_obj_t sck = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t mosi = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t miso = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t dc = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t cs = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t reset = MP_OBJ_NEW_SMALL_INT(-1);
 
     for (size_t i = 0; i < n_kw; i++) {
         mp_obj_t key = args[2 * i];
@@ -135,25 +145,30 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
             bits = mp_obj_get_int(val);
         } else if (q == MP_QSTR_lsb_first) {
             lsb_first = mp_obj_is_true(val);
+        } else if (q == MP_QSTR_soft) {
+            soft = mp_obj_is_true(val);
         } else if (q == MP_QSTR_sck) {
-            sck = mp_obj_get_int(val);
+            sck = val;
         } else if (q == MP_QSTR_mosi) {
-            mosi = mp_obj_get_int(val);
+            mosi = val;
         } else if (q == MP_QSTR_miso) {
-            miso = mp_obj_get_int(val);
+            miso = val;
         } else if (q == MP_QSTR_dc) {
-            dc = mp_obj_get_int(val);
+            dc = val;
         } else if (q == MP_QSTR_cs) {
-            cs = mp_obj_get_int(val);
+            cs = val;
         } else if (q == MP_QSTR_reset) {
-            reset = mp_obj_get_int(val);
+            reset = val;
         } else {
             mp_raise_TypeError(MP_ERROR_TEXT("extra keyword arguments given"));
         }
     }
 
-    if (dc == -1) {
+    if (displayif_pin_spec_unset(dc)) {
         mp_raise_ValueError(MP_ERROR_TEXT("DC pin must be specified"));
+    }
+    if (soft && (displayif_pin_spec_unset(sck) || displayif_pin_spec_unset(mosi))) {
+        mp_raise_ValueError(MP_ERROR_TEXT("soft SPI requires sck and mosi"));
     }
 
     // Tear down any prior SPIBus (soft-reset survivor or leaked instance) before recreate.
@@ -168,7 +183,8 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     mp_obj_t pin_cls = mp_load_attr(machine_mod, MP_QSTR_Pin);
     mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
     mp_int_t pin_in = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_IN));
-    mp_obj_t spi_cls = mp_load_attr(machine_mod, MP_QSTR_SPI);
+    // LSB/MSB from SoftSPI or SPI so soft path works when SoftSPI is present.
+    mp_obj_t spi_cls = soft ? mp_load_attr(machine_mod, MP_QSTR_SoftSPI) : mp_load_attr(machine_mod, MP_QSTR_SPI);
     mp_int_t spi_lsb = mp_obj_get_int(mp_load_attr(spi_cls, MP_QSTR_LSB));
     mp_int_t spi_msb = mp_obj_get_int(mp_load_attr(spi_cls, MP_QSTR_MSB));
 
@@ -177,46 +193,60 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->phase = phase;
     self->bits = bits;
     self->firstbit = lsb_first ? spi_lsb : spi_msb;
+    self->soft = soft;
 
-    // Match Python SPI(...) construction
     mp_obj_t spi_kwargs = mp_obj_new_dict(0);
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_baudrate), mp_obj_new_int(self->baudrate));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_polarity), mp_obj_new_int(self->polarity));
     mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_phase), mp_obj_new_int(self->phase));
-    mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_bits), mp_obj_new_int(self->bits));
-    mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
 
-    self->has_spi_pins = !(mosi == -1 && miso == -1 && sck == -1);
-    if (self->has_spi_pins) {
-        // Python always passes sck/mosi Pin; miso is Pin or None
-        self->sck_pin = displayif_machine_pin(sck, pin_out, 0);
-        self->mosi_pin = displayif_machine_pin(mosi, pin_out, 0);
-        self->miso_pin = (miso > -1) ? displayif_machine_pin(miso, pin_in, 0) : mp_const_none;
+    if (soft) {
+        self->sck_pin = displayif_machine_pin_cfg(sck, pin_out, 0);
+        self->mosi_pin = displayif_machine_pin_cfg(mosi, pin_out, 0);
+        self->miso_pin = displayif_pin_spec_unset(miso) ? mp_const_none : displayif_machine_pin_cfg(miso, pin_in, 0);
+        self->has_spi_pins = true;
         mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sck), self->sck_pin);
         mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_mosi), self->mosi_pin);
-        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso), self->miso_pin);
+        if (self->miso_pin != mp_const_none) {
+            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso), self->miso_pin);
+        }
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
+        self->spi = displayif_machine_softspi(spi_kwargs);
     } else {
-        self->sck_pin = mp_const_none;
-        self->mosi_pin = mp_const_none;
-        self->miso_pin = mp_const_none;
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_bits), mp_obj_new_int(self->bits));
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_firstbit), mp_obj_new_int(self->firstbit));
+
+        self->has_spi_pins = !(displayif_pin_spec_unset(mosi) && displayif_pin_spec_unset(miso) && displayif_pin_spec_unset(sck));
+        if (self->has_spi_pins) {
+            self->sck_pin = displayif_machine_pin_cfg(sck, pin_out, 0);
+            self->mosi_pin = displayif_machine_pin_cfg(mosi, pin_out, 0);
+            self->miso_pin = displayif_pin_spec_unset(miso) ? mp_const_none : displayif_machine_pin_cfg(miso, pin_in, 0);
+            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_sck), self->sck_pin);
+            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_mosi), self->mosi_pin);
+            mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_miso), self->miso_pin);
+        } else {
+            self->sck_pin = mp_const_none;
+            self->mosi_pin = mp_const_none;
+            self->miso_pin = mp_const_none;
+        }
+
+        mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_id), mp_obj_new_int(id));
+        self->spi = displayif_machine_spi(spi_kwargs);
     }
 
-    mp_obj_dict_store(spi_kwargs, MP_OBJ_NEW_QSTR(MP_QSTR_id), mp_obj_new_int(id));
-    self->spi = displayif_machine_spi(spi_kwargs);
-
     // DC/CS after SPI init (same comment as Python)
-    self->dc = displayif_machine_pin(dc, pin_out, DC_DATA);
+    self->dc = displayif_machine_pin_cfg(dc, pin_out, DC_DATA);
 
-    if (cs != -1) {
-        self->cs = displayif_machine_pin(cs, pin_out, CS_INACTIVE);
+    if (!displayif_pin_spec_unset(cs)) {
+        self->cs = displayif_machine_pin_cfg(cs, pin_out, CS_INACTIVE);
         self->has_cs = true;
     } else {
         self->cs = mp_const_none;
         self->has_cs = false;
     }
 
-    if (reset != -1) {
-        self->reset = displayif_machine_pin(reset, pin_out, 1);
+    if (!displayif_pin_spec_unset(reset)) {
+        self->reset = displayif_machine_pin_cfg(reset, pin_out, 1);
         self->has_reset = true;
     } else {
         self->reset = mp_const_none;
@@ -226,7 +256,7 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->buf1 = mp_obj_new_bytearray(1, (byte[]){0});
     self->deinited = false;
     s_active = self;
-    mp_printf(&mp_plat_print, "SPIBus loaded\n");
+    mp_printf(&mp_plat_print, soft ? "SPIBus loaded (SoftSPI)\n" : "SPIBus loaded\n");
     return MP_OBJ_FROM_PTR(self);
 }
 
