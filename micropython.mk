@@ -12,6 +12,7 @@ DISPLAYIF_PORT_ESP32 := $(findstring /ports/esp32,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_MIMXRT := $(findstring /ports/mimxrt,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_SAMD := $(findstring /ports/samd,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_RP2 := $(findstring /ports/rp2,$(PORT_DIR_ABS))
+DISPLAYIF_PORT_STM32 := $(findstring /ports/stm32,$(PORT_DIR_ABS))
 
 ifeq ($(DISPLAYIF_PORT_ESP32),)
 DISPLAYIF_PORT_ESP32 := 0
@@ -37,6 +38,12 @@ else
 DISPLAYIF_PORT_RP2 := 1
 endif
 
+ifeq ($(DISPLAYIF_PORT_STM32),)
+DISPLAYIF_PORT_STM32 := 0
+else
+DISPLAYIF_PORT_STM32 := 1
+endif
+
 DISPLAYIF_IS_MCU := 0
 ifeq ($(DISPLAYIF_PORT_ESP32),1)
 DISPLAYIF_IS_MCU := 1
@@ -48,6 +55,9 @@ ifeq ($(DISPLAYIF_PORT_SAMD),1)
 DISPLAYIF_IS_MCU := 1
 endif
 ifeq ($(DISPLAYIF_PORT_RP2),1)
+DISPLAYIF_IS_MCU := 1
+endif
+ifeq ($(DISPLAYIF_PORT_STM32),1)
 DISPLAYIF_IS_MCU := 1
 endif
 
@@ -87,4 +97,8 @@ endif
 
 ifeq ($(DISPLAYIF_PORT_RP2),1)
 include $(DISPLAYIF_MOD_DIR)/ports/rp2/micropython.mk
+endif
+
+ifeq ($(DISPLAYIF_PORT_STM32),1)
+include $(DISPLAYIF_MOD_DIR)/ports/stm32/micropython.mk
 endif

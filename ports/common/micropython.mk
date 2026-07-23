@@ -3,8 +3,8 @@
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/include -I$(DISPLAYIF_MOD_DIR)/ports/common -Wno-unused-function
 CFLAGS_USERMOD += -DDISPLAYIF_WRAP_GC_SWEEP=1 -DDISPLAYIF_WRAP_MP_DEINIT=1
 # Soft-reset: tear down before gc_sweep_all; mp_deinit is a second pass.
-# Bare `ld` (mimxrt/samd/stm32) rejects -Wl,; gcc-as-linker wants it.
-ifneq ($(findstring /ports/mimxrt,$(CURDIR))$(findstring /ports/samd,$(CURDIR))$(findstring /ports/stm32,$(CURDIR)),)
+# Bare `ld` (mimxrt/samd) rejects -Wl,; gcc-as-linker (esp32/rp2/stm32) wants it.
+ifneq ($(findstring /ports/mimxrt,$(CURDIR))$(findstring /ports/samd,$(CURDIR)),)
 LDFLAGS_USERMOD += --wrap=gc_sweep_all --wrap=mp_deinit
 else
 LDFLAGS_USERMOD += -Wl,--wrap=gc_sweep_all -Wl,--wrap=mp_deinit
