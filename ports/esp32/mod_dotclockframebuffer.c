@@ -514,9 +514,11 @@ static mp_obj_t dotclockframebuffer_refresh(mp_obj_t self_in) {
         vTaskDelay(1);
     }
 
+    // Advance the paint target. Do not memcpy the full FB — that costs
+    // ~100ms+ on 800x480 PSRAM and is redundant when a dual-buffer GUI
+    // (e.g. LVGL DIRECT) already syncs dirty regions across both panel FBs.
+    // Painters that only touch dirty areas stay correct after the flip.
     uint8_t next = (uint8_t)(1 - presented);
-    // Keep both FBs identical for LVGL PARTIAL updates into the new back.
-    memcpy(self->fbs[next], self->fbs[presented], self->buf_len);
     self->draw_index = next;
     self->buf = self->fbs[next];
     return mp_const_none;
@@ -613,6 +615,32 @@ static mp_obj_t dotclockframebuffer_del(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_del_obj, dotclockframebuffer_del);
 
+// Panel FB views for GUI direct-paint (LVGL DIRECT, etc.). External refs —
+// do not free; lifetime follows the DotClockFramebuffer object.
+static mp_obj_t dotclockframebuffer_framebuffers(mp_obj_t self_in) {
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
+    }
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+    if (self->num_fbs >= 2 && self->fbs[0] != NULL && self->fbs[1] != NULL) {
+        mp_obj_t items[2] = {
+            mp_obj_new_bytearray_by_ref(self->buf_len, self->fbs[0]),
+            mp_obj_new_bytearray_by_ref(self->buf_len, self->fbs[1]),
+        };
+        return mp_obj_new_tuple(2, items);
+    }
+#endif
+    if (self->buf == NULL) {
+        return mp_const_empty_tuple;
+    }
+    mp_obj_t items[1] = {
+        mp_obj_new_bytearray_by_ref(self->buf_len, self->buf),
+    };
+    return mp_obj_new_tuple(1, items);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_framebuffers_obj, dotclockframebuffer_framebuffers);
+
 static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (dest[0] == MP_OBJ_NULL) {
@@ -623,11 +651,16 @@ static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest
             dest[0] = mp_obj_new_int(self->height);
         } else if (attr == MP_QSTR_row_stride) {
             dest[0] = mp_obj_new_int(self->row_stride);
+        } else if (attr == MP_QSTR_buf_len) {
+            dest[0] = mp_obj_new_int(self->buf_len);
         } else if (attr == MP_QSTR_auto_refresh) {
             // False: FBDisplay.show() must call refresh() to promote the back
             // buffer. (CP Qualia uses True because displayio composites a
             // separate Bitmap; MP LVGL paints this FB directly.)
             dest[0] = mp_const_false;
+        } else if (attr == MP_QSTR_framebuffers) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_framebuffers_obj);
+            dest[1] = self_in;
         } else if (attr == MP_QSTR_refresh) {
             dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_refresh_obj);
             dest[1] = self_in;
@@ -651,6 +684,7 @@ static const mp_rom_map_elem_t dotclockframebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&dotclockframebuffer_refresh_obj) },
     { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&dotclockframebuffer_blit_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&dotclockframebuffer_fill_rect_obj) },
+    { MP_ROM_QSTR(MP_QSTR_framebuffers), MP_ROM_PTR(&dotclockframebuffer_framebuffers_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
 };

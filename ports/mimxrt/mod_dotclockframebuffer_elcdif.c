@@ -331,6 +331,19 @@ static mp_obj_t dotclockframebuffer_refresh(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_refresh_obj, dotclockframebuffer_refresh);
 
+static mp_obj_t dotclockframebuffer_framebuffers(mp_obj_t self_in) {
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited || self->buf == NULL) {
+        return mp_const_empty_tuple;
+    }
+    // eLCDIF path is single-FB; expose one buffer for share_framebuffer GUIs.
+    mp_obj_t items[1] = {
+        mp_obj_new_bytearray_by_ref(self->buf_len, self->buf),
+    };
+    return mp_obj_new_tuple(1, items);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_framebuffers_obj, dotclockframebuffer_framebuffers);
+
 static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (dest[0] == MP_OBJ_NULL) {
@@ -343,6 +356,9 @@ static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest
         } else if (attr == MP_QSTR_auto_refresh) {
             // Continuous eLCDIF scanout — same contract as esp32 DotClock.
             dest[0] = mp_const_true;
+        } else if (attr == MP_QSTR_framebuffers) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_framebuffers_obj);
+            dest[1] = self_in;
         }
     }
 }
@@ -371,6 +387,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_del_obj, dotclockframebuffe
 
 static const mp_rom_map_elem_t dotclockframebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&dotclockframebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_framebuffers), MP_ROM_PTR(&dotclockframebuffer_framebuffers_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
 };

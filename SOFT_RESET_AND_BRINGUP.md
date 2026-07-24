@@ -25,8 +25,9 @@ These are **three** knobs. Agents repeatedly mixed them up.
 | Mechanism | What it is | Why | Policy |
 |-----------|------------|-----|--------|
 | **Bounce buffer** | DRAM refill from PSRAM FB (`bounce_buffer_size_px = 20 * h_res`) | Without it, large DPI panels **slide horizontally** under load (PSRAM underrun) | **Always on** for esp32 DotClock — never remove when debugging tear |
-| **Panel double-FB** (`num_fbs = 2`) | Paint back; `refresh()`/`show()` promotes after bounce adopts | LVGL blits the FB directly; painting the **live** bounce source mid-scan → flicker / black strips. CP Qualia paints a separate `Bitmap` instead | **Required for MP LVGL**; `auto_refresh=False` so `FBDisplay.show` presents |
+| **Panel double-FB** (`num_fbs = 2`) | Paint back; `refresh()`/`show()` promotes after bounce adopts | Painting the **live** bounce source mid-scan → flicker / black strips. GUIs may bind both panel FBs via `framebuffers()` (`share_framebuffer` on `FBDisplay`) for LVGL DIRECT | **Required for MP LVGL**; `auto_refresh=False` so `FBDisplay.show` presents |
 | **`auto_refresh`** | Whether `FBDisplay.show()` skips `refresh()` | Coupled to double-FB, **not** to bounce | `False` on MP DotClock; CP `FramebufferDisplay(auto_refresh=True)` is a different architecture |
+| **Present `refresh()`** | Flip back→front after bounce adopts | Do **not** full-FB `memcpy` after flip (~100ms+ on 800×480). Dual-buffer GUIs sync dirty regions; `show()` advances the paint pointer only | Keep bounce wait + `draw_bitmap`; no clone |
 
 **History (same day, this campaign):** Qualia black → continuous scanout; Qualia slide → **add bounce** (kept); Qualia flicker → **double-FB + `auto_refresh=False`** (`623dc04`); T-RGB black while FB had color → probes skipped `show()` on double-FB, then mistakenly switched to **single-FB + `auto_refresh=True`** (`0e3de1a`) — bounce was **not** removed; LCD-7 UI then black-with-edge under LVGL → restore double-FB + present via `show()`.
 
