@@ -331,12 +331,71 @@ static mp_obj_t dotclockframebuffer_refresh(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_refresh_obj, dotclockframebuffer_refresh);
 
+/* blit(buf, x, y, w, h) — C memcpy into the scanout FB (parity with esp32). */
+static mp_obj_t dotclockframebuffer_blit(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
+    }
+    mp_buffer_info_t srcinfo;
+    mp_get_buffer_raise(args[1], &srcinfo, MP_BUFFER_READ);
+    int x = mp_obj_get_int(args[2]);
+    int y = mp_obj_get_int(args[3]);
+    int w = mp_obj_get_int(args[4]);
+    int h = mp_obj_get_int(args[5]);
+    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > self->width || y + h > self->height) {
+        mp_raise_ValueError(MP_ERROR_TEXT("blit rect out of range"));
+    }
+    size_t row_bytes = (size_t)w * sizeof(uint16_t);
+    if (srcinfo.len < row_bytes * (size_t)h) {
+        mp_raise_ValueError(MP_ERROR_TEXT("blit buffer too small"));
+    }
+    const uint8_t *src = srcinfo.buf;
+    uint8_t *dst = self->buf + (size_t)y * self->row_stride + (size_t)x * sizeof(uint16_t);
+    for (int row = 0; row < h; row++) {
+        memcpy(dst, src, row_bytes);
+        dst += self->row_stride;
+        src += row_bytes;
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dotclockframebuffer_blit_obj, 6, 6, dotclockframebuffer_blit);
+
+/* fill_rect(x, y, w, h, color) — C RGB565 fill (parity with esp32). */
+static mp_obj_t dotclockframebuffer_fill_rect(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
+    }
+    int x = mp_obj_get_int(args[1]);
+    int y = mp_obj_get_int(args[2]);
+    int w = mp_obj_get_int(args[3]);
+    int h = mp_obj_get_int(args[4]);
+    uint16_t color = (uint16_t)mp_obj_get_int(args[5]);
+    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > self->width || y + h > self->height) {
+        mp_raise_ValueError(MP_ERROR_TEXT("fill_rect out of range"));
+    }
+    for (int row = 0; row < h; row++) {
+        uint16_t *dst = (uint16_t *)(self->buf + (size_t)(y + row) * self->row_stride + (size_t)x * sizeof(uint16_t));
+        for (int col = 0; col < w; col++) {
+            dst[col] = color;
+        }
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dotclockframebuffer_fill_rect_obj, 6, 6, dotclockframebuffer_fill_rect);
+
+// Panel FB view for GUI direct-paint (LVGL DIRECT, etc.). eLCDIF is single-FB.
 static mp_obj_t dotclockframebuffer_framebuffers(mp_obj_t self_in) {
     dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    if (self->deinited || self->buf == NULL) {
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("RGB framebuffer is deinited"));
+    }
+    if (self->buf == NULL) {
         return mp_const_empty_tuple;
     }
-    // eLCDIF path is single-FB; expose one buffer for share_framebuffer GUIs.
     mp_obj_t items[1] = {
         mp_obj_new_bytearray_by_ref(self->buf_len, self->buf),
     };
@@ -344,20 +403,45 @@ static mp_obj_t dotclockframebuffer_framebuffers(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_framebuffers_obj, dotclockframebuffer_framebuffers);
 
+static mp_obj_t dotclockframebuffer_del(mp_obj_t self_in) {
+    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    dotclockframebuffer_deinit_internal(self);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_del_obj, dotclockframebuffer_del);
+
 static void dotclockframebuffer_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (dest[0] == MP_OBJ_NULL) {
+        // Custom attr replaces locals_dict lookup — expose methods here (esp32 parity).
         if (attr == MP_QSTR_width) {
             dest[0] = mp_obj_new_int(self->width);
         } else if (attr == MP_QSTR_height) {
             dest[0] = mp_obj_new_int(self->height);
         } else if (attr == MP_QSTR_row_stride) {
             dest[0] = mp_obj_new_int(self->row_stride);
+        } else if (attr == MP_QSTR_buf_len) {
+            dest[0] = mp_obj_new_int(self->buf_len);
         } else if (attr == MP_QSTR_auto_refresh) {
-            // Continuous eLCDIF scanout — same contract as esp32 DotClock.
+            // Continuous eLCDIF scanout of a single FB (no tear-free flip).
             dest[0] = mp_const_true;
         } else if (attr == MP_QSTR_framebuffers) {
             dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_framebuffers_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR_refresh) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_refresh_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR_blit) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_blit_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR_fill_rect) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_fill_rect_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR_deinit) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_del_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR___del__) {
+            dest[0] = MP_OBJ_FROM_PTR(&dotclockframebuffer_del_obj);
             dest[1] = self_in;
         }
     }
@@ -369,24 +453,20 @@ static mp_int_t dotclockframebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_
     if (self->deinited || self->buf == NULL) {
         bufinfo->buf = NULL;
         bufinfo->len = 0;
-        bufinfo->typecode = 'H';
+        bufinfo->typecode = 'B';
         return 0;
     }
     bufinfo->buf = self->buf;
     bufinfo->len = self->buf_len;
-    bufinfo->typecode = 'H';
+    // Byte-addressable for displaysys.FBDisplay (MP has no memoryview.cast).
+    bufinfo->typecode = 'B';
     return 0;
 }
 
-static mp_obj_t dotclockframebuffer_del(mp_obj_t self_in) {
-    dotclockframebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
-    dotclockframebuffer_deinit_internal(self);
-    return mp_const_none;
-}
-static MP_DEFINE_CONST_FUN_OBJ_1(dotclockframebuffer_del_obj, dotclockframebuffer_del);
-
 static const mp_rom_map_elem_t dotclockframebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&dotclockframebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&dotclockframebuffer_blit_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&dotclockframebuffer_fill_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_framebuffers), MP_ROM_PTR(&dotclockframebuffer_framebuffers_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&dotclockframebuffer_del_obj) },
