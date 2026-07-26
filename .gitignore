@@ -1,16 +1,19 @@
+# Shared minimum (PyDevices package / cmod repos)
 .venv/
 __pycache__/
 *.py[cod]
-*.o
-*.a
-*.so
-*.pyd
 *.egg-info/
 .eggs/
 build/
 dist/
-wheels/
+*.so
+*.pyd
 
 # Cursor IDE throwaways (do not ignore the whole .cursor/ tree)
 .cursor/debug*
 .cursor/plans/
+
+# Repo-specific
+*.o
+*.a
+wheels/
