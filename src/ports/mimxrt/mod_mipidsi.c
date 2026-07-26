@@ -33,6 +33,10 @@ typedef struct _mipidsi_display_obj_t {
     uint16_t row_stride;
     uint8_t *buf;
     size_t buf_len;
+    uint8_t virtual_channel;
+    int16_t rotation;
+    mp_float_t brightness;
+    uint16_t native_frames_per_second;
     int backlight_pin;
     bool backlight_on_high;
     bool lcdif_ready;
@@ -152,6 +156,10 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         ARG_vsync_pulse_width,
         ARG_vsync_front_porch,
         ARG_vsync_back_porch,
+        ARG_virtual_channel,
+        ARG_rotation,
+        ARG_brightness,
+        ARG_native_frames_per_second,
         ARG_reset_pin,
         ARG_backlight_pin,
         ARG_backlight_on_high,
@@ -160,7 +168,7 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_init_sequence, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_color_depth, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
+        { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
         { MP_QSTR_pixel_clock_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_hsync_pulse_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_hsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
@@ -168,6 +176,10 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_vsync_pulse_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_vsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_vsync_back_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_virtual_channel, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_rotation, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_brightness, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NEW_SMALL_INT(1) } },
+        { MP_QSTR_native_frames_per_second, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 60 } },
         { MP_QSTR_reset_pin, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
         { MP_QSTR_backlight_pin, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
         { MP_QSTR_backlight_on_high, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = true } },
@@ -191,6 +203,22 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     if (vals[ARG_pixel_clock_frequency].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("pixel_clock_frequency must be positive"));
     }
+    if (vals[ARG_virtual_channel].u_int < 0 || vals[ARG_virtual_channel].u_int > 3) {
+        mp_raise_ValueError(MP_ERROR_TEXT("virtual_channel must be 0..3"));
+    }
+    if (vals[ARG_virtual_channel].u_int != 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("virtual_channel must be 0 on mimxrt"));
+    }
+    if (vals[ARG_rotation].u_int % 90 != 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("Display rotation must be in 90 degree increments"));
+    }
+    if (vals[ARG_native_frames_per_second].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("native_frames_per_second must be positive"));
+    }
+    mp_float_t brightness = mp_obj_get_float(vals[ARG_brightness].u_obj);
+    if (brightness < 0.0f || brightness > 1.0f) {
+        mp_raise_ValueError(MP_ERROR_TEXT("brightness must be 0.0..1.0"));
+    }
 
     mp_buffer_info_t init_bufinfo;
     mp_get_buffer_raise(vals[ARG_init_sequence].u_obj, &init_bufinfo, MP_BUFFER_READ);
@@ -208,6 +236,10 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("MIPI DSI framebuffer allocation failed"));
     }
     memset(self->buf, 0, self->buf_len);
+    self->virtual_channel = (uint8_t)vals[ARG_virtual_channel].u_int;
+    self->rotation = (int16_t)vals[ARG_rotation].u_int;
+    self->brightness = brightness;
+    self->native_frames_per_second = (uint16_t)vals[ARG_native_frames_per_second].u_int;
     self->backlight_pin = vals[ARG_backlight_pin].u_int;
     self->backlight_on_high = vals[ARG_backlight_on_high].u_bool;
     self->lcdif_ready = false;
@@ -227,9 +259,13 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         .lane_bit_rate_hz = bus->lane_bit_rate_hz,
     };
 
+    /* Brightness 0 leaves backlight off; HAL still applies backlight_on_high polarity. */
+    bool backlight_enable = brightness > 0.0f;
     mipidsi_raise_status(displayif_mimxrt1176_dsi_display_start(&timings,
         init_bufinfo.buf, init_bufinfo.len,
-        vals[ARG_reset_pin].u_int, self->backlight_pin, self->backlight_on_high));
+        vals[ARG_reset_pin].u_int,
+        backlight_enable ? self->backlight_pin : -1,
+        self->backlight_on_high));
 
     displayif_mimxrt1176_dsi_lcdifv2_start(self->buf);
     self->lcdif_ready = true;
