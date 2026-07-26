@@ -37,7 +37,6 @@ typedef struct _mipidsi_display_obj_t {
     int16_t rotation;
     mp_float_t brightness;
     uint16_t native_frames_per_second;
-    int backlight_pin;
     bool backlight_on_high;
     bool lcdif_ready;
     bool deinited;
@@ -160,8 +159,6 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         ARG_rotation,
         ARG_brightness,
         ARG_native_frames_per_second,
-        ARG_reset_pin,
-        ARG_backlight_pin,
         ARG_backlight_on_high,
     };
     static const mp_arg_t allowed_args[] = {
@@ -180,8 +177,7 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_rotation, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_brightness, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NEW_SMALL_INT(1) } },
         { MP_QSTR_native_frames_per_second, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 60 } },
-        { MP_QSTR_reset_pin, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_backlight_pin, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
+        /* Accepted for CP signature parity; board_config owns reset/backlight GPIO. */
         { MP_QSTR_backlight_on_high, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = true } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
@@ -240,7 +236,6 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     self->rotation = (int16_t)vals[ARG_rotation].u_int;
     self->brightness = brightness;
     self->native_frames_per_second = (uint16_t)vals[ARG_native_frames_per_second].u_int;
-    self->backlight_pin = vals[ARG_backlight_pin].u_int;
     self->backlight_on_high = vals[ARG_backlight_on_high].u_bool;
     self->lcdif_ready = false;
     self->deinited = false;
@@ -259,13 +254,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         .lane_bit_rate_hz = bus->lane_bit_rate_hz,
     };
 
-    /* Brightness 0 leaves backlight off; HAL still applies backlight_on_high polarity. */
-    bool backlight_enable = brightness > 0.0f;
     mipidsi_raise_status(displayif_mimxrt1176_dsi_display_start(&timings,
-        init_bufinfo.buf, init_bufinfo.len,
-        vals[ARG_reset_pin].u_int,
-        backlight_enable ? self->backlight_pin : -1,
-        self->backlight_on_high));
+        init_bufinfo.buf, init_bufinfo.len));
 
     displayif_mimxrt1176_dsi_lcdifv2_start(self->buf);
     self->lcdif_ready = true;

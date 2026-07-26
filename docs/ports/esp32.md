@@ -40,9 +40,11 @@ Waveshare / Espressif P4 4B touch LCD with LVGL soft-reset re-import.
 
 `Display` accepts CircuitPython-compatible optional kwargs:
 `virtual_channel=0` (wired into esp_lcd DBI/DPI), `rotation=0` (90° steps;
-metadata for callers), `brightness=1.0` (digital backlight on if > 0),
-`native_frames_per_second=60`, `backlight_on_high=True`. `color_depth`
-defaults to 16.
+metadata for callers), `brightness=1.0`, `native_frames_per_second=60`,
+`backlight_on_high=True`. `color_depth` defaults to 16. Panel **reset** and
+**backlight** GPIO are owned by board_config (not `Display`); `brightness` /
+`backlight_on_high` are accepted for CP signature parity and stored as
+metadata.
 
 | Topic | Behavior |
 |-------|----------|
