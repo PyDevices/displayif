@@ -76,5 +76,5 @@ make BOARD=ESP32_GENERIC_S3 \
 - [docs/HANDOFF.md](docs/HANDOFF.md) — port matrix, hardware validation, RP2350 DSI notes
 - [docs/ports/esp32.md](docs/ports/esp32.md) — Qualia DotClock + P4 mipidsi behavioral notes
 - [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
-- [PyDevices/cmods](https://github.com/PyDevices/cmods) — optional build-shortcut workspace; see `[MP_EXAMPLE.md](https://github.com/PyDevices/cmods/blob/main/MP_EXAMPLE.md)` for ESP32-P4 bring-up
+- [PyDevices/cmods](https://github.com/PyDevices/cmods) — optional build-shortcut workspace; see `[MP_EXAMPLE.md](https://github.com/PyDevices/cmods/blob/main/docs/MP_EXAMPLE.md)` for ESP32-P4 bring-up
 
