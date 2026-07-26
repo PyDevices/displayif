@@ -1,0 +1,37 @@
+# samd CMake glue.
+
+add_library(displayif_samd INTERFACE)
+target_include_directories(displayif_samd INTERFACE
+    ${DISPLAYIF_MOD_DIR}/src/ports/samd
+    ${DISPLAYIF_MOD_DIR}/src/include
+)
+target_link_libraries(usermod INTERFACE displayif_samd)
+
+target_sources(displayif_samd INTERFACE
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_dotclockframebuffer.c
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_mipidsi.c
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/i80bus/gpio_bitbang.c
+)
+
+target_compile_definitions(displayif_samd INTERFACE
+    DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="SAMD has no native RGB LCD scanout"
+    DISPLAYIF_STUB_MIPIDSI_MSG="MIPI DSI not available on SAMD"
+)
+
+if(MCU_SERIES MATCHES "SAMD51")
+    target_sources(displayif_samd INTERFACE
+        ${DISPLAYIF_MOD_DIR}/src/ports/samd/mod_i80bus.c
+        ${DISPLAYIF_MOD_DIR}/src/ports/samd/rgbmatrix_pm.c
+        ${DISPLAYIF_MOD_DIR}/src/ports/samd/samd_irq_hook.c
+    )
+    target_compile_definitions(displayif_samd INTERFACE
+        __SAMD51__=1
+    )
+else()
+    target_sources(displayif_samd INTERFACE
+        ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_i80bus.c
+    )
+    target_compile_definitions(displayif_samd INTERFACE
+        DISPLAYIF_STUB_I80BUS_MSG="I80 parallel bus requires SAMD51"
+    )
+endif()
