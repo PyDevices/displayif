@@ -12,6 +12,9 @@ ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espress
 | `mod_mipidsi.c` | `mipidsi.Bus` / `mipidsi.Display` | P4 (`SOC_MIPI_DSI_SUPPORTED`) | **FBDisplay** |
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | S3 (Protomatter + LCD_CAM) | **FBDisplay** |
 
+`I80Bus` kwargs match CircuitPython `ParallelBus`: `command`, `chip_select`,
+`write`, `data_pins`, `frequency` (default 30 MHz).
+
 On SoCs without the matching peripheral, modules import but constructors raise `NotImplementedError`.
 
 Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings (via `displayif_pin_resolve`).

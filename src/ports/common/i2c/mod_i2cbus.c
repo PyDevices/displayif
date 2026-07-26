@@ -24,19 +24,19 @@ static const mp_obj_type_t i2cbus_type;
 
 static mp_obj_t i2cbus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
-        ARG_i2c,
-        ARG_address,
+        ARG_i2c_bus,
+        ARG_device_address,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_i2c, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_address, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0x3C } },
+        { MP_QSTR_i2c_bus, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_device_address, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
     i2cbus_obj_t *self = mp_obj_malloc(i2cbus_obj_t, type);
-    self->i2c = vals[ARG_i2c].u_obj;
-    self->address = vals[ARG_address].u_int;
+    self->i2c = vals[ARG_i2c_bus].u_obj;
+    self->address = vals[ARG_device_address].u_int;
     self->deinited = false;
     vstr_init(&self->vstr, 32);
     return MP_OBJ_FROM_PTR(self);

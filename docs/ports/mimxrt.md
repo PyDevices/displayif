@@ -50,18 +50,18 @@ see [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md).
 
 ### `i80bus` (FlexIO MCULCD)
 
-On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel **8080** mode with an **8-bit** data bus. Matches the pydisplay `I80Bus(dc, cs, wr, data, freq)` contract with `.send(command, data=None)` and `.deinit()`.
+On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel **8080** mode with an **8-bit** data bus. Constructor kwargs match CircuitPython `ParallelBus` names (`command`, `chip_select`, `write`, `data_pins`, `frequency`; default 30 MHz) with `.send(command, data=None)` and `.deinit()`.
 
 **Pin constraints (minimal driver):**
 
-- **Data** and **wr** must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11).
-- **dc** and **cs** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
+- **`data_pins`** and **`write`** must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11).
+- **`command`** and **`chip_select`** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
 - Only **one** `I80Bus` instance per board (single FLEXIO2 peripheral).
 - **IOMUX** for FlexIO pins is applied at construction; see pydisplay `teensy41_flexio_ili9341` for an example pin map.
 
 On **MIMXRT1060-EVK**, the LCDIF RGB pins on `GPIO_B0_04`–`GPIO_B0_11` overlap the typical FlexIO2 data mapping — do not use the RK043 RGB shield pins simultaneously with i80bus. Teensy 4.x boards can wire an external 8080 display to FLEXIO2-capable pads per the schematic.
 
-Default `freq` is 20 MHz (byte rate). Bulk transfers (≥64 bytes) use `FLEXIO_MCULCD_TransferBlocking` with `dataOnly=true`.
+Default `frequency` is 30 MHz (CP ParallelBus default; byte rate on this port). Bulk transfers (≥64 bytes) use `FLEXIO_MCULCD_TransferBlocking` with `dataOnly=true`.
 
 Example pydisplay config: `busdisplay/i80/teensy41_flexio_ili9341`.
 
