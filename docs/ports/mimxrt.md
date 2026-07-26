@@ -20,7 +20,8 @@ NXP i.MX RT display interfaces for MicroPython `mimxrt` port.
 
 On **MIMXRT1062**, `displayif.DotClockFramebuffer` uses the NXP SDK **eLCDIF** block for
 dot-clock RGB scanout. Targets the **MIMXRT1060-EVK** with the RK043FN02H-CT
-shield (J49). RGB565 16-pin parallel layout only (RGB-666 not supported yet).
+shield (J49). Requires CircuitPython-style `red`/`green`/`blue` (5/6/5) pin
+tuples; EVK IOMUX is fixed to LCDIF D0..D15 in B0..B4, G0..G5, R0..R4 order.
 
 Lifecycle: idempotent `deinit` / `__del__` / ctor + soft-reset teardown (stops
 eLCDIF; see [IDEMPOTENT_LIFECYCLE.md](../IDEMPOTENT_LIFECYCLE.md)). For the

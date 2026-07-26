@@ -130,16 +130,33 @@ static void dotclockframebuffer_validate_evk_pin(const machine_pin_obj_t *pin, G
     }
 }
 
-static void dotclockframebuffer_validate_evk_pins(mp_obj_t de, mp_obj_t vsync, mp_obj_t hsync, mp_obj_t dclk, mp_obj_t data) {
+// Match CircuitPython / esp32: wire order is B0..B4, G0..G5, R0..R4.
+static void dotclockframebuffer_validate_evk_pins(mp_obj_t de, mp_obj_t vsync, mp_obj_t hsync, mp_obj_t dclk,
+    mp_obj_t red, mp_obj_t green, mp_obj_t blue) {
     dotclockframebuffer_validate_evk_pin(pin_find(de), GPIO2, 1);
     dotclockframebuffer_validate_evk_pin(pin_find(vsync), GPIO2, 3);
     dotclockframebuffer_validate_evk_pin(pin_find(hsync), GPIO2, 2);
     dotclockframebuffer_validate_evk_pin(pin_find(dclk), GPIO2, 0);
 
+    mp_obj_t blue_pins[5];
+    mp_obj_t green_pins[6];
+    mp_obj_t red_pins[5];
+    size_t n_blue = displayif_pin_seq_to_objs(blue, blue_pins, 5);
+    size_t n_green = displayif_pin_seq_to_objs(green, green_pins, 6);
+    size_t n_red = displayif_pin_seq_to_objs(red, red_pins, 5);
+    if (!(n_red == 5 && n_green == 6 && n_blue == 5)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("red/green/blue must be 5/6/5 pins (RGB565)"));
+    }
+
     mp_obj_t data_pins[DCFB_LCDIF_DATA_PIN_COUNT];
-    size_t count = displayif_pin_seq_to_objs(data, data_pins, DCFB_LCDIF_DATA_PIN_COUNT);
-    if (count != DCFB_LCDIF_DATA_PIN_COUNT) {
-        mp_raise_ValueError(MP_ERROR_TEXT("data must be a 16-pin sequence for RGB565"));
+    for (size_t i = 0; i < 5; i++) {
+        data_pins[i] = blue_pins[i];
+    }
+    for (size_t i = 0; i < 6; i++) {
+        data_pins[5 + i] = green_pins[i];
+    }
+    for (size_t i = 0; i < 5; i++) {
+        data_pins[11 + i] = red_pins[i];
     }
     for (size_t i = 0; i < DCFB_LCDIF_DATA_PIN_COUNT; i++) {
         dotclockframebuffer_validate_evk_pin(pin_find(data_pins[i]), GPIO2, 4 + i);
@@ -222,7 +239,6 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         ARG_red,
         ARG_green,
         ARG_blue,
-        ARG_data,
         ARG_frequency,
         ARG_width,
         ARG_height,
@@ -244,10 +260,9 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         { MP_QSTR_vsync, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_hsync, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_dclk, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_red, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_green, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_blue, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_red, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_green, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_blue, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
@@ -267,14 +282,6 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    bool rgb666 = vals[ARG_red].u_obj != MP_OBJ_NULL;
-    bool rgb565 = vals[ARG_data].u_obj != MP_OBJ_NULL;
-    if (rgb666 == rgb565) {
-        mp_raise_ValueError(MP_ERROR_TEXT("Specify exactly one of red/green/blue or data pin layout"));
-    }
-    if (rgb666) {
-        mp_raise_ValueError(MP_ERROR_TEXT("RGB-666 not supported on mimxrt eLCDIF yet"));
-    }
     if (vals[ARG_width].u_int <= 0 || vals[ARG_height].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("width and height must be positive"));
     }
@@ -283,7 +290,8 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         mp_raise_ValueError(MP_ERROR_TEXT("frequency out of range (1-65 MHz)"));
     }
     dotclockframebuffer_validate_evk_pins(vals[ARG_de].u_obj, vals[ARG_vsync].u_obj,
-        vals[ARG_hsync].u_obj, vals[ARG_dclk].u_obj, vals[ARG_data].u_obj);
+        vals[ARG_hsync].u_obj, vals[ARG_dclk].u_obj,
+        vals[ARG_red].u_obj, vals[ARG_green].u_obj, vals[ARG_blue].u_obj);
     (void)vals[ARG_overscan_left];
     (void)vals[ARG_pclk_idle_high];
 

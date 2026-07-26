@@ -18,7 +18,8 @@ Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings (
 ### `displayif.DotClockFramebuffer` (RGB LCD / Qualia)
 
 Python import is `displayif.DotClockFramebuffer` (CP uses `dotclockframebuffer.DotClockFramebuffer`). Supports
-RGB-666 pin tuples (`red`/`green`/`blue`) and 16-pin RGB565 (`data=`) layouts.
+Required RGB565 pin tuples (`red`/`green`/`blue` = 5/6/5), matching CircuitPython
+`dotclockframebuffer.DotClockFramebuffer` (wire order B0..B4, G0..G5, R0..R4).
 
 Behavioral contract (proven on Qualia S3 + TL040HDS20):
 
