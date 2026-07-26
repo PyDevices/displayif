@@ -79,7 +79,6 @@ typedef struct _dotclockframebuffer_obj_t {
     bool pclk_idle_high;
     int overscan_left;
     uint8_t bits_per_pixel;
-    bool rgb666_layout;
     bool deinited;
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     esp_lcd_panel_handle_t panel;
@@ -160,23 +159,16 @@ static void dotclockframebuffer_raise_esp_err(esp_err_t err) {
 }
 
 // Match CircuitPython DotClockFramebuffer: RGB565 wire order is B0..B4, G0..G5, R0..R4.
-static void dotclockframebuffer_fill_data_pins(dotclockframebuffer_obj_t *self, mp_obj_t red, mp_obj_t green, mp_obj_t blue, mp_obj_t data) {
+static void dotclockframebuffer_fill_data_pins(dotclockframebuffer_obj_t *self, mp_obj_t red, mp_obj_t green, mp_obj_t blue) {
     int pins[DCFB_MAX_DATA_PINS];
-    size_t count = 0;
-
-    if (data != MP_OBJ_NULL) {
-        count = displayif_esp32_pin_seq_to_gpios(data, pins, DCFB_MAX_DATA_PINS);
-    } else {
-        size_t n_blue = displayif_esp32_pin_seq_to_gpios(blue, pins, DCFB_MAX_DATA_PINS);
-        size_t n_green = displayif_esp32_pin_seq_to_gpios(green, pins + n_blue, DCFB_MAX_DATA_PINS - n_blue);
-        size_t n_red = displayif_esp32_pin_seq_to_gpios(red, pins + n_blue + n_green,
-            DCFB_MAX_DATA_PINS - n_blue - n_green);
-        count = n_blue + n_green + n_red;
-        if (!(n_red == 5 && n_green == 6 && n_blue == 5)) {
-            mp_raise_ValueError(MP_ERROR_TEXT("red/green/blue must be 5/6/5 pins (RGB565)"));
-        }
+    size_t n_blue = displayif_esp32_pin_seq_to_gpios(blue, pins, DCFB_MAX_DATA_PINS);
+    size_t n_green = displayif_esp32_pin_seq_to_gpios(green, pins + n_blue, DCFB_MAX_DATA_PINS - n_blue);
+    size_t n_red = displayif_esp32_pin_seq_to_gpios(red, pins + n_blue + n_green,
+        DCFB_MAX_DATA_PINS - n_blue - n_green);
+    size_t count = n_blue + n_green + n_red;
+    if (!(n_red == 5 && n_green == 6 && n_blue == 5)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("red/green/blue must be 5/6/5 pins (RGB565)"));
     }
-
     if (count == 0 || count > DCFB_MAX_DATA_PINS) {
         mp_raise_ValueError(MP_ERROR_TEXT("invalid RGB data pin layout"));
     }
@@ -363,7 +355,6 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         ARG_red,
         ARG_green,
         ARG_blue,
-        ARG_data,
         ARG_frequency,
         ARG_width,
         ARG_height,
@@ -385,10 +376,9 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         { MP_QSTR_vsync, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_hsync, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_dclk, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_red, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_green, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_blue, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_red, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_green, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_blue, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
@@ -408,14 +398,6 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    bool rgb666 = vals[ARG_red].u_obj != MP_OBJ_NULL;
-    bool rgb565 = vals[ARG_data].u_obj != MP_OBJ_NULL;
-    if (rgb666 == rgb565) {
-        mp_raise_ValueError(MP_ERROR_TEXT("Specify exactly one of red/green/blue or data pin layout"));
-    }
-    if (rgb666 && (vals[ARG_green].u_obj == MP_OBJ_NULL || vals[ARG_blue].u_obj == MP_OBJ_NULL)) {
-        mp_raise_ValueError(MP_ERROR_TEXT("red/green/blue pin tuples required together"));
-    }
     if (vals[ARG_width].u_int <= 0 || vals[ARG_height].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("width and height must be positive"));
     }
@@ -453,7 +435,6 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
     self->pclk_active_high = vals[ARG_pclk_active_high].u_bool;
     self->pclk_idle_high = vals[ARG_pclk_idle_high].u_bool;
     self->overscan_left = vals[ARG_overscan_left].u_int;
-    self->rgb666_layout = rgb666;
     self->bits_per_pixel = 16;
     self->deinited = false;
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
@@ -469,7 +450,7 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
 
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     dotclockframebuffer_fill_data_pins(self, vals[ARG_red].u_obj, vals[ARG_green].u_obj,
-        vals[ARG_blue].u_obj, vals[ARG_data].u_obj);
+        vals[ARG_blue].u_obj);
     // Start continuous scanout immediately (CircuitPython DotClockFramebuffer model).
     dotclockframebuffer_init_panel(self);
 #else
