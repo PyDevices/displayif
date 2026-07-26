@@ -36,6 +36,12 @@ with an **LCDIFV2** video bridge to the DPI path. Primary hardware target:
 **TC358762** DSI-to-RGB bridge. Panel init is supplied via the pydisplay board
 config `init_sequence` bytes.
 
+`Display` accepts the same CircuitPython optional kwargs as esp32
+(`virtual_channel`, `rotation`, `brightness`, `native_frames_per_second`,
+`backlight_on_high`). `virtual_channel` must be `0` on this port (NXP path
+does not multiplex VC yet). `brightness` gates the digital backlight (on if
+> 0).
+
 Lifecycle: wires `displayif_mimxrt1176_dsi_*_deinit/stop` into the shared
 soft-reset registry. ESP32-P4 `mipidsi` is the soft-reset + blit reference —
 see [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md).
