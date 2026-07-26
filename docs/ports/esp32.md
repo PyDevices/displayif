@@ -49,7 +49,7 @@ Waveshare / Espressif P4 4B touch LCD with LVGL soft-reset re-import.
 See [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md) and
 [IDEMPOTENT_LIFECYCLE.md](../IDEMPOTENT_LIFECYCLE.md).
 
-Large framebuffers use **PSRAM** when available — see [HANDOFF.md](../HANDOFF.md#esp32-psram--sdkconfig-large-framebuffers).
+Large framebuffers use **PSRAM** when available — see [PORT_MATRIX.md](../PORT_MATRIX.md#esp32-psram--sdkconfig-large-framebuffers).
 
 ## Build
 

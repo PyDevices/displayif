@@ -6,7 +6,7 @@ pydisplay MP board configs that raise `NotImplementedError` on import need firmw
 
 **CircuitPython** has its own display stack (`dotclockframebuffer`, `mipidsi`, `picodvi`, …). displayif does not ship CP bindings — use pydisplay `cp_`* board configs with CP firmware.
 
-**Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/HANDOFF.md](docs/HANDOFF.md).
+**Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
 
 **Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
 (**implemented**): [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md). Bring-up /
@@ -32,7 +32,7 @@ Parallel dot-clock RGB uses **`displayif.DotClockFramebuffer`** (not CircuitPyth
 
 ## ESP32 large framebuffers
 
-RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_SPIRAM` is enabled and sized in your board `sdkconfig` before building — see [docs/HANDOFF.md](docs/HANDOFF.md#esp32-psram--sdkconfig-large-framebuffers).
+RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_SPIRAM` is enabled and sized in your board `sdkconfig` before building — see [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md#esp32-psram--sdkconfig-large-framebuffers).
 
 ## 🚀 Build
 
@@ -73,7 +73,7 @@ make BOARD=ESP32_GENERIC_S3 \
 
 ## Related
 
-- [docs/HANDOFF.md](docs/HANDOFF.md) — port matrix, hardware validation, RP2350 DSI notes
+- [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md) — port matrix, hardware validation, RP2350 DSI notes
 - [docs/ports/esp32.md](docs/ports/esp32.md) — Qualia DotClock + P4 mipidsi behavioral notes
 - [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
 - [PyDevices/cmods](https://github.com/PyDevices/cmods) — optional build-shortcut workspace; see `[MP_EXAMPLE.md](https://github.com/PyDevices/cmods/blob/main/docs/MP_EXAMPLE.md)` for ESP32-P4 bring-up

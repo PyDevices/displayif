@@ -1,6 +1,6 @@
-# displayif — agent handoff (July 2026)
+# displayif — port matrix
 
-Handoff for **pydevices/displayif**: native display **interface** modules for pydisplay. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/` (names from `micropython/ports/`).
+Native display **interface** modules for pydisplay. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/` (names from `micropython/ports/`).
 
 **Start here for agents:** [AGENTS.md](../AGENTS.md) → [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) → [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) (soft-reset wraps, symptom table, bring-up methods).
 
