@@ -101,10 +101,11 @@ static void spibus_reinit_spi(spibus_obj_t *self) {
     displayif_obj_call_method_kw(self->spi, MP_QSTR_init, kwargs);
 }
 
-// Parse keyword-only args to match:
+// Parse keyword-only args. Display-control pin names match CircuitPython FourWire
+// (command / chip_select / reset). SPI ownership extras stay displayif-specific:
 //   SPIBus(*, id=2, baudrate=24_000_000, polarity=0, phase=0, bits=8,
 //           lsb_first=False, soft=False, sck=-1, mosi=-1, miso=-1,
-//           dc=-1, cs=-1, reset=-1)
+//           command=-1, chip_select=-1, reset=-1)
 // Pin kwargs accept int, board name str ("D9"), or machine.Pin (mimxrt / samd).
 // soft=True uses machine.SoftSPI and requires sck + mosi.
 static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
@@ -122,8 +123,8 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     mp_obj_t sck = MP_OBJ_NEW_SMALL_INT(-1);
     mp_obj_t mosi = MP_OBJ_NEW_SMALL_INT(-1);
     mp_obj_t miso = MP_OBJ_NEW_SMALL_INT(-1);
-    mp_obj_t dc = MP_OBJ_NEW_SMALL_INT(-1);
-    mp_obj_t cs = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t command = MP_OBJ_NEW_SMALL_INT(-1);
+    mp_obj_t chip_select = MP_OBJ_NEW_SMALL_INT(-1);
     mp_obj_t reset = MP_OBJ_NEW_SMALL_INT(-1);
 
     for (size_t i = 0; i < n_kw; i++) {
@@ -153,10 +154,10 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
             mosi = val;
         } else if (q == MP_QSTR_miso) {
             miso = val;
-        } else if (q == MP_QSTR_dc) {
-            dc = val;
-        } else if (q == MP_QSTR_cs) {
-            cs = val;
+        } else if (q == MP_QSTR_command) {
+            command = val;
+        } else if (q == MP_QSTR_chip_select) {
+            chip_select = val;
         } else if (q == MP_QSTR_reset) {
             reset = val;
         } else {
@@ -164,8 +165,8 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         }
     }
 
-    if (displayif_pin_spec_unset(dc)) {
-        mp_raise_ValueError(MP_ERROR_TEXT("DC pin must be specified"));
+    if (displayif_pin_spec_unset(command)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("command pin must be specified"));
     }
     if (soft && (displayif_pin_spec_unset(sck) || displayif_pin_spec_unset(mosi))) {
         mp_raise_ValueError(MP_ERROR_TEXT("soft SPI requires sck and mosi"));
@@ -234,11 +235,11 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         self->spi = displayif_machine_spi(spi_kwargs);
     }
 
-    // DC/CS after SPI init (same comment as Python)
-    self->dc = displayif_machine_pin_cfg(dc, pin_out, DC_DATA);
+    // command / chip_select after SPI init (same order as Python SPIBus)
+    self->dc = displayif_machine_pin_cfg(command, pin_out, DC_DATA);
 
-    if (!displayif_pin_spec_unset(cs)) {
-        self->cs = displayif_machine_pin_cfg(cs, pin_out, CS_INACTIVE);
+    if (!displayif_pin_spec_unset(chip_select)) {
+        self->cs = displayif_machine_pin_cfg(chip_select, pin_out, CS_INACTIVE);
         self->has_cs = true;
     } else {
         self->cs = mp_const_none;

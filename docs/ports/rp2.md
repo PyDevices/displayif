@@ -15,9 +15,15 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 | `src/ports/common/notimpl/mod_dotclockframebuffer.c` | `dotclockframebuffer.DotClockFramebuffer` | stub | **FBDisplay** (N/A) |
 | `src/ports/common/notimpl/mod_mipidsi.c` | `mipidsi.Bus` / `Display` | stub | **FBDisplay** (N/A) |
 
+`SPIBus` uses CircuitPython `FourWire` names for display-control pins
+(`command`, `chip_select`, `reset`) and keeps MicroPython SPI extras
+(`id`, `sck`/`mosi`/`miso`, `bits`, `lsb_first`, `soft`). It builds its own
+`machine.SPI` / `SoftSPI` rather than taking a prebuilt `spi_bus` object.
+
 ### `i2cbus`
 
-`I2CBus(i2c_bus, *, device_address)` — CircuitPython `I2CDisplayBus` kwargs (positional bus, required `device_address`).
+`I2CBus(i2c_bus, *, device_address)` — CircuitPython `I2CDisplayBus` kwargs
+(positional bus, required `device_address`).
 
 ### `picodvi`
 
