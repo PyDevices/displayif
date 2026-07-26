@@ -24,6 +24,7 @@ their own module names (`mipidsi`, `i80bus`, `picodvi`, …).
 | `src/ports/common` | `spibus` / `i2cbus` | **BusDisplay** | shipped |
 | `src/ports/esp32` | `displayif` (`DotClockFramebuffer`) | **FBDisplay** | esp_lcd RGB scanout |
 | `src/ports/esp32` | `i80bus` | bus driver | esp_lcd I80 (S3) |
+| `src/ports/esp32` | `qspibus` | bus driver | esp_lcd SPI quad_mode (S3) |
 | `src/ports/esp32` | `mipidsi` | **FBDisplay** | ESP32-P4 MIPI DSI |
 | `src/ports/esp32` / `mimxrt` / `samd` / `rp2` | `rgbmatrix` | **FBDisplay** | Protomatter backends |
 | `src/ports/rp2` | `i80bus` | bus driver | PIO+DMA |
@@ -92,7 +93,7 @@ displayif/
 │   ├── include/displayif/
 │   └── ports/
 │       ├── common/      # spi/, i2c/, rgbmatrix/, i80bus/gpio_bitbang.c
-│       ├── esp32/       # displayif (DotClock), i80bus, mipidsi, rgbmatrix (S3)
+│       ├── esp32/       # displayif (DotClock), i80bus, qspibus, mipidsi, rgbmatrix (S3)
 │       ├── mimxrt/      # rgbmatrix; eLCDIF displayif; RT1176 mipidsi; FlexIO i80bus
 │       ├── samd/        # rgbmatrix; GPIO i80bus (SAMD51); stubs
 │       └── rp2/         # rgbmatrix; i80bus PIO+DMA; picodvi

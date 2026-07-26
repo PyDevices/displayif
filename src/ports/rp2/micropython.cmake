@@ -15,6 +15,7 @@ target_sources(displayif_rp2 INTERFACE
     ${DISPLAYIF_MOD_DIR}/src/ports/rp2/mod_i80bus.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_dotclockframebuffer.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_mipidsi.c
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_qspibus.c
     ${DISPLAYIF_MOD_DIR}/src/ports/rp2/mod_picodvi.c
 )
 
@@ -36,6 +37,7 @@ endif()
 target_compile_definitions(displayif_rp2 INTERFACE
     DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="RP2040 has no native RGB LCD scanout"
     DISPLAYIF_STUB_MIPIDSI_MSG="RP2040 has no MIPI DSI host"
+    DISPLAYIF_STUB_QSPIBUS_MSG="qspibus not supported on rp2"
 )
 
 target_link_libraries(displayif_rp2 INTERFACE

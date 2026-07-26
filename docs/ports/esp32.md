@@ -8,12 +8,27 @@ ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espress
 |----------|---------------|-----|-------------------|
 | `mod_dotclockframebuffer.c` | `displayif.DotClockFramebuffer` | RGB LCD (`SOC_LCD_RGB_SUPPORTED`) | **FBDisplay** |
 | `mod_i80bus.c` | `i80bus.I80Bus` | S3 (`SOC_LCD_I80_SUPPORTED`) | bus driver |
+| `mod_qspibus.c` | `qspibus.QSPIBus` | S3 (`esp_lcd` SPI `quad_mode`) | bus driver |
 | `mod_mipidsi.c` | `mipidsi.Bus` / `mipidsi.Display` | P4 (`SOC_MIPI_DSI_SUPPORTED`) | **FBDisplay** |
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | S3 (Protomatter + LCD_CAM) | **FBDisplay** |
 
 On SoCs without the matching peripheral, modules import but constructors raise `NotImplementedError`.
 
 Pin arguments accept `machine.Pin` objects, integers, or port pin-name strings (via `displayif_pin_resolve`).
+
+### `qspibus.QSPIBus` (ESP32-S3)
+
+Keyword-only constructor matches CircuitPython `qspibus.QSPIBus`:
+
+```python
+qspibus.QSPIBus(
+    *,
+    clock, data0, data1, data2, data3, cs,
+    dcx=None, reset=None, frequency=80_000_000,
+)
+```
+
+Uses ESP-IDF `spi_bus_initialize` + `esp_lcd_new_panel_io_spi` with `quad_mode`, dual DMA bounce buffers, and encoded QSPI command words (`0x02` / `0x32`). Methods: `send(command, data)`, `write_command`, `write_data`, `reset`, `deinit` / `__del__`. Soft-reset tears down panel IO, SPI host, DMA buffers, and the transfer semaphore before GC.
 
 ### `displayif.DotClockFramebuffer` (RGB LCD / Qualia)
 

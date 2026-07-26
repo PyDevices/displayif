@@ -71,6 +71,7 @@ Stubs under `src/ports/common/notimpl/` and ctor-raise stubs stay stubs (no hard
 | `spibus` | `spibus` | `src/ports/common/spi/mod_spibus.c` | BusDisplay |
 | `i2cbus` | `i2cbus` | `src/ports/common/i2c/mod_i2cbus.c` | BusDisplay |
 | `i80bus` | `i80bus` | `src/ports/esp32/mod_i80bus.c`, `src/ports/rp2/mod_i80bus.c`, `src/ports/mimxrt/mod_i80bus.c`, `src/ports/samd/mod_i80bus.c` (+ `src/ports/common/i80bus/`) | BusDisplay |
+| `qspibus` | `qspibus` | `src/ports/esp32/mod_qspibus.c` (S3); `src/ports/common/notimpl/mod_qspibus.c` elsewhere | BusDisplay |
 | `displayif` | `displayif` | `src/ports/esp32/mod_dotclockframebuffer.c`, `src/ports/mimxrt/mod_dotclockframebuffer_elcdif.c` | FBDisplay |
 | `mipidsi` | `mipidsi` | `src/ports/esp32/mod_mipidsi.c`, `src/ports/mimxrt/mod_mipidsi.c` (+ `mimxrt1176_dsi_display.*`) | FBDisplay |
 | `picodvi` | `picodvi` | `src/ports/rp2/mod_picodvi.c` (+ `picodvi_rp2040.*`, `picodvi_rp2350.*`) | FBDisplay |
@@ -89,6 +90,7 @@ Verify with grep if unsure (`displayif_register_soft_reset`, `*_host_teardown`).
 | `spibus` (common) | yes | yes | n/a (Python SPI) | Idempotent `deinited` guard |
 | `i2cbus` (common) | yes | yes | n/a (Python I2C) | Clears `vstr`; thin wrapper |
 | `i80bus` esp32/rp2/mimxrt/samd | yes | yes | yes (hw ports) | Static host handles; SAMD GPIO is thin |
+| `qspibus` esp32 (S3) | yes | yes | yes | esp_lcd SPI quad + DMA buffers + sem; host teardown before GC |
 | `displayif` (DotClock) esp32 | yes | yes | yes | Panel + SPIRAM/panel FB in BSS host; Qualia-proven |
 | `displayif` (DotClock) mimxrt eLCDIF | yes | yes | yes | Stops eLCDIF; GC buf not `m_free`'d on soft reset |
 | `mipidsi` esp32 | Bus + Display | yes | yes | `esp_lcd_del_dsi_bus` + LDO + SPIRAM FB; P4-proven |

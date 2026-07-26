@@ -10,12 +10,14 @@ target_link_libraries(usermod INTERFACE displayif_samd)
 target_sources(displayif_samd INTERFACE
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_dotclockframebuffer.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_mipidsi.c
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_qspibus.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/i80bus/gpio_bitbang.c
 )
 
 target_compile_definitions(displayif_samd INTERFACE
     DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="SAMD has no native RGB LCD scanout"
     DISPLAYIF_STUB_MIPIDSI_MSG="MIPI DSI not available on SAMD"
+    DISPLAYIF_STUB_QSPIBUS_MSG="qspibus not supported on samd"
 )
 
 if(MCU_SERIES MATCHES "SAMD51")

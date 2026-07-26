@@ -6,6 +6,7 @@ CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/src/include
 SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_dotclockframebuffer.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_mipidsi.c \
+    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_qspibus.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/common/i80bus/gpio_bitbang.c
 
 ifeq ($(MCU_SERIES),SAMD51)
