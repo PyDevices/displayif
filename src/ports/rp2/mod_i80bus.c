@@ -165,46 +165,46 @@ static void i80bus_transfer(i80bus_obj_t *self, const uint8_t *data, size_t len)
 
 static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
-        ARG_dc,
-        ARG_cs,
-        ARG_wr,
-        ARG_data,
-        ARG_freq,
+        ARG_command,
+        ARG_chip_select,
+        ARG_write,
+        ARG_data_pins,
+        ARG_frequency,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_dc, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_cs, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_wr, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_freq, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 20000000 } },
+        { MP_QSTR_command, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_chip_select, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_write, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_data_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_frequency, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 30000000 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    if (vals[ARG_dc].u_obj == MP_OBJ_NULL || vals[ARG_wr].u_obj == MP_OBJ_NULL) {
-        mp_raise_ValueError(MP_ERROR_TEXT("dc and wr pins must be specified"));
+    if (vals[ARG_command].u_obj == MP_OBJ_NULL || vals[ARG_write].u_obj == MP_OBJ_NULL) {
+        mp_raise_ValueError(MP_ERROR_TEXT("command and write pins must be specified"));
     }
-    if (vals[ARG_freq].u_int <= 0) {
-        mp_raise_ValueError(MP_ERROR_TEXT("freq must be positive"));
+    if (vals[ARG_frequency].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
     }
 
     int data_pins[I80BUS_DATA_WIDTH];
-    size_t data_count = displayif_pin_seq_to_ints(vals[ARG_data].u_obj, data_pins, I80BUS_DATA_WIDTH);
+    size_t data_count = displayif_pin_seq_to_ints(vals[ARG_data_pins].u_obj, data_pins, I80BUS_DATA_WIDTH);
     if (data_count != I80BUS_DATA_WIDTH) {
-        mp_raise_ValueError(MP_ERROR_TEXT("data must be 8 consecutive pins"));
+        mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 consecutive pins"));
     }
     for (size_t i = 1; i < data_count; i++) {
         if (data_pins[i] != data_pins[i - 1] + 1) {
-            mp_raise_ValueError(MP_ERROR_TEXT("data pins must be consecutive"));
+            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be consecutive"));
         }
     }
 
-    uint8_t dc_pin = i80bus_pin_num(vals[ARG_dc].u_obj);
-    uint8_t wr_pin = i80bus_pin_num(vals[ARG_wr].u_obj);
+    uint8_t dc_pin = i80bus_pin_num(vals[ARG_command].u_obj);
+    uint8_t wr_pin = i80bus_pin_num(vals[ARG_write].u_obj);
     uint8_t cs_pin = 0;
-    bool has_cs = vals[ARG_cs].u_obj != MP_OBJ_NULL;
+    bool has_cs = vals[ARG_chip_select].u_obj != MP_OBJ_NULL;
     if (has_cs) {
-        cs_pin = i80bus_pin_num(vals[ARG_cs].u_obj);
+        cs_pin = i80bus_pin_num(vals[ARG_chip_select].u_obj);
     }
 
     i80bus_host_teardown();
@@ -253,7 +253,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     sm_config_set_out_shift(&config, false, false, 0);
     sm_config_set_fifo_join(&config, PIO_FIFO_JOIN_TX);
 
-    float div = (float)clock_get_hz(clk_sys) / ((float)vals[ARG_freq].u_int * I80BUS_CYCLES_PER_BYTE);
+    float div = (float)clock_get_hz(clk_sys) / ((float)vals[ARG_frequency].u_int * I80BUS_CYCLES_PER_BYTE);
     if (div < 1.0f) {
         div = 1.0f;
     }
@@ -281,7 +281,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->has_cs = has_cs;
     self->wr_pin = wr_pin;
     self->data_base = data_base;
-    self->freq = vals[ARG_freq].u_int;
+    self->freq = vals[ARG_frequency].u_int;
     self->deinited = false;
     s_host.pio = pio;
     s_host.sm = sm;

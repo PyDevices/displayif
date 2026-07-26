@@ -15,6 +15,10 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 | `src/ports/common/notimpl/mod_dotclockframebuffer.c` | `displayif.DotClockFramebuffer` | stub | **FBDisplay** (N/A) |
 | `src/ports/common/notimpl/mod_mipidsi.c` | `mipidsi.Bus` / `Display` | stub | **FBDisplay** (N/A) |
 
+### `i2cbus`
+
+`I2CBus(i2c_bus, *, device_address)` — CircuitPython `I2CDisplayBus` kwargs (positional bus, required `device_address`).
+
 ### `picodvi`
 
 **Implemented** for both RP2040 and RP2350:
@@ -26,7 +30,7 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 
 ### `i80bus`
 
-Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DMA** for bulk `send()` transfers. Matches the pydisplay `I80Bus(dc, cs, wr, data, freq)` contract.
+Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DMA** for bulk `send()` transfers. Constructor kwargs match CircuitPython `ParallelBus` names: `command`, `chip_select`, `write`, `data_pins`, `frequency` (default 30 MHz).
 
 ### `rgbmatrix`
 

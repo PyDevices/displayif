@@ -80,38 +80,38 @@ static void i80bus_raise_esp_err(esp_err_t err) {
 
 static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
-        ARG_dc,
-        ARG_cs,
-        ARG_wr,
-        ARG_data,
-        ARG_freq,
+        ARG_command,
+        ARG_chip_select,
+        ARG_write,
+        ARG_data_pins,
+        ARG_frequency,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_dc, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_cs, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_wr, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_freq, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 20000000 } },
+        { MP_QSTR_command, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_chip_select, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_write, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_data_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_frequency, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 30000000 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    if (vals[ARG_dc].u_obj == MP_OBJ_NULL || vals[ARG_wr].u_obj == MP_OBJ_NULL) {
-        mp_raise_ValueError(MP_ERROR_TEXT("dc and wr pins must be specified"));
+    if (vals[ARG_command].u_obj == MP_OBJ_NULL || vals[ARG_write].u_obj == MP_OBJ_NULL) {
+        mp_raise_ValueError(MP_ERROR_TEXT("command and write pins must be specified"));
     }
-    if (vals[ARG_freq].u_int <= 0) {
-        mp_raise_ValueError(MP_ERROR_TEXT("freq must be positive"));
+    if (vals[ARG_frequency].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
     }
 
     int data_pins[ESP_LCD_I80_BUS_WIDTH_MAX];
-    size_t data_count = displayif_esp32_pin_seq_to_gpios(vals[ARG_data].u_obj, data_pins, ESP_LCD_I80_BUS_WIDTH_MAX);
+    size_t data_count = displayif_esp32_pin_seq_to_gpios(vals[ARG_data_pins].u_obj, data_pins, ESP_LCD_I80_BUS_WIDTH_MAX);
     if (data_count != 8 && data_count != 16) {
-        mp_raise_ValueError(MP_ERROR_TEXT("data must be 8 or 16 pins"));
+        mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 or 16 pins"));
     }
 
-    int dc_pin = displayif_esp32_pin_gpio(vals[ARG_dc].u_obj);
-    int cs_pin = (vals[ARG_cs].u_obj == MP_OBJ_NULL) ? -1 : displayif_esp32_pin_gpio(vals[ARG_cs].u_obj);
-    int wr_pin = displayif_esp32_pin_gpio(vals[ARG_wr].u_obj);
+    int dc_pin = displayif_esp32_pin_gpio(vals[ARG_command].u_obj);
+    int cs_pin = (vals[ARG_chip_select].u_obj == MP_OBJ_NULL) ? -1 : displayif_esp32_pin_gpio(vals[ARG_chip_select].u_obj);
+    int wr_pin = displayif_esp32_pin_gpio(vals[ARG_write].u_obj);
 
     i80bus_host_teardown();
     i80bus_ensure_soft_reset_registered();
@@ -138,7 +138,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
 
     esp_lcd_panel_io_i80_config_t io_config = {
         .cs_gpio_num = self->has_cs ? cs_pin : -1,
-        .pclk_hz = vals[ARG_freq].u_int,
+        .pclk_hz = vals[ARG_frequency].u_int,
         .trans_queue_depth = 10,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,

@@ -137,27 +137,27 @@ static uint8_t i80bus_pick_rd_pin(uint8_t data_start, uint8_t wr_index) {
 
 static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
-        ARG_dc,
-        ARG_cs,
-        ARG_wr,
-        ARG_data,
-        ARG_freq,
+        ARG_command,
+        ARG_chip_select,
+        ARG_write,
+        ARG_data_pins,
+        ARG_frequency,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_dc, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_cs, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_wr, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_freq, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 20000000 } },
+        { MP_QSTR_command, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_chip_select, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_write, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_data_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_frequency, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 30000000 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    if (vals[ARG_dc].u_obj == MP_OBJ_NULL || vals[ARG_wr].u_obj == MP_OBJ_NULL) {
-        mp_raise_ValueError(MP_ERROR_TEXT("dc and wr pins must be specified"));
+    if (vals[ARG_command].u_obj == MP_OBJ_NULL || vals[ARG_write].u_obj == MP_OBJ_NULL) {
+        mp_raise_ValueError(MP_ERROR_TEXT("command and write pins must be specified"));
     }
-    if (vals[ARG_freq].u_int <= 0) {
-        mp_raise_ValueError(MP_ERROR_TEXT("freq must be positive"));
+    if (vals[ARG_frequency].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
     }
 
     if (s_flexio_in_use) {
@@ -166,9 +166,9 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     i80bus_ensure_soft_reset_registered();
 
     mp_obj_t data_pins[I80BUS_DATA_WIDTH];
-    size_t data_count = displayif_pin_seq_to_objs(vals[ARG_data].u_obj, data_pins, I80BUS_DATA_WIDTH);
+    size_t data_count = displayif_pin_seq_to_objs(vals[ARG_data_pins].u_obj, data_pins, I80BUS_DATA_WIDTH);
     if (data_count != I80BUS_DATA_WIDTH) {
-        mp_raise_ValueError(MP_ERROR_TEXT("data must be 8 consecutive FlexIO2 pins"));
+        mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 consecutive FlexIO2 pins"));
     }
 
     const machine_pin_obj_t *data_pin_objs[I80BUS_DATA_WIDTH];
@@ -177,16 +177,16 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         data_pin_objs[i] = pin_find(data_pins[i]);
         flexio_indices[i] = i80bus_flexio2_index(data_pin_objs[i]);
         if (flexio_indices[i] < 0) {
-            mp_raise_ValueError(MP_ERROR_TEXT("data pins must map to FLEXIO2 on GPIO_B0/GPIO_B1"));
+            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must map to FLEXIO2 on GPIO_B0/GPIO_B1"));
         }
     }
     for (size_t i = 1; i < I80BUS_DATA_WIDTH; i++) {
         if (flexio_indices[i] != flexio_indices[i - 1] + 1) {
-            mp_raise_ValueError(MP_ERROR_TEXT("data pins must be consecutive FlexIO2 indices"));
+            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be consecutive FlexIO2 indices"));
         }
     }
 
-    const machine_pin_obj_t *wr_pin_obj = pin_find(displayif_pin_resolve(vals[ARG_wr].u_obj));
+    const machine_pin_obj_t *wr_pin_obj = pin_find(displayif_pin_resolve(vals[ARG_write].u_obj));
     int wr_flexio = i80bus_flexio2_index(wr_pin_obj);
     if (wr_flexio < 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("wr pin must map to FLEXIO2 on GPIO_B0/GPIO_B1"));
@@ -198,10 +198,10 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
 
     i80bus_obj_t *self = mp_obj_malloc(i80bus_obj_t, type);
-    self->dc_pin = displayif_pin_resolve(vals[ARG_dc].u_obj);
-    self->has_cs = vals[ARG_cs].u_obj != MP_OBJ_NULL;
+    self->dc_pin = displayif_pin_resolve(vals[ARG_command].u_obj);
+    self->has_cs = vals[ARG_chip_select].u_obj != MP_OBJ_NULL;
     if (self->has_cs) {
-        self->cs_pin = displayif_pin_resolve(vals[ARG_cs].u_obj);
+        self->cs_pin = displayif_pin_resolve(vals[ARG_chip_select].u_obj);
         displayif_pin_set(self->cs_pin, 1);
     } else {
         self->cs_pin = mp_const_none;
@@ -234,7 +234,7 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
 
     flexio_mculcd_config_t config;
     FLEXIO_MCULCD_GetDefaultConfig(&config);
-    config.baudRate_Bps = (uint32_t)vals[ARG_freq].u_int * I80BUS_DATA_WIDTH;
+    config.baudRate_Bps = (uint32_t)vals[ARG_frequency].u_int * I80BUS_DATA_WIDTH;
 
     s_callback_bus = self;
     uint32_t flexio_hz = BOARD_BOOTCLOCKRUN_FLEXIO2_CLK_ROOT;
