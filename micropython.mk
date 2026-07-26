@@ -80,25 +80,25 @@ endif
 ifeq ($(DISPLAYIF_PORT_RP2),1)
 DISPLAYIF_RGBMATRIX_USE_PROTOMATTER = 1
 endif
-include $(DISPLAYIF_MOD_DIR)/ports/common/micropython.mk
+include $(DISPLAYIF_MOD_DIR)/src/ports/common/micropython.mk
 endif
 
 ifeq ($(DISPLAYIF_PORT_ESP32),1)
-include $(DISPLAYIF_MOD_DIR)/ports/esp32/micropython.mk
+include $(DISPLAYIF_MOD_DIR)/src/ports/esp32/micropython.mk
 endif
 
 ifeq ($(DISPLAYIF_PORT_MIMXRT),1)
-include $(DISPLAYIF_MOD_DIR)/ports/mimxrt/micropython.mk
+include $(DISPLAYIF_MOD_DIR)/src/ports/mimxrt/micropython.mk
 endif
 
 ifeq ($(DISPLAYIF_PORT_SAMD),1)
-include $(DISPLAYIF_MOD_DIR)/ports/samd/micropython.mk
+include $(DISPLAYIF_MOD_DIR)/src/ports/samd/micropython.mk
 endif
 
 ifeq ($(DISPLAYIF_PORT_RP2),1)
-include $(DISPLAYIF_MOD_DIR)/ports/rp2/micropython.mk
+include $(DISPLAYIF_MOD_DIR)/src/ports/rp2/micropython.mk
 endif
 
 ifeq ($(DISPLAYIF_PORT_STM32),1)
-include $(DISPLAYIF_MOD_DIR)/ports/stm32/micropython.mk
+include $(DISPLAYIF_MOD_DIR)/src/ports/stm32/micropython.mk
 endif

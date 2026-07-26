@@ -51,25 +51,25 @@ if(DISPLAYIF_PORT_RP2)
 endif()
 
 if(DISPLAYIF_IS_MCU)
-    include(${DISPLAYIF_MOD_DIR}/ports/common/micropython.cmake)
+    include(${DISPLAYIF_MOD_DIR}/src/ports/common/micropython.cmake)
 endif()
 
 if(DISPLAYIF_PORT_ESP32)
-    include(${DISPLAYIF_MOD_DIR}/ports/esp32/micropython.cmake)
+    include(${DISPLAYIF_MOD_DIR}/src/ports/esp32/micropython.cmake)
 endif()
 
 if(DISPLAYIF_PORT_MIMXRT)
-    include(${DISPLAYIF_MOD_DIR}/ports/mimxrt/micropython.cmake)
+    include(${DISPLAYIF_MOD_DIR}/src/ports/mimxrt/micropython.cmake)
 endif()
 
 if(DISPLAYIF_PORT_SAMD)
-    include(${DISPLAYIF_MOD_DIR}/ports/samd/micropython.cmake)
+    include(${DISPLAYIF_MOD_DIR}/src/ports/samd/micropython.cmake)
 endif()
 
 if(DISPLAYIF_PORT_RP2)
-    include(${DISPLAYIF_MOD_DIR}/ports/rp2/micropython.cmake)
+    include(${DISPLAYIF_MOD_DIR}/src/ports/rp2/micropython.cmake)
 endif()
 
 if(DISPLAYIF_PORT_STM32)
-    include(${DISPLAYIF_MOD_DIR}/ports/stm32/micropython.cmake)
+    include(${DISPLAYIF_MOD_DIR}/src/ports/stm32/micropython.cmake)
 endif()

@@ -1,16 +1,29 @@
 # AGENTS.md — displayif
 
 Native MicroPython display **interface** modules for pydisplay (`USER_C_MODULES`).
-Portable code in `ports/common/`; SoC code under `ports/<mp-port>/`.
+Portable code in `src/ports/common/`; SoC code under `src/ports/<mp-port>/`.
 
 **Before editing lifecycle / soft-reset / a new board bring-up**, read:
 
-1. [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) — required `deinit` / soft-reset contract (**implemented** for all real backends)
-2. [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) — proven failure modes and methods from **ESP32-P4 `mipidsi`** and **Qualia S3 `displayif.DotClockFramebuffer`** (+ LVGL); applies to other ports/interfaces
-3. [HANDOFF.md](HANDOFF.md) — module/port matrix and pydisplay board-config map
+1. [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md) — required `deinit` / soft-reset contract (**implemented** for all real backends)
+2. [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) — proven failure modes and methods from **ESP32-P4 `mipidsi`** and **Qualia S3 `displayif.DotClockFramebuffer`** (+ LVGL); applies to other ports/interfaces
+3. [docs/HANDOFF.md](docs/HANDOFF.md) — module/port matrix and pydisplay board-config map
 
 Those two interfaces are the reference bring-ups: keep their scanout / blit /
 attr / soft-reset patterns when changing siblings.
+
+## Layout
+
+| Path | Contents |
+|------|----------|
+| `src/include/` | Public headers (`displayif/` subdir) |
+| `src/ports/` | Port C sources + per-port `micropython.mk` / `.cmake` (`common/`, `esp32/`, …) |
+| `docs/` | Markdown docs (root keeps `README.md` and `AGENTS.md` only) |
+| `docs/ports/` | Per-port notes moved from former `ports/*/README.md` |
+| `tests/` | Unit tests only (e.g. `test_lifecycle_api.py`) |
+| `tools/` | Developer / hardware smoke tests (`*_smoke.py`) and helpers |
+
+Root `micropython.mk` / `micropython.cmake` stay at the repo root for `USER_C_MODULES`.
 
 ## Hard rules
 

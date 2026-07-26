@@ -5,7 +5,7 @@ current port and checks that constructible types declare ``deinit`` (and usually
 ``__del__``) on their MicroPython type locals.
 
 Hardware-backed behaviour (double deinit, soft reset + reconstruct, DMA/PIO
-teardown) is covered by manual smoke scripts listed in tests/README.md.
+teardown) is covered by manual smoke scripts listed in tools/README.md.
 """
 
 import sys
