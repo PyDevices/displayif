@@ -26,7 +26,7 @@ status_t displayif_mimxrt1176_dsi_bus_init(uint8_t num_lanes, uint32_t lane_bit_
 void displayif_mimxrt1176_dsi_bus_deinit(void);
 
 status_t displayif_mimxrt1176_dsi_display_start(const displayif_mimxrt1176_dsi_timings_t *timings,
-    const uint8_t *init_sequence, size_t init_len, int reset_pin, int backlight_pin, bool backlight_on_high);
+    const uint8_t *init_sequence, size_t init_len);
 void displayif_mimxrt1176_dsi_display_stop(void);
 
 void displayif_mimxrt1176_dsi_set_framebuffer(uint8_t *buf);

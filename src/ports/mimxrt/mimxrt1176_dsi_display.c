@@ -4,13 +4,11 @@
 #include <string.h>
 
 #include "py/mphal.h"
-#include "displayif/mp_helpers.h"
 #include "mimxrt1176_dsi_display.h"
 
 #if defined(MIMXRT1176_SERIES) || defined(CPU_MIMXRT1176) || defined(CPU_MIMXRT1176DVMAA_cm7)
 
 #include "fsl_clock.h"
-#include "fsl_gpio.h"
 #include "fsl_lcdifv2.h"
 #include "fsl_mipi_dsi.h"
 
@@ -53,23 +51,6 @@ static uint32_t s_mipi_dphy_ref_clk_hz;
 static uint32_t s_mipi_dphy_bit_clk_hz;
 static uint32_t s_mipi_dpi_clk_hz;
 static displayif_mimxrt1176_dsi_timings_t s_timings;
-
-static void displayif_gpio_out(int pin, bool on) {
-    if (pin < 0) {
-        return;
-    }
-    displayif_machine_pin(pin, 1, on ? 1 : 0);
-}
-
-static void displayif_gpio_reset(int pin) {
-    if (pin < 0) {
-        return;
-    }
-    displayif_gpio_out(pin, false);
-    mp_hal_delay_ms(10);
-    displayif_gpio_out(pin, true);
-    mp_hal_delay_ms(200);
-}
 
 static void displayif_init_mipi_dsi_clock(void) {
     const clock_root_config_t mipi_esc_clock_config = {
@@ -377,7 +358,7 @@ static void displayif_lcdifv2_start(uint8_t *buf) {
 }
 
 status_t displayif_mimxrt1176_dsi_display_start(const displayif_mimxrt1176_dsi_timings_t *timings,
-    const uint8_t *init_sequence, size_t init_len, int reset_pin, int backlight_pin, bool backlight_on_high) {
+    const uint8_t *init_sequence, size_t init_len) {
     if (!s_dsi_bus_ready || timings == NULL) {
         return kStatus_Fail;
     }
@@ -388,7 +369,7 @@ status_t displayif_mimxrt1176_dsi_display_start(const displayif_mimxrt1176_dsi_t
     IOMUXC_GPR->GPR62 |= (IOMUXC_GPR_GPR62_MIPI_DSI_BYTE_SOFT_RESET_N_MASK
         | IOMUXC_GPR_GPR62_MIPI_DSI_DPI_SOFT_RESET_N_MASK);
 
-    displayif_gpio_reset(reset_pin);
+    /* Panel reset / backlight GPIO are owned by board_config, not mipidsi.Display. */
     if (init_sequence != NULL && init_len > 0) {
         status_t status = displayif_mimxrt1176_dsi_send_init_sequence(init_sequence, init_len);
         if (status != kStatus_Success) {
@@ -400,11 +381,6 @@ status_t displayif_mimxrt1176_dsi_display_start(const displayif_mimxrt1176_dsi_t
         if (status != kStatus_Success) {
             return status;
         }
-    }
-
-    if (backlight_pin >= 0) {
-        bool on = backlight_on_high;
-        displayif_gpio_out(backlight_pin, on);
     }
 
     s_dsi_display_ready = true;

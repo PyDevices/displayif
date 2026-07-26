@@ -32,7 +32,6 @@
 #include "esp_ldo_regulator.h"
 #include "esp_cache.h"
 #include "esp_heap_caps.h"
-#include "driver/gpio.h"
 
 #define MIPIDSI_INIT_DELAY_FLAG 0x80
 
@@ -58,7 +57,10 @@ typedef struct _mipidsi_display_obj_t {
     uint16_t row_stride;
     uint8_t *buf;
     size_t buf_len;
-    int backlight_pin;
+    uint8_t virtual_channel;
+    int16_t rotation;
+    mp_float_t brightness;
+    uint16_t native_frames_per_second;
     bool backlight_on_high;
     bool deinited;
 } mipidsi_display_obj_t;
@@ -70,13 +72,9 @@ typedef struct {
     esp_lcd_panel_io_handle_t io;
     esp_lcd_panel_handle_t panel;
     uint8_t *buf; /* SPIRAM / heap_caps — not GC; must free on soft reset */
-    int backlight_pin;
-    bool backlight_on_high;
 } mipidsi_host_t;
 
-static mipidsi_host_t s_host = {
-    .backlight_pin = -1,
-};
+static mipidsi_host_t s_host;
 static bool s_soft_reset_registered;
 
 static const mp_obj_type_t mipidsi_bus_type;
@@ -87,19 +85,6 @@ static void mipidsi_raise_esp_err(esp_err_t err) {
         return;
     }
     mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("ESP-IDF error %d (%s)"), err, esp_err_to_name(err));
-}
-
-static void mipidsi_backlight_set(int pin, bool on_high, bool on) {
-    if (pin < 0) {
-        return;
-    }
-    gpio_config_t cfg = {
-        .pin_bit_mask = 1ULL << pin,
-        .mode = GPIO_MODE_OUTPUT,
-    };
-    gpio_config(&cfg);
-    int level = on ? (on_high ? 1 : 0) : (on_high ? 0 : 1);
-    gpio_set_level(pin, level);
 }
 
 #define MIPIDSI_CACHE_LINE 64
@@ -127,10 +112,6 @@ static void mipidsi_free_framebuffer(uint8_t *ptr) {
 
 /* Complete host teardown. Safe if already clean. Does not touch Python objects. */
 static void mipidsi_host_teardown(void) {
-    if (s_host.backlight_pin >= 0) {
-        mipidsi_backlight_set(s_host.backlight_pin, s_host.backlight_on_high, false);
-        s_host.backlight_pin = -1;
-    }
     if (s_host.panel != NULL) {
         esp_lcd_panel_del(s_host.panel);
         s_host.panel = NULL;
@@ -205,21 +186,6 @@ static void mipidsi_send_init_sequence(esp_lcd_panel_io_handle_t io, const uint8
     }
 }
 
-static void mipidsi_gpio_reset(int reset_pin) {
-    if (reset_pin < 0) {
-        return;
-    }
-    gpio_config_t cfg = {
-        .pin_bit_mask = 1ULL << reset_pin,
-        .mode = GPIO_MODE_OUTPUT,
-    };
-    mipidsi_raise_esp_err(gpio_config(&cfg));
-    gpio_set_level(reset_pin, 0);
-    mp_hal_delay_ms(10);
-    gpio_set_level(reset_pin, 1);
-    mp_hal_delay_ms(200);
-}
-
 static void mipidsi_bus_deinit_internal(mipidsi_bus_obj_t *self) {
     /* Bus deinit tears down the whole host unit (panel depends on bus). */
     mipidsi_host_teardown();
@@ -235,10 +201,6 @@ static void mipidsi_display_deinit_internal(mipidsi_display_obj_t *self) {
         return;
     }
     /* Tear down display-owned host pieces; leave bus alive if still referenced. */
-    if (s_host.backlight_pin >= 0) {
-        mipidsi_backlight_set(s_host.backlight_pin, s_host.backlight_on_high, false);
-        s_host.backlight_pin = -1;
-    }
     if (s_host.panel != NULL) {
         esp_lcd_panel_del(s_host.panel);
         s_host.panel = NULL;
@@ -335,15 +297,17 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         ARG_vsync_pulse_width,
         ARG_vsync_front_porch,
         ARG_vsync_back_porch,
-        ARG_reset_pin,
-        ARG_backlight_pin,
+        ARG_virtual_channel,
+        ARG_rotation,
+        ARG_brightness,
+        ARG_native_frames_per_second,
         ARG_backlight_on_high,
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_init_sequence, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_color_depth, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
+        { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
         { MP_QSTR_pixel_clock_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_hsync_pulse_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_hsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
@@ -351,8 +315,11 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_vsync_pulse_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_vsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_vsync_back_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_reset_pin, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
-        { MP_QSTR_backlight_pin, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = -1 } },
+        { MP_QSTR_virtual_channel, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_rotation, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_brightness, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NEW_SMALL_INT(1) } },
+        { MP_QSTR_native_frames_per_second, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 60 } },
+        /* Accepted for CP signature parity; board_config owns reset/backlight GPIO. */
         { MP_QSTR_backlight_on_high, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = true } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
@@ -374,17 +341,30 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     if (vals[ARG_pixel_clock_frequency].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("pixel_clock_frequency must be positive"));
     }
+    if (vals[ARG_virtual_channel].u_int < 0 || vals[ARG_virtual_channel].u_int > 3) {
+        mp_raise_ValueError(MP_ERROR_TEXT("virtual_channel must be 0..3"));
+    }
+    if (vals[ARG_rotation].u_int % 90 != 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("Display rotation must be in 90 degree increments"));
+    }
+    if (vals[ARG_native_frames_per_second].u_int <= 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("native_frames_per_second must be positive"));
+    }
+    mp_float_t brightness = mp_obj_get_float(vals[ARG_brightness].u_obj);
+    if (brightness < 0.0f || brightness > 1.0f) {
+        mp_raise_ValueError(MP_ERROR_TEXT("brightness must be 0.0..1.0"));
+    }
 
     mp_buffer_info_t init_bufinfo;
     mp_get_buffer_raise(vals[ARG_init_sequence].u_obj, &init_bufinfo, MP_BUFFER_READ);
 
+    uint8_t virtual_channel = (uint8_t)vals[ARG_virtual_channel].u_int;
+
     /* Replace any previous Display on this host without dropping the Bus. */
     mipidsi_display_deinit_internal(NULL);
 
-    mipidsi_gpio_reset(vals[ARG_reset_pin].u_int);
-
     esp_lcd_dbi_io_config_t dbi_config = {
-        .virtual_channel = 0,
+        .virtual_channel = virtual_channel,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
     };
@@ -400,7 +380,7 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     }
 
     esp_lcd_dpi_panel_config_t dpi_config = {
-        .virtual_channel = 0,
+        .virtual_channel = virtual_channel,
         .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
         .dpi_clock_freq_mhz = dpi_clock_mhz,
         .in_color_format = LCD_COLOR_FMT_RGB565,
@@ -437,16 +417,16 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     }
     memset(self->buf, 0, self->buf_len);
     s_host.buf = self->buf;
-    self->backlight_pin = vals[ARG_backlight_pin].u_int;
+    self->virtual_channel = virtual_channel;
+    self->rotation = (int16_t)vals[ARG_rotation].u_int;
+    self->brightness = brightness;
+    self->native_frames_per_second = (uint16_t)vals[ARG_native_frames_per_second].u_int;
     self->backlight_on_high = vals[ARG_backlight_on_high].u_bool;
     self->deinited = false;
-    s_host.backlight_pin = self->backlight_pin;
-    s_host.backlight_on_high = self->backlight_on_high;
     /* Point DPI engine at the FB once; later updates are CPU write + msync. */
     mipidsi_raise_esp_err(esp_cache_msync(
         self->buf, mipidsi_align_up(self->buf_len), ESP_CACHE_MSYNC_FLAG_DIR_C2M));
     mipidsi_raise_esp_err(esp_lcd_panel_draw_bitmap(panel, 0, 0, self->width, self->height, self->buf));
-    mipidsi_backlight_set(self->backlight_pin, self->backlight_on_high, true);
 
     return MP_OBJ_FROM_PTR(self);
 }
