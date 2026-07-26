@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Dot-clock RGB framebuffer for mimxrt (NXP eLCDIF) — MIMXRT1060-EVK / RK043 shield.
 //
-// Python: displayif.DotClockFramebuffer (module name "displayif").
+// Python: dotclockframebuffer.DotClockFramebuffer (matches CircuitPython).
 // Constructor pin arguments are validated against the EVK LCDIF pad routing
 // (BOARD_InitLCDPins / RK043 shield). IOMUX is applied from mimxrt1060_lcd_pins.c
 // and is not configurable for arbitrary pins.
@@ -492,7 +492,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 );
 
 static const mp_rom_map_elem_t dotclockframebuffer_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_displayif) },
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_dotclockframebuffer) },
     { MP_ROM_QSTR(MP_QSTR_DotClockFramebuffer), MP_ROM_PTR(&dotclockframebuffer_type) },
 };
 static MP_DEFINE_CONST_DICT(dotclockframebuffer_module_globals, dotclockframebuffer_module_globals_table);
@@ -502,6 +502,6 @@ const mp_obj_module_t dotclockframebuffer_user_cmodule = {
     .globals = (mp_obj_dict_t *)&dotclockframebuffer_module_globals,
 };
 
-MP_REGISTER_MODULE(MP_QSTR_displayif, dotclockframebuffer_user_cmodule);
+MP_REGISTER_MODULE(MP_QSTR_dotclockframebuffer, dotclockframebuffer_user_cmodule);
 
 #endif /* MIMXRT1062 */

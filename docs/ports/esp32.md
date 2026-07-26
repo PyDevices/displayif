@@ -6,7 +6,7 @@ ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espress
 
 | C source | Python import | SoC | pydisplay backend |
 |----------|---------------|-----|-------------------|
-| `mod_dotclockframebuffer.c` | `displayif.DotClockFramebuffer` | RGB LCD (`SOC_LCD_RGB_SUPPORTED`) | **FBDisplay** |
+| `mod_dotclockframebuffer.c` | `dotclockframebuffer.DotClockFramebuffer` | RGB LCD (`SOC_LCD_RGB_SUPPORTED`) | **FBDisplay** |
 | `mod_i80bus.c` | `i80bus.I80Bus` | S3 (`SOC_LCD_I80_SUPPORTED`) | bus driver |
 | `mod_qspibus.c` | `qspibus.QSPIBus` | S3 (`esp_lcd` SPI `quad_mode`) | bus driver |
 | `mod_mipidsi.c` | `mipidsi.Bus` / `mipidsi.Display` | P4 (`SOC_MIPI_DSI_SUPPORTED`) | **FBDisplay** |
@@ -33,11 +33,11 @@ qspibus.QSPIBus(
 
 Uses ESP-IDF `spi_bus_initialize` + `esp_lcd_new_panel_io_spi` with `quad_mode`, dual DMA bounce buffers, and encoded QSPI command words (`0x02` / `0x32`). Methods: `send(command, data)`, `write_command`, `write_data`, `reset`, `deinit` / `__del__`. Soft-reset tears down panel IO, SPI host, DMA buffers, and the transfer semaphore before GC.
 
-### `displayif.DotClockFramebuffer` (RGB LCD / Qualia)
+### `dotclockframebuffer.DotClockFramebuffer` (RGB LCD / Qualia)
 
-Python import is `displayif.DotClockFramebuffer` (CP uses `dotclockframebuffer.DotClockFramebuffer`). Supports
+Python import is `dotclockframebuffer.DotClockFramebuffer` (same as CircuitPython).
 Required RGB565 pin tuples (`red`/`green`/`blue` = 5/6/5), matching CircuitPython
-`dotclockframebuffer.DotClockFramebuffer` (wire order B0..B4, G0..G5, R0..R4).
+(wire order B0..B4, G0..G5, R0..R4).
 
 Behavioral contract (proven on Qualia S3 + TL040HDS20):
 
@@ -50,7 +50,7 @@ Behavioral contract (proven on Qualia S3 + TL040HDS20):
 | Fast paths | Native `blit` / `fill_rect` (expose via custom `attr`) |
 | Lifecycle | Idempotent `deinit` / `__del__` / ctor + soft-reset teardown |
 
-See [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md#reference-displayifdotclockframebuffer-on-qualia-esp32-s3).
+See [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md#reference-dotclockframebufferdotclockframebuffer-on-qualia-esp32-s3).
 
 ### `mipidsi` (ESP32-P4 DSI)
 

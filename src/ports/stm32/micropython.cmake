@@ -14,7 +14,7 @@ target_sources(displayif_stm32 INTERFACE
 )
 
 target_compile_definitions(displayif_stm32 INTERFACE
-    DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="STM32 has no displayif DotClock backend yet"
+    DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="STM32 has no DotClockFramebuffer backend yet"
     DISPLAYIF_STUB_MIPIDSI_MSG="MIPI DSI not available on this STM32 port"
     DISPLAYIF_STUB_I80BUS_MSG="I80 parallel bus not available on this STM32 port"
     DISPLAYIF_STUB_QSPIBUS_MSG="qspibus not available on this STM32 port"
