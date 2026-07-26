@@ -7,6 +7,7 @@ SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/src/ports/esp32/mod_dotclockframebuffer.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/esp32/mod_mipidsi.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/esp32/mod_i80bus.c \
+    $(DISPLAYIF_MOD_DIR)/src/ports/esp32/mod_qspibus.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/esp32/soft_reset_gc_sweep.c
 
 ifeq ($(IDF_TARGET),esp32s3)

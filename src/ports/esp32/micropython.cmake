@@ -11,11 +11,12 @@ target_sources(displayif_esp32 INTERFACE
     ${DISPLAYIF_MOD_DIR}/src/ports/esp32/mod_dotclockframebuffer.c
     ${DISPLAYIF_MOD_DIR}/src/ports/esp32/mod_mipidsi.c
     ${DISPLAYIF_MOD_DIR}/src/ports/esp32/mod_i80bus.c
+    ${DISPLAYIF_MOD_DIR}/src/ports/esp32/mod_qspibus.c
     ${DISPLAYIF_MOD_DIR}/src/ports/esp32/soft_reset_gc_sweep.c
 )
 
-# esp_lcd symbols for RGB, I80, and MIPI DSI backends.
-if(CONFIG_SOC_LCD_RGB_SUPPORTED OR CONFIG_SOC_LCD_I80_SUPPORTED OR CONFIG_SOC_MIPI_DSI_SUPPORTED)
+# esp_lcd symbols for RGB, I80, MIPI DSI, and QSPI (panel IO SPI) backends.
+if(CONFIG_SOC_LCD_RGB_SUPPORTED OR CONFIG_SOC_LCD_I80_SUPPORTED OR CONFIG_SOC_MIPI_DSI_SUPPORTED OR CONFIG_IDF_TARGET_ESP32S3)
     target_link_libraries(displayif_esp32 INTERFACE idf::esp_lcd)
 endif()
 

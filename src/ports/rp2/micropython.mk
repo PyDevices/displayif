@@ -14,7 +14,8 @@ SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/src/ports/rp2/rgbmatrix_pm.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/rp2/mod_i80bus.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_dotclockframebuffer.c \
-    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_mipidsi.c
+    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_mipidsi.c \
+    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_qspibus.c
 
 SRC_USERMOD_C := $(filter-out $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_picodvi.c,$(SRC_USERMOD_C))
 SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/src/ports/rp2/mod_picodvi.c

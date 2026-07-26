@@ -7,7 +7,8 @@ CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/src/ports/mimxrt
 SRC_USERMOD_C += \
     $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_dotclockframebuffer.c \
     $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_mipidsi.c \
-    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_i80bus.c
+    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_i80bus.c \
+    $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_qspibus.c
 
 ifeq ($(MCU_SERIES),MIMXRT1062)
 SRC_USERMOD_C := $(filter-out $(DISPLAYIF_MOD_DIR)/src/ports/common/notimpl/mod_dotclockframebuffer.c,$(SRC_USERMOD_C))

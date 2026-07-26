@@ -10,11 +10,13 @@ target_sources(displayif_mimxrt INTERFACE
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_dotclockframebuffer.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_mipidsi.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_i80bus.c
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/notimpl/mod_qspibus.c
 )
 
 target_compile_definitions(displayif_mimxrt INTERFACE
     DISPLAYIF_STUB_DOTCLOCKFRAMEBUFFER_MSG="LCDIF dotclockframebuffer not implemented on mimxrt"
     DISPLAYIF_STUB_I80BUS_MSG="FlexIO i80bus not implemented on mimxrt"
+    DISPLAYIF_STUB_QSPIBUS_MSG="qspibus not supported on mimxrt"
 )
 
 if(BOARD MATCHES "MIMXRT1170|PHYBOARD_RT1170")
