@@ -33,7 +33,7 @@ OSError: ESP-IDF error 261 (ESP_ERR_NOT_FOUND)
 
 **Fix:** `src/ports/esp32/mod_mipidsi.c` mirrors bus/panel/LDO/FB handles in BSS, registers `mipidsi_host_teardown` with `displayif_register_soft_reset()`, and uses the same teardown from `deinit` / `__del__` / idempotent ctors (`esp_lcd_del_*`, LDO release, `heap_caps_free`). See [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md).
 
-The same class of bug applies to every accelerated bus that owns DMA, IRQs, PIO SMs, FlexIO, eLCDIF, HSTX, RGB panel handles, etc. — including **`displayif.DotClockFramebuffer`** on ESP32-S3 (Qualia).
+The same class of bug applies to every accelerated bus that owns DMA, IRQs, PIO SMs, FlexIO, eLCDIF, HSTX, RGB panel handles, etc. — including **`dotclockframebuffer.DotClockFramebuffer`** on ESP32-S3 (Qualia).
 
 ---
 
@@ -72,7 +72,7 @@ Stubs under `src/ports/common/notimpl/` and ctor-raise stubs stay stubs (no hard
 | `i2cbus` | `i2cbus` | `src/ports/common/i2c/mod_i2cbus.c` | BusDisplay |
 | `i80bus` | `i80bus` | `src/ports/esp32/mod_i80bus.c`, `src/ports/rp2/mod_i80bus.c`, `src/ports/mimxrt/mod_i80bus.c`, `src/ports/samd/mod_i80bus.c` (+ `src/ports/common/i80bus/`) | BusDisplay |
 | `qspibus` | `qspibus` | `src/ports/esp32/mod_qspibus.c` (S3); `src/ports/common/notimpl/mod_qspibus.c` elsewhere | BusDisplay |
-| `displayif` | `displayif` | `src/ports/esp32/mod_dotclockframebuffer.c`, `src/ports/mimxrt/mod_dotclockframebuffer_elcdif.c` | FBDisplay |
+| `dotclockframebuffer` | `dotclockframebuffer` | `src/ports/esp32/mod_dotclockframebuffer.c`, `src/ports/mimxrt/mod_dotclockframebuffer_elcdif.c` | FBDisplay |
 | `mipidsi` | `mipidsi` | `src/ports/esp32/mod_mipidsi.c`, `src/ports/mimxrt/mod_mipidsi.c` (+ `mimxrt1176_dsi_display.*`) | FBDisplay |
 | `picodvi` | `picodvi` | `src/ports/rp2/mod_picodvi.c` (+ `picodvi_rp2040.*`, `picodvi_rp2350.*`) | FBDisplay |
 | `rgbmatrix` | `rgbmatrix` | `src/ports/common/rgbmatrix/mod_rgbmatrix.c` (+ per-port `rgbmatrix_pm.c`) | FBDisplay |
@@ -91,8 +91,8 @@ Verify with grep if unsure (`displayif_register_soft_reset`, `*_host_teardown`).
 | `i2cbus` (common) | yes | yes | n/a (Python I2C) | Clears `vstr`; thin wrapper |
 | `i80bus` esp32/rp2/mimxrt/samd | yes | yes | yes (hw ports) | Static host handles; SAMD GPIO is thin |
 | `qspibus` esp32 (S3) | yes | yes | yes | esp_lcd SPI quad + DMA buffers + sem; host teardown before GC |
-| `displayif` (DotClock) esp32 | yes | yes | yes | Panel + SPIRAM/panel FB in BSS host; Qualia-proven |
-| `displayif` (DotClock) mimxrt eLCDIF | yes | yes | yes | Stops eLCDIF; GC buf not `m_free`'d on soft reset |
+| `dotclockframebuffer` esp32 | yes | yes | yes | Panel + SPIRAM/panel FB in BSS host; Qualia-proven |
+| `dotclockframebuffer` mimxrt eLCDIF | yes | yes | yes | Stops eLCDIF; GC buf not `m_free`'d on soft reset |
 | `mipidsi` esp32 | Bus + Display | yes | yes | `esp_lcd_del_dsi_bus` + LDO + SPIRAM FB; P4-proven |
 | `mipidsi` mimxrt | Bus + Display | yes | yes | Wires `*_bus_deinit` / `*_display_stop` |
 | `picodvi` rp2 | yes | yes | yes | Static HW shadow; no dangling `active_picodvi` |
@@ -106,7 +106,7 @@ Shared: `src/include/displayif/soft_reset.h` + `src/ports/common/soft_reset.c` (
 
 ### Public Python API
 
-For each constructible type that owns host resources (`Bus`, `Display`, `displayif.DotClockFramebuffer`, `Framebuffer`, `I80Bus`, matrix objects, etc.):
+For each constructible type that owns host resources (`Bus`, `Display`, `dotclockframebuffer.DotClockFramebuffer`, `Framebuffer`, `I80Bus`, matrix objects, etc.):
 
 ```python
 obj.deinit()   # idempotent; safe if never fully constructed / already deinited
@@ -122,7 +122,7 @@ Pattern:
 
 ### Idempotent constructor
 
-Second `Bus(...)` / `Display(...)` / `displayif.DotClockFramebuffer(...)` on the same hardware unit must not fail with “no interrupt” / “resource busy”:
+Second `Bus(...)` / `Display(...)` / `dotclockframebuffer.DotClockFramebuffer(...)` on the same hardware unit must not fail with “no interrupt” / “resource busy”:
 
 1. If module-level (or singleton) handles for that unit are non-NULL → full hardware teardown.
 2. Then create fresh.
@@ -157,7 +157,7 @@ For **each** real module/port above:
 2. **Explicit deinit + reconstruct:** `obj.deinit();` then construct again with same args — succeeds.  
 3. **Double deinit:** `obj.deinit(); obj.deinit();` — no crash / no exception.  
 4. **Soft reset + reconstruct:** construct → soft-reset → construct again — **succeeds without hard reset**.  
-5. **Import board_config twice across soft reset** — no `ESP_ERR_NOT_FOUND` / interrupt failure (proven on ESP32-P4 `mipidsi` and Qualia `displayif.DotClockFramebuffer`).  
+5. **Import board_config twice across soft reset** — no `ESP_ERR_NOT_FOUND` / interrupt failure (proven on ESP32-P4 `mipidsi` and Qualia `dotclockframebuffer.DotClockFramebuffer`).  
 6. Stubs unchanged (still raise / notimpl).  
 7. No silent “ignore error and continue” that leaves hardware half-initialized.  
 8. Tests: `tests/test_lifecycle_api.py` (import-only); hardware soft-reset smoke documented in `tools/README.md` / [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md).
@@ -179,7 +179,7 @@ For **each** real module/port above:
 src/include/displayif/soft_reset.h
 src/ports/common/soft_reset.c
 src/ports/esp32/mod_mipidsi.c                 # P4 reference bring-up
-src/ports/esp32/mod_dotclockframebuffer.c     # Qualia; Python displayif.DotClockFramebuffer
+src/ports/esp32/mod_dotclockframebuffer.c     # Qualia; Python dotclockframebuffer.DotClockFramebuffer
 src/ports/mimxrt/mod_mipidsi.c
 src/ports/mimxrt/mimxrt1176_dsi_display.c
 src/ports/mimxrt/mod_dotclockframebuffer_elcdif.c

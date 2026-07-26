@@ -5,7 +5,7 @@ Hardware / developer smoke scripts. Unit tests live in [`tests/`](../tests/).
 | Script | Port | Notes |
 |--------|------|-------|
 | `test_spi_smoke.py` | MCU with SPI (`rp2`, `esp32`, …) | native `spibus` |
-| `test_dotclockframebuffer_smoke.py` | `esp32` (RGB LCD SoC) | `displayif.DotClockFramebuffer`; buffer protocol; esp_lcd scanout |
+| `test_dotclockframebuffer_smoke.py` | `esp32` (RGB LCD SoC) | `dotclockframebuffer.DotClockFramebuffer`; buffer protocol; esp_lcd scanout |
 | `test_mimxrt_dotclockframebuffer_smoke.py` | `mimxrt` (MIMXRT1062) | small buffer; `refresh()` uses eLCDIF scanout |
 | `test_i80bus_smoke.py` | `esp32-S3`, `rp2`, `mimxrt` (1062), `samd` (SAMD51) | import `I80Bus` |
 | `test_mipidsi_smoke.py` | `esp32p4` | import `Bus` / `Display`; full panel needs Waveshare 4B hardware |

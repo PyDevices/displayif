@@ -9,16 +9,16 @@ NXP i.MX RT display interfaces for MicroPython `mimxrt` port.
 | `src/ports/common/spi/mod_spibus.c` | `spibus.SPIBus` | all mimxrt | **BusDisplay** |
 | `src/ports/common/i2c/mod_i2cbus.c` | `i2cbus.I2CBus` | all mimxrt | **BusDisplay** |
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | MIMXRT1062 (`TEENSY40`, `TEENSY41`, `MIMXRT1060_EVK`) | **FBDisplay** |
-| `mod_dotclockframebuffer_elcdif.c` | `displayif.DotClockFramebuffer` | MIMXRT1062 (`MIMXRT1060_EVK`, Teensy 4.x) | **FBDisplay** |
+| `mod_dotclockframebuffer_elcdif.c` | `dotclockframebuffer.DotClockFramebuffer` | MIMXRT1062 (`MIMXRT1060_EVK`, Teensy 4.x) | **FBDisplay** |
 | `mod_mipidsi.c` + `mimxrt1176_dsi_display.c` | `mipidsi.Bus` / `Display` | MIMXRT1176 (`MIMXRT1170_EVK`) | **FBDisplay** |
 | `mod_i80bus.c` | `i80bus.I80Bus` | MIMXRT1062 (`TEENSY40`, `TEENSY41`, `MIMXRT1060_EVK`) | bus driver |
 | `src/ports/common/notimpl/mod_i80bus.c` | `i80bus.I80Bus` | stub (non-1062) | bus driver (N/A) |
-| `src/ports/common/notimpl/mod_dotclockframebuffer.c` | `displayif.DotClockFramebuffer` | stub (non-1062) | **FBDisplay** (N/A) |
+| `src/ports/common/notimpl/mod_dotclockframebuffer.c` | `dotclockframebuffer.DotClockFramebuffer` | stub (non-1062) | **FBDisplay** (N/A) |
 | `src/ports/common/notimpl/mod_mipidsi.c` | `mipidsi.Bus` / `Display` | stub (non-1176) | **FBDisplay** (N/A) |
 
-### `displayif.DotClockFramebuffer` (eLCDIF)
+### `dotclockframebuffer.DotClockFramebuffer` (eLCDIF)
 
-On **MIMXRT1062**, `displayif.DotClockFramebuffer` uses the NXP SDK **eLCDIF** block for
+On **MIMXRT1062**, `dotclockframebuffer.DotClockFramebuffer` uses the NXP SDK **eLCDIF** block for
 dot-clock RGB scanout. Targets the **MIMXRT1060-EVK** with the RK043FN02H-CT
 shield (J49). Requires CircuitPython-style `red`/`green`/`blue` (5/6/5) pin
 tuples; EVK IOMUX is fixed to LCDIF D0..D15 in B0..B4, G0..G5, R0..R4 order.
@@ -67,13 +67,13 @@ Example pydisplay config: `busdisplay/i80/teensy41_flexio_ili9341`.
 
 ### Stubs
 
-Non-1062 mimxrt boards get stub `displayif`; non-1176 boards get stub `mipidsi`. Stub modules import but raise `NotImplementedError` from the constructor.
+Non-1062 mimxrt boards get stub `dotclockframebuffer`; non-1176 boards get stub `mipidsi`. Stub modules import but raise `NotImplementedError` from the constructor.
 
 ## pydisplay board configs
 
 | Config | Module | Hardware |
 |--------|--------|----------|
-| `fbdisplay/mimxrt1060_evk_rk043_rgb` | `displayif` | MIMXRT1060-EVK + RK043 shield (J49) |
+| `fbdisplay/mimxrt1060_evk_rk043_rgb` | `dotclockframebuffer` | MIMXRT1060-EVK + RK043 shield (J49) |
 | `fbdisplay/mimxrt1170_evk_waveshare_5dsi` | `mipidsi` | MIMXRT1170-EVK + Waveshare 50H-800480-IPS (TC358762 bridge) on J84 |
 | `fbdisplay/matrixportal_m4_64x32` | `rgbmatrix` | Metro M4 (SAMD — see samd port) |
 | `fbdisplay/rgb_matrix_featherwing_teensy41_64x32` | `rgbmatrix` | Teensy 4.1 + FeatherWing |
@@ -91,7 +91,7 @@ Make port — `USER_C_MODULES` is the workspace parent (sibling layout with `dis
 
 ```bash
 cd micropython/ports/mimxrt
-make USER_C_MODULES=../../.. BOARD=TEENSY41          # MIMXRT1062 — eLCDIF displayif.DotClockFramebuffer
+make USER_C_MODULES=../../.. BOARD=TEENSY41          # MIMXRT1062 — eLCDIF dotclockframebuffer.DotClockFramebuffer
 make USER_C_MODULES=../../.. BOARD=TEENSY40
 make USER_C_MODULES=../../.. BOARD=MIMXRT1060_EVK
 make USER_C_MODULES=../../.. BOARD=MIMXRT1170_EVK    # MIMXRT1176 — mipidsi

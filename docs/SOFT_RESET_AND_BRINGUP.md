@@ -150,7 +150,7 @@ approach. Do not stack silent fallbacks.
 | Soft-reset then `import` → Guru Meditation / Load access fault in LVGL (`get_native_obj`, `set_draw_buffers`, weird `.type` pointing at a method) | `machine.Timer` / `esp_timer` still armed; fires into swept Python callbacks | `displayif_port_pre_gc_sweep()` (esp32); do **not** leave this only in micropython `main.c` |
 | Soft-reset then reconstruct → `ESP_ERR_NOT_FOUND` / “No free interrupt” (DSI bridge, RGB panel, etc.) | Host bus/panel/IRQ not released; `__del__` never ran | `displayif_register_soft_reset` + complete `*_host_teardown`; must run before heap wipe |
 | Black panel, process “works” (`mipidsi`) | Missing `show` / `refresh_cb`, backlight off, wrong fb path | `displaysys` + board_config; keep presentation wired |
-| Black / backlight-only (`displayif.DotClockFramebuffer` Qualia) | Separate malloc FB + `refresh_on_demand=1`, panel never started, or wrong data-pin order | Continuous scanout (`refresh_on_demand=0`), panel FB via `esp_lcd_rgb_panel_get_frame_buffer`, start DMA at ctor; Qualia needs **BGR** 5/6/5 pin tuple (not LCD-EV learn-guide order) |
+| Black / backlight-only (`dotclockframebuffer.DotClockFramebuffer` Qualia) | Separate malloc FB + `refresh_on_demand=1`, panel never started, or wrong data-pin order | Continuous scanout (`refresh_on_demand=0`), panel FB via `esp_lcd_rgb_panel_get_frame_buffer`, start DMA at ctor; Qualia needs **BGR** 5/6/5 pin tuple (not LCD-EV learn-guide order) |
 | Horizontal “sliding” / tearing under load (Qualia 720×720) | PSRAM cannot sustain 16bpp DPI alone | `bounce_buffer_size_px = 20 * h_res` + dirty-row `esp_cache_msync` in native blit/fill/`refresh` |
 | `AttributeError: 'DotClockFramebuffer' object has no attribute 'refresh'` (or `blit`) | Custom `attr` replaces `locals_dict` lookup | Expose methods in `attr` (same pattern as `mipidsi.Display`) |
 | UI ~1–2 FPS / multi‑second full redraws | Python per-pixel / `memoryview` path into SPIRAM FB (MP has no `memoryview.cast`) | Buffer typecode `'B'` + native `blit` / `fill_rect`; `fbdisplay` calls them when present |
@@ -166,7 +166,7 @@ approach. Do not stack silent fallbacks.
 
 ---
 
-## Reference: `displayif.DotClockFramebuffer` (ESP32-S3)
+## Reference: `dotclockframebuffer.DotClockFramebuffer` on Qualia (ESP32-S3)
 
 Reference board: Adafruit Qualia S3 + TL040HDS20 (720×720). Same native module
 serves Waveshare 4.3″/7″ ST7262 and LILYGO T-RGB (see matrix above).

@@ -10,7 +10,7 @@ Microchip SAMD display interfaces for MicroPython `samd` port.
 | `src/ports/common/i2c/mod_i2cbus.c` | `i2cbus.I2CBus` | all samd | **BusDisplay** |
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | SAMD51 | **FBDisplay** |
 | `mod_i80bus.c` + `common/i80bus/gpio_bitbang.c` | `i80bus.I80Bus` | SAMD51 | bus driver |
-| `src/ports/common/notimpl/mod_dotclockframebuffer.c` | `displayif.DotClockFramebuffer` | stub | **FBDisplay** (N/A) |
+| `src/ports/common/notimpl/mod_dotclockframebuffer.c` | `dotclockframebuffer.DotClockFramebuffer` | stub | **FBDisplay** (N/A) |
 | `src/ports/common/notimpl/mod_mipidsi.c` | `mipidsi.Bus` / `Display` | stub | **FBDisplay** (N/A) |
 
 ### `i80bus` (GPIO bit-bang)

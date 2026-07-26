@@ -1,12 +1,12 @@
-"""Smoke test for displayif.DotClockFramebuffer import and buffer protocol (esp32)."""
+"""Smoke test for dotclockframebuffer.DotClockFramebuffer import and buffer protocol (esp32)."""
 
 import sys
 
-print("displayif.DotClockFramebuffer smoke test")
+print("dotclockframebuffer.DotClockFramebuffer smoke test")
 
-import displayif
+import dotclockframebuffer
 
-fb = displayif.DotClockFramebuffer(
+fb = dotclockframebuffer.DotClockFramebuffer(
     de=17,
     vsync=3,
     hsync=46,
@@ -43,4 +43,4 @@ except (NotImplementedError, OSError) as exc:
 else:
     print("refresh ok")
 
-print("displayif.DotClockFramebuffer ok on", sys.platform)
+print("dotclockframebuffer.DotClockFramebuffer ok on", sys.platform)

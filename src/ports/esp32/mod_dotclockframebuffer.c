@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 // Dot-clock RGB framebuffer for esp32 port (ESP-IDF esp_lcd RGB panel).
 //
-// Python: displayif.DotClockFramebuffer (module name "displayif").
-// CircuitPython equivalent: dotclockframebuffer.DotClockFramebuffer — same
-// continuous DMA scanout + DRAM bounce, but MP presents via double panel FBs
-// (paint back, swap on refresh) because LVGL blits directly into the FB;
-// CP paints a separate Bitmap and FramebufferDisplay composites.
+// Python: dotclockframebuffer.DotClockFramebuffer (matches CircuitPython).
+// Same continuous DMA scanout + DRAM bounce as CP, but MP presents via double
+// panel FBs (paint back, swap on refresh) because LVGL blits directly into the
+// FB; CP paints a separate Bitmap and FramebufferDisplay composites.
 //
 // Two independent mechanisms (do not conflate):
 //   * Bounce buffer (DRAM) — required on large PSRAM DPI panels; without it
@@ -682,7 +681,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 );
 
 static const mp_rom_map_elem_t dotclockframebuffer_module_globals_table[] = {
-    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_displayif) },
+    { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_dotclockframebuffer) },
     { MP_ROM_QSTR(MP_QSTR_DotClockFramebuffer), MP_ROM_PTR(&dotclockframebuffer_type) },
 };
 static MP_DEFINE_CONST_DICT(dotclockframebuffer_module_globals, dotclockframebuffer_module_globals_table);
@@ -692,4 +691,4 @@ const mp_obj_module_t dotclockframebuffer_user_cmodule = {
     .globals = (mp_obj_dict_t *)&dotclockframebuffer_module_globals,
 };
 
-MP_REGISTER_MODULE(MP_QSTR_displayif, dotclockframebuffer_user_cmodule);
+MP_REGISTER_MODULE(MP_QSTR_dotclockframebuffer, dotclockframebuffer_user_cmodule);

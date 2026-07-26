@@ -10,7 +10,7 @@ pydisplay MP board configs that raise `NotImplementedError` on import need firmw
 
 **Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
 (**implemented**): [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md). Bring-up /
-failure modes (P4 `mipidsi`, Qualia `displayif.DotClockFramebuffer`):
+failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
 [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md).
 
 ## Native modules
@@ -19,17 +19,16 @@ failure modes (P4 `mipidsi`, Qualia `displayif.DotClockFramebuffer`):
 | Module              | Port tree                                                                                       | pydisplay backend |
 | ------------------- | ----------------------------------------------------------------------------------------------- | ----------------- |
 | `spibus` / `i2cbus` | `common`                                                                                        | **BusDisplay**    |
-| `displayif` (`DotClockFramebuffer`) | `esp32` (RGB LCD), `mimxrt` (1062 eLCDIF)                                              | **FBDisplay**     |
+| `dotclockframebuffer` | `esp32` (RGB LCD), `mimxrt` (1062 eLCDIF)                                              | **FBDisplay**     |
 | `i80bus`            | `esp32` (S3), `rp2` (PIO+DMA), `mimxrt` (1062 FlexIO), `samd` (SAMD51 GPIO)                     | **BusDisplay**    |
 | `qspibus`           | `esp32` (S3 esp_lcd SPI quad_mode); stubs elsewhere                                             | **BusDisplay**    |
 | `mipidsi`           | `esp32` (P4), `mimxrt` (1176)                                                                   | **FBDisplay**     |
 | `picodvi`           | `rp2` (RP2040 PIO / RP2350 HSTX)                                                                | **FBDisplay**     |
 | `rgbmatrix`         | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2`                                        | **FBDisplay**     |
-| stubs               | `samd` / `rp2` / non-1062 mimxrt (`displayif.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`); non-S3 `qspibus` | ctor raises |
+| stubs               | `samd` / `rp2` / non-1062 mimxrt (`dotclockframebuffer.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`); non-S3 `qspibus` | ctor raises |
 
 
-Parallel dot-clock RGB uses **`displayif.DotClockFramebuffer`** (not CircuitPython’s
-`dotclockframebuffer` module name) — no `RGBDisplay`.
+Parallel dot-clock RGB uses **`dotclockframebuffer.DotClockFramebuffer`** (same module name as CircuitPython) — no `RGBDisplay`.
 
 ## ESP32 large framebuffers
 
