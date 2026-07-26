@@ -12,8 +12,8 @@ bus = spibus.SPIBus(
     sck=18,
     mosi=19,
     miso=-1,
-    dc=9,
-    cs=10,
+    command=9,
+    chip_select=10,
     reset=6,
 )
 
