@@ -222,7 +222,7 @@ When adding or porting a backend that owns host resources:
 6. [ ] If the port has async hardware timers that schedule Python (esp32
       `machine.Timer`), ensure `displayif_port_pre_gc_sweep()` stops them — or
       implement the strong hook for that port
-7. [ ] Large framebuffers: PSRAM / sdkconfig sized (see HANDOFF); prefer native
+7. [ ] Large framebuffers: PSRAM / sdkconfig sized (see PORT_MATRIX); prefer native
       blit paths into SPIRAM
 8. [ ] pydisplay board_config: touch axes, backlight, `FBDisplay` refresh wiring
 9. [ ] If custom `attr` is set: export `refresh` / `blit` / `fill_rect` /
