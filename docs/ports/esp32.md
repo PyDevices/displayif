@@ -12,8 +12,9 @@ ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espress
 | `mod_mipidsi.c` | `mipidsi.Bus` / `mipidsi.Display` | P4 (`SOC_MIPI_DSI_SUPPORTED`) | **FBDisplay** |
 | `rgbmatrix_pm.c` + common `rgbmatrix` | `rgbmatrix.RGBMatrix` | S3 (Protomatter + LCD_CAM) | **FBDisplay** |
 
-`I80Bus` kwargs match CircuitPython `ParallelBus`: `command`, `chip_select`,
-`write`, `data_pins`, `frequency` (default 30 MHz).
+`I80Bus` kwargs match CircuitPython `ParallelBus`: exactly one of `data0` or
+`data_pins`, plus `command`, `chip_select`, `write`, optional `read` / `reset`,
+and `frequency` (default 30 MHz). `data0` expands to eight consecutive GPIOs.
 
 On SoCs without the matching peripheral, modules import but constructors raise `NotImplementedError`.
 
@@ -57,13 +58,16 @@ See [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md#reference-dotclockf
 `mipidsi.Bus` + `mipidsi.Display` for `SOC_MIPI_DSI_SUPPORTED`. Proven on
 Waveshare / Espressif P4 4B touch LCD with LVGL soft-reset re-import.
 
-`Display` accepts CircuitPython-compatible optional kwargs:
-`virtual_channel=0` (wired into esp_lcd DBI/DPI), `rotation=0` (90° steps;
-metadata for callers), `brightness=1.0`, `native_frames_per_second=60`,
-`backlight_on_high=True`. `color_depth` defaults to 16. Panel **reset** and
-**backlight** GPIO are owned by board_config (not `Display`); `brightness` /
-`backlight_on_high` are accepted for CP signature parity and stored as
-metadata.
+`Bus(frequency=500_000_000, num_lanes=2, …)` matches CircuitPython defaults
+(`ldo_*` remain displayif extras).
+
+`Display(bus, init_sequence, *, …)` takes positional `bus` and `init_sequence`
+like CircuitPython. Optional kwargs: `virtual_channel=0` (wired into esp_lcd
+DBI/DPI), `rotation=0` (90° steps; metadata), `brightness=1.0`,
+`native_frames_per_second=60`, `backlight_pin=None`, `backlight_on_high=True`.
+`color_depth` defaults to 16. Panel **reset** and **backlight** GPIO are owned
+by board_config; `backlight_pin` / `brightness` / `backlight_on_high` are
+accepted for CP signature parity and stored as metadata (not driven here).
 
 | Topic | Behavior |
 |-------|----------|

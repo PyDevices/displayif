@@ -7,6 +7,7 @@
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/binary.h"
+#include "py/mphal.h"
 #include "displayif/mp_helpers.h"
 #include "displayif/soft_reset.h"
 #include "machine_pin.h"
@@ -33,6 +34,8 @@ typedef struct _i80bus_obj_t {
     uint8_t wr_pin;
     uint8_t data_base;
     uint32_t freq;
+    bool has_reset;
+    uint8_t reset_pin;
     bool deinited;
 } i80bus_obj_t;
 
@@ -111,6 +114,10 @@ static void i80bus_prepare_program(void) {
     i80bus_program_ready = true;
 }
 
+static bool i80bus_arg_is_set(mp_obj_t obj) {
+    return obj != MP_OBJ_NULL && obj != mp_const_none;
+}
+
 static int i80bus_pin_num(mp_obj_t pin_or_int) {
     if (mp_obj_is_small_int(pin_or_int) || mp_obj_is_int(pin_or_int)) {
         return displayif_pin_id(pin_or_int);
@@ -165,46 +172,78 @@ static void i80bus_transfer(i80bus_obj_t *self, const uint8_t *data, size_t len)
 
 static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
+        ARG_data0,
+        ARG_data_pins,
         ARG_command,
         ARG_chip_select,
         ARG_write,
-        ARG_data_pins,
+        ARG_read,
+        ARG_reset,
         ARG_frequency,
     };
     static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_data0, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
+        { MP_QSTR_data_pins, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
         { MP_QSTR_command, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_chip_select, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_write, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_read, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
+        { MP_QSTR_reset, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
         { MP_QSTR_frequency, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 30000000 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    if (vals[ARG_command].u_obj == MP_OBJ_NULL || vals[ARG_write].u_obj == MP_OBJ_NULL) {
+    if (!i80bus_arg_is_set(vals[ARG_command].u_obj) || !i80bus_arg_is_set(vals[ARG_write].u_obj)) {
         mp_raise_ValueError(MP_ERROR_TEXT("command and write pins must be specified"));
     }
     if (vals[ARG_frequency].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
     }
 
-    int data_pins[I80BUS_DATA_WIDTH];
-    size_t data_count = displayif_pin_seq_to_ints(vals[ARG_data_pins].u_obj, data_pins, I80BUS_DATA_WIDTH);
-    if (data_count != I80BUS_DATA_WIDTH) {
-        mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 consecutive pins"));
+    bool has_data0 = i80bus_arg_is_set(vals[ARG_data0].u_obj);
+    bool has_data_pins = i80bus_arg_is_set(vals[ARG_data_pins].u_obj);
+    if (has_data0 == has_data_pins) {
+        mp_raise_ValueError(MP_ERROR_TEXT("Specify exactly one of data0 or data_pins"));
     }
-    for (size_t i = 1; i < data_count; i++) {
-        if (data_pins[i] != data_pins[i - 1] + 1) {
-            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be consecutive"));
+
+    int data_pins[I80BUS_DATA_WIDTH];
+    size_t data_count;
+    if (has_data0) {
+        /* CircuitPython ParallelBus(data0=): eight consecutive GPIOs from data0. */
+        int base = i80bus_pin_num(vals[ARG_data0].u_obj);
+        data_count = I80BUS_DATA_WIDTH;
+        for (size_t i = 0; i < data_count; i++) {
+            data_pins[i] = base + (int)i;
+        }
+    } else {
+        data_count = displayif_pin_seq_to_ints(vals[ARG_data_pins].u_obj, data_pins, I80BUS_DATA_WIDTH);
+        if (data_count != I80BUS_DATA_WIDTH) {
+            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 consecutive pins"));
+        }
+        for (size_t i = 1; i < data_count; i++) {
+            if (data_pins[i] != data_pins[i - 1] + 1) {
+                mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be consecutive"));
+            }
         }
     }
+
+    /* read is accepted for CP ParallelBus signature parity (unused on write path). */
+    (void)vals[ARG_read];
 
     uint8_t dc_pin = i80bus_pin_num(vals[ARG_command].u_obj);
     uint8_t wr_pin = i80bus_pin_num(vals[ARG_write].u_obj);
     uint8_t cs_pin = 0;
-    bool has_cs = vals[ARG_chip_select].u_obj != MP_OBJ_NULL;
+    bool has_cs = i80bus_arg_is_set(vals[ARG_chip_select].u_obj);
     if (has_cs) {
         cs_pin = i80bus_pin_num(vals[ARG_chip_select].u_obj);
+    }
+
+    uint8_t reset_pin = 0;
+    bool has_reset = i80bus_arg_is_set(vals[ARG_reset].u_obj);
+    if (has_reset) {
+        reset_pin = i80bus_pin_num(vals[ARG_reset].u_obj);
+        i80bus_gpio_out(reset_pin, true);
     }
 
     i80bus_host_teardown();
@@ -282,6 +321,8 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->wr_pin = wr_pin;
     self->data_base = data_base;
     self->freq = vals[ARG_frequency].u_int;
+    self->has_reset = has_reset;
+    self->reset_pin = reset_pin;
     self->deinited = false;
     s_host.pio = pio;
     s_host.sm = sm;
@@ -325,6 +366,21 @@ static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
+static mp_obj_t i80bus_reset(mp_obj_t self_in) {
+    i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
+    }
+    if (!self->has_reset) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("No %q pin"), MP_QSTR_reset);
+    }
+    gpio_put(self->reset_pin, 0);
+    mp_hal_delay_us(4);
+    gpio_put(self->reset_pin, 1);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_reset_obj, i80bus_reset);
+
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
     i80bus_deinit_internal(self);
@@ -333,6 +389,7 @@ static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 
 static const mp_rom_map_elem_t i80bus_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&i80bus_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i80bus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i80bus_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i80bus_deinit_obj) },

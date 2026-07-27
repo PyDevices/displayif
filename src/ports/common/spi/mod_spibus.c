@@ -33,6 +33,7 @@ typedef struct _spibus_obj_t {
     mp_int_t firstbit;
     mp_obj_t buf1;
     bool has_cs;
+    bool has_dc;
     bool has_reset;
     bool has_spi_pins;
     bool soft; // machine.SoftSPI (bitbang) — do not reinit every send
@@ -102,7 +103,9 @@ static void spibus_reinit_spi(spibus_obj_t *self) {
 }
 
 // Parse keyword-only args. Display-control pin names match CircuitPython FourWire
-// (command / chip_select / reset). SPI ownership extras stay displayif-specific:
+// (optional command / chip_select / reset). Without command, send() uses the
+// FourWire 9-bit DC-in-stream path. SPI ownership extras stay displayif-specific
+// (no prebuilt spi_bus):
 //   SPIBus(*, id=2, baudrate=24_000_000, polarity=0, phase=0, bits=8,
 //           lsb_first=False, soft=False, sck=-1, mosi=-1, miso=-1,
 //           command=-1, chip_select=-1, reset=-1)
@@ -165,9 +168,7 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
         }
     }
 
-    if (displayif_pin_spec_unset(command)) {
-        mp_raise_ValueError(MP_ERROR_TEXT("command pin must be specified"));
-    }
+    /* command may be unset: CircuitPython FourWire then uses 9-bit DC-in-stream mode. */
     if (soft && (displayif_pin_spec_unset(sck) || displayif_pin_spec_unset(mosi))) {
         mp_raise_ValueError(MP_ERROR_TEXT("soft SPI requires sck and mosi"));
     }
@@ -236,7 +237,13 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
 
     // command / chip_select after SPI init (same order as Python SPIBus)
-    self->dc = displayif_machine_pin_cfg(command, pin_out, DC_DATA);
+    if (!displayif_pin_spec_unset(command)) {
+        self->dc = displayif_machine_pin_cfg(command, pin_out, DC_DATA);
+        self->has_dc = true;
+    } else {
+        self->dc = mp_const_none;
+        self->has_dc = false;
+    }
 
     if (!displayif_pin_spec_unset(chip_select)) {
         self->cs = displayif_machine_pin_cfg(chip_select, pin_out, CS_INACTIVE);
@@ -249,6 +256,11 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     if (!displayif_pin_spec_unset(reset)) {
         self->reset = displayif_machine_pin_cfg(reset, pin_out, 1);
         self->has_reset = true;
+        /* Match CircuitPython FourWire: pulse reset on construct. */
+        displayif_pin_set(self->reset, 0);
+        mp_hal_delay_us(1000);
+        displayif_pin_set(self->reset, 1);
+        mp_hal_delay_us(1000);
     } else {
         self->reset = mp_const_none;
         self->has_reset = false;
@@ -267,15 +279,51 @@ static mp_obj_t spibus_reset(mp_obj_t self_in) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("spibus is deinited"));
     }
     if (!self->has_reset) {
-        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("No reset pin defined"));
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("No %q pin"), MP_QSTR_reset);
     }
     displayif_pin_set(self->reset, 0);
-    mp_hal_delay_ms(10);
+    mp_hal_delay_us(1000);
     displayif_pin_set(self->reset, 1);
-    mp_hal_delay_ms(10);
+    mp_hal_delay_us(1000);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(spibus_reset_obj, spibus_reset);
+
+/* CircuitPython FourWire 9-bit DC-in-stream when no command (D/C) pin. */
+static void spibus_write_9bit(spibus_obj_t *self, uint8_t dc, const uint8_t *data, size_t data_length) {
+    if (data_length == 0) {
+        return;
+    }
+    uint8_t buffer = 0;
+    uint8_t bits = 0;
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(self->buf1, &bufinfo, MP_BUFFER_WRITE);
+    for (size_t i = 0; i < data_length; i++) {
+        bits = (bits + 1) % 8;
+        if (bits == 0) {
+            buffer = (uint8_t)((buffer << 1) | dc);
+            ((uint8_t *)bufinfo.buf)[0] = buffer;
+            displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
+            ((uint8_t *)bufinfo.buf)[0] = data[i];
+            displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
+        } else {
+            buffer = (uint8_t)((buffer << (9 - bits)) | (dc << (8 - bits)) | (data[i] >> bits));
+            ((uint8_t *)bufinfo.buf)[0] = buffer;
+            displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
+        }
+        buffer = data[i];
+    }
+    if (bits > 0) {
+        buffer = (uint8_t)(buffer << (8 - bits));
+        ((uint8_t *)bufinfo.buf)[0] = buffer;
+        displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
+        if (self->has_cs) {
+            displayif_pin_set(self->cs, CS_INACTIVE);
+            mp_hal_delay_us(1);
+            displayif_pin_set(self->cs, CS_ACTIVE);
+        }
+    }
+}
 
 static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
     spibus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -288,23 +336,36 @@ static mp_obj_t spibus_send(size_t n_args, const mp_obj_t *args) {
     spibus_reinit_spi(self);
     spibus_cs_set(self, CS_ACTIVE);
 
-    if (command != mp_const_none) {
-        // Must write via buffer protocol — MP_OBJ_TO_PTR(bytearray) is not payload.
-        uint8_t cmd = (uint8_t)mp_obj_get_int(command);
-        mp_buffer_info_t bufinfo;
-        mp_get_buffer_raise(self->buf1, &bufinfo, MP_BUFFER_WRITE);
-        ((uint8_t *)bufinfo.buf)[0] = cmd;
-        displayif_pin_set(self->dc, DC_CMD);
-        displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
-    }
+    if (!self->has_dc) {
+        if (command != mp_const_none) {
+            uint8_t cmd = (uint8_t)mp_obj_get_int(command);
+            spibus_write_9bit(self, DC_CMD, &cmd, 1);
+        }
+        if (data != mp_const_none && data != mp_const_false && data != mp_const_empty_bytes) {
+            mp_buffer_info_t bufinfo;
+            if (mp_get_buffer(data, &bufinfo, MP_BUFFER_READ) && bufinfo.len > 0) {
+                spibus_write_9bit(self, DC_DATA, bufinfo.buf, bufinfo.len);
+            }
+        }
+    } else {
+        if (command != mp_const_none) {
+            // Must write via buffer protocol — MP_OBJ_TO_PTR(bytearray) is not payload.
+            uint8_t cmd = (uint8_t)mp_obj_get_int(command);
+            mp_buffer_info_t bufinfo;
+            mp_get_buffer_raise(self->buf1, &bufinfo, MP_BUFFER_WRITE);
+            ((uint8_t *)bufinfo.buf)[0] = cmd;
+            displayif_pin_set(self->dc, DC_CMD);
+            displayif_obj_call_method1(self->spi, MP_QSTR_write, self->buf1);
+        }
 
-    // Match Python: `if data and len(data):`
-    if (data != mp_const_none && data != mp_const_false && data != mp_const_empty_bytes) {
-        mp_buffer_info_t bufinfo;
-        if (mp_get_buffer(data, &bufinfo, MP_BUFFER_READ)) {
-            if (bufinfo.len > 0) {
-                displayif_pin_set(self->dc, DC_DATA);
-                displayif_obj_call_method1(self->spi, MP_QSTR_write, data);
+        // Match Python: `if data and len(data):`
+        if (data != mp_const_none && data != mp_const_false && data != mp_const_empty_bytes) {
+            mp_buffer_info_t bufinfo;
+            if (mp_get_buffer(data, &bufinfo, MP_BUFFER_READ)) {
+                if (bufinfo.len > 0) {
+                    displayif_pin_set(self->dc, DC_DATA);
+                    displayif_obj_call_method1(self->spi, MP_QSTR_write, data);
+                }
             }
         }
     }
