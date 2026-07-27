@@ -50,12 +50,13 @@ see [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md).
 
 ### `i80bus` (FlexIO MCULCD)
 
-On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel **8080** mode with an **8-bit** data bus. Constructor kwargs match CircuitPython `ParallelBus` names (`command`, `chip_select`, `write`, `data_pins`, `frequency`; default 30 MHz) with `.send(command, data=None)` and `.deinit()`.
+On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel **8080** mode with an **8-bit** data bus. Constructor kwargs match CircuitPython `ParallelBus` (exactly one of `data0` / `data_pins`, plus `command`, `chip_select`, `write`, optional `read` / `reset`, `frequency` default 30 MHz) with `.send(command, data=None)`, `.reset()`, and `.deinit()`.
 
 **Pin constraints (minimal driver):**
 
-- **`data_pins`** and **`write`** must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11).
-- **`command`** and **`chip_select`** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
+- **`data0`** or **`data_pins`**, and **`write`**, must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11). `data0` expands to eight consecutive FlexIO2 pads.
+- Optional **`read`** (FlexIO2 pad) selects `RDPinIndex` when provided.
+- **`command`**, **`chip_select`**, and optional **`reset`** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
 - Only **one** `I80Bus` instance per board (single FLEXIO2 peripheral).
 - **IOMUX** for FlexIO pins is applied at construction; see pydisplay `teensy41_flexio_ili9341` for an example pin map.
 

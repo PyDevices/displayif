@@ -227,7 +227,7 @@ static mp_obj_t mipidsi_bus_make(const mp_obj_type_t *type, size_t n_args, size_
         ARG_ldo_voltage_mv,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_frequency, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 500000000 } },
         { MP_QSTR_num_lanes, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 2 } },
         { MP_QSTR_ldo_chan, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = MIPIDSI_LDO_CHAN_DEFAULT } },
         { MP_QSTR_ldo_voltage_mv, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = MIPIDSI_LDO_VOLTAGE_MV_DEFAULT } },
@@ -280,51 +280,53 @@ static mp_obj_t mipidsi_bus_deinit(mp_obj_t self_in) {
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_bus_deinit_obj, mipidsi_bus_deinit);
 
 static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    if (n_args < 1) {
-        mp_raise_TypeError(MP_ERROR_TEXT("Display requires a Bus instance"));
-    }
-    mp_obj_t bus_obj = args[0];
-
     enum {
+        ARG_bus,
         ARG_init_sequence,
         ARG_width,
         ARG_height,
-        ARG_color_depth,
-        ARG_pixel_clock_frequency,
         ARG_hsync_pulse_width,
-        ARG_hsync_front_porch,
         ARG_hsync_back_porch,
+        ARG_hsync_front_porch,
         ARG_vsync_pulse_width,
-        ARG_vsync_front_porch,
         ARG_vsync_back_porch,
+        ARG_vsync_front_porch,
+        ARG_pixel_clock_frequency,
         ARG_virtual_channel,
         ARG_rotation,
+        ARG_color_depth,
+        ARG_backlight_pin,
         ARG_brightness,
         ARG_native_frames_per_second,
         ARG_backlight_on_high,
     };
     static const mp_arg_t allowed_args[] = {
-        { MP_QSTR_init_sequence, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_bus, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_init_sequence, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_height, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
-        { MP_QSTR_pixel_clock_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_hsync_pulse_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_hsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_hsync_back_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_hsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_vsync_pulse_width, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
-        { MP_QSTR_vsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_vsync_back_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_vsync_front_porch, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_pixel_clock_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_virtual_channel, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_rotation, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
+        /* Accepted for CP signature parity; board_config owns backlight GPIO. */
+        { MP_QSTR_backlight_pin, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
         { MP_QSTR_brightness, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NEW_SMALL_INT(1) } },
         { MP_QSTR_native_frames_per_second, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 60 } },
-        /* Accepted for CP signature parity; board_config owns reset/backlight GPIO. */
         { MP_QSTR_backlight_on_high, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = true } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
-    mp_arg_parse_all_kw_array(n_args - 1, n_kw, args + 1, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
+    (void)vals[ARG_backlight_pin];
+
+    mp_obj_t bus_obj = vals[ARG_bus].u_obj;
     mipidsi_bus_obj_t *bus = MP_OBJ_TO_PTR(bus_obj);
     if (!mp_obj_is_type(bus_obj, &mipidsi_bus_type)) {
         mp_raise_TypeError(MP_ERROR_TEXT("bus must be mipidsi.Bus"));

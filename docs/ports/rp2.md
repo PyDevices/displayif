@@ -22,8 +22,9 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 
 ### `i2cbus`
 
-`I2CBus(i2c_bus, *, device_address)` — CircuitPython `I2CDisplayBus` kwargs
-(positional bus, required `device_address`).
+`I2CBus(i2c_bus, *, device_address, reset=None)` — CircuitPython
+`I2CDisplayBus` kwargs (positional bus, required `device_address`, optional
+`reset` with `.reset()`).
 
 ### `picodvi`
 
@@ -36,7 +37,7 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 
 ### `i80bus`
 
-Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DMA** for bulk `send()` transfers. Constructor kwargs match CircuitPython `ParallelBus` names: `command`, `chip_select`, `write`, `data_pins`, `frequency` (default 30 MHz).
+Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DMA** for bulk `send()` transfers. Constructor kwargs match CircuitPython `ParallelBus`: exactly one of `data0` or `data_pins`, plus `command`, `chip_select`, `write`, optional `read` / `reset`, and `frequency` (default 30 MHz).
 
 ### `rgbmatrix`
 

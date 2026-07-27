@@ -7,6 +7,7 @@
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/misc.h"
+#include "py/mphal.h"
 #include "displayif/mp_helpers.h"
 
 #define CO_CMD 0x00
@@ -16,6 +17,8 @@ typedef struct _i2cbus_obj_t {
     mp_obj_base_t base;
     mp_obj_t i2c;
     uint8_t address;
+    mp_obj_t reset;
+    bool has_reset;
     vstr_t vstr;
     bool deinited;
 } i2cbus_obj_t;
@@ -26,10 +29,12 @@ static mp_obj_t i2cbus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     enum {
         ARG_i2c_bus,
         ARG_device_address,
+        ARG_reset,
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_i2c_bus, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_device_address, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        { MP_QSTR_reset, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
@@ -38,6 +43,20 @@ static mp_obj_t i2cbus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->i2c = vals[ARG_i2c_bus].u_obj;
     self->address = vals[ARG_device_address].u_int;
     self->deinited = false;
+    self->has_reset = vals[ARG_reset].u_obj != MP_OBJ_NULL && vals[ARG_reset].u_obj != mp_const_none
+        && !displayif_pin_spec_unset(vals[ARG_reset].u_obj);
+    if (self->has_reset) {
+        mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
+        mp_obj_t pin_cls = mp_load_attr(machine_mod, MP_QSTR_Pin);
+        mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
+        self->reset = displayif_machine_pin_cfg(vals[ARG_reset].u_obj, pin_out, 1);
+        /* Match CircuitPython I2CDisplayBus: pulse reset on construct. */
+        displayif_pin_set(self->reset, 0);
+        mp_hal_delay_us(4);
+        displayif_pin_set(self->reset, 1);
+    } else {
+        self->reset = mp_const_none;
+    }
     vstr_init(&self->vstr, 32);
     return MP_OBJ_FROM_PTR(self);
 }
@@ -102,6 +121,21 @@ static mp_obj_t i2cbus_send_data(mp_obj_t self_in, mp_obj_t data_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(i2cbus_send_data_obj, i2cbus_send_data);
 
+static mp_obj_t i2cbus_reset(mp_obj_t self_in) {
+    i2cbus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i2cbus is deinited"));
+    }
+    if (!self->has_reset) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("No %q pin"), MP_QSTR_reset);
+    }
+    displayif_pin_set(self->reset, 0);
+    mp_hal_delay_us(4);
+    displayif_pin_set(self->reset, 1);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(i2cbus_reset_obj, i2cbus_reset);
+
 static mp_obj_t i2cbus_deinit(mp_obj_t self_in) {
     i2cbus_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (self->deinited) {
@@ -114,6 +148,7 @@ static mp_obj_t i2cbus_deinit(mp_obj_t self_in) {
 static MP_DEFINE_CONST_FUN_OBJ_1(i2cbus_deinit_obj, i2cbus_deinit);
 
 static const mp_rom_map_elem_t i2cbus_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&i2cbus_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i2cbus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_send_data), MP_ROM_PTR(&i2cbus_send_data_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i2cbus_deinit_obj) },

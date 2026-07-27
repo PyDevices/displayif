@@ -2,12 +2,14 @@
 // Intel 8080 parallel display bus for MIMXRT1062 (NXP FlexIO MCULCD, 8-bit).
 // Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/binary.h"
+#include "py/mphal.h"
 #include "displayif/mp_helpers.h"
 #include "displayif/soft_reset.h"
 #include "pin.h"
@@ -40,6 +42,8 @@ typedef struct _i80bus_obj_t {
     mp_obj_t dc_pin;
     mp_obj_t cs_pin;
     bool has_cs;
+    mp_obj_t reset_pin;
+    bool has_reset;
     bool initialized;
     bool deinited;
 } i80bus_obj_t;
@@ -83,6 +87,10 @@ static void i80bus_raise_status(status_t status) {
         return;
     }
     mp_raise_msg_varg(&mp_type_OSError, MP_ERROR_TEXT("NXP SDK status %d"), (int)status);
+}
+
+static bool i80bus_arg_is_set(mp_obj_t obj) {
+    return obj != MP_OBJ_NULL && obj != mp_const_none;
 }
 
 static int i80bus_flexio2_index(const machine_pin_obj_t *pin) {
@@ -137,27 +145,39 @@ static uint8_t i80bus_pick_rd_pin(uint8_t data_start, uint8_t wr_index) {
 
 static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
+        ARG_data0,
+        ARG_data_pins,
         ARG_command,
         ARG_chip_select,
         ARG_write,
-        ARG_data_pins,
+        ARG_read,
+        ARG_reset,
         ARG_frequency,
     };
     static const mp_arg_t allowed_args[] = {
+        { MP_QSTR_data0, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
+        { MP_QSTR_data_pins, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
         { MP_QSTR_command, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_chip_select, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
         { MP_QSTR_write, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
-        { MP_QSTR_data_pins, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
+        { MP_QSTR_read, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
+        { MP_QSTR_reset, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
         { MP_QSTR_frequency, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 30000000 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
 
-    if (vals[ARG_command].u_obj == MP_OBJ_NULL || vals[ARG_write].u_obj == MP_OBJ_NULL) {
+    if (!i80bus_arg_is_set(vals[ARG_command].u_obj) || !i80bus_arg_is_set(vals[ARG_write].u_obj)) {
         mp_raise_ValueError(MP_ERROR_TEXT("command and write pins must be specified"));
     }
     if (vals[ARG_frequency].u_int <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("frequency must be positive"));
+    }
+
+    bool has_data0 = i80bus_arg_is_set(vals[ARG_data0].u_obj);
+    bool has_data_pins = i80bus_arg_is_set(vals[ARG_data_pins].u_obj);
+    if (has_data0 == has_data_pins) {
+        mp_raise_ValueError(MP_ERROR_TEXT("Specify exactly one of data0 or data_pins"));
     }
 
     if (s_flexio_in_use) {
@@ -165,24 +185,43 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     }
     i80bus_ensure_soft_reset_registered();
 
-    mp_obj_t data_pins[I80BUS_DATA_WIDTH];
-    size_t data_count = displayif_pin_seq_to_objs(vals[ARG_data_pins].u_obj, data_pins, I80BUS_DATA_WIDTH);
-    if (data_count != I80BUS_DATA_WIDTH) {
-        mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 consecutive FlexIO2 pins"));
-    }
-
     const machine_pin_obj_t *data_pin_objs[I80BUS_DATA_WIDTH];
     int flexio_indices[I80BUS_DATA_WIDTH];
-    for (size_t i = 0; i < I80BUS_DATA_WIDTH; i++) {
-        data_pin_objs[i] = pin_find(data_pins[i]);
-        flexio_indices[i] = i80bus_flexio2_index(data_pin_objs[i]);
-        if (flexio_indices[i] < 0) {
-            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must map to FLEXIO2 on GPIO_B0/GPIO_B1"));
+
+    if (has_data0) {
+        /* CircuitPython ParallelBus(data0=): eight consecutive FlexIO2 pins from data0. */
+        int base_idx = i80bus_flexio2_index(pin_find(vals[ARG_data0].u_obj));
+        if (base_idx < 0 || base_idx + I80BUS_DATA_WIDTH > 32) {
+            mp_raise_ValueError(MP_ERROR_TEXT("data0 must map to FLEXIO2 on GPIO_B0/GPIO_B1"));
         }
-    }
-    for (size_t i = 1; i < I80BUS_DATA_WIDTH; i++) {
-        if (flexio_indices[i] != flexio_indices[i - 1] + 1) {
-            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be consecutive FlexIO2 indices"));
+        for (size_t i = 0; i < I80BUS_DATA_WIDTH; i++) {
+            int idx = base_idx + (int)i;
+            char name[16];
+            if (idx < 16) {
+                snprintf(name, sizeof(name), "GPIO_B0_%02d", idx);
+            } else {
+                snprintf(name, sizeof(name), "GPIO_B1_%02d", idx - 16);
+            }
+            data_pin_objs[i] = pin_find(MP_OBJ_NEW_QSTR(qstr_from_str(name)));
+            flexio_indices[i] = idx;
+        }
+    } else {
+        mp_obj_t data_pins[I80BUS_DATA_WIDTH];
+        size_t data_count = displayif_pin_seq_to_objs(vals[ARG_data_pins].u_obj, data_pins, I80BUS_DATA_WIDTH);
+        if (data_count != I80BUS_DATA_WIDTH) {
+            mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be 8 consecutive FlexIO2 pins"));
+        }
+        for (size_t i = 0; i < I80BUS_DATA_WIDTH; i++) {
+            data_pin_objs[i] = pin_find(data_pins[i]);
+            flexio_indices[i] = i80bus_flexio2_index(data_pin_objs[i]);
+            if (flexio_indices[i] < 0) {
+                mp_raise_ValueError(MP_ERROR_TEXT("data_pins must map to FLEXIO2 on GPIO_B0/GPIO_B1"));
+            }
+        }
+        for (size_t i = 1; i < I80BUS_DATA_WIDTH; i++) {
+            if (flexio_indices[i] != flexio_indices[i - 1] + 1) {
+                mp_raise_ValueError(MP_ERROR_TEXT("data_pins must be consecutive FlexIO2 indices"));
+            }
         }
     }
 
@@ -199,12 +238,20 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
 
     i80bus_obj_t *self = mp_obj_malloc(i80bus_obj_t, type);
     self->dc_pin = displayif_pin_resolve(vals[ARG_command].u_obj);
-    self->has_cs = vals[ARG_chip_select].u_obj != MP_OBJ_NULL;
+    self->has_cs = i80bus_arg_is_set(vals[ARG_chip_select].u_obj);
     if (self->has_cs) {
         self->cs_pin = displayif_pin_resolve(vals[ARG_chip_select].u_obj);
         displayif_pin_set(self->cs_pin, 1);
     } else {
         self->cs_pin = mp_const_none;
+    }
+    self->has_reset = i80bus_arg_is_set(vals[ARG_reset].u_obj);
+    if (self->has_reset) {
+        mp_obj_t pin_cls = mp_load_attr(mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL), MP_QSTR_Pin);
+        mp_int_t pin_out = mp_obj_get_int(mp_load_attr(pin_cls, MP_QSTR_OUT));
+        self->reset_pin = displayif_machine_pin_cfg(vals[ARG_reset].u_obj, pin_out, 1);
+    } else {
+        self->reset_pin = mp_const_none;
     }
     displayif_pin_set(self->dc_pin, 0);
     self->initialized = false;
@@ -217,6 +264,12 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
 
     uint8_t data_start = (uint8_t)flexio_indices[0];
     uint8_t rd_flexio = i80bus_pick_rd_pin(data_start, (uint8_t)wr_flexio);
+    if (i80bus_arg_is_set(vals[ARG_read].u_obj)) {
+        int rd_idx = i80bus_flexio2_index(pin_find(displayif_pin_resolve(vals[ARG_read].u_obj)));
+        if (rd_idx >= 0) {
+            rd_flexio = (uint8_t)rd_idx;
+        }
+    }
 
     self->lcd.flexioBase = FLEXIO2;
     self->lcd.busType = kFLEXIO_MCULCD_8080;
@@ -291,6 +344,21 @@ static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
+static mp_obj_t i80bus_reset(mp_obj_t self_in) {
+    i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    if (self->deinited) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
+    }
+    if (!self->has_reset) {
+        mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("No %q pin"), MP_QSTR_reset);
+    }
+    displayif_pin_set(self->reset_pin, 0);
+    mp_hal_delay_us(4);
+    displayif_pin_set(self->reset_pin, 1);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_reset_obj, i80bus_reset);
+
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
     i80bus_deinit_internal(self);
@@ -299,6 +367,7 @@ static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 
 static const mp_rom_map_elem_t i80bus_locals_dict_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&i80bus_reset_obj) },
     { MP_ROM_QSTR(MP_QSTR_send), MP_ROM_PTR(&i80bus_send_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&i80bus_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&i80bus_deinit_obj) },
