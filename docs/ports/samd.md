@@ -18,7 +18,8 @@ Microchip SAMD display interfaces for MicroPython `samd` port.
 On **SAMD51**, `i80bus` uses PORT `OUTSET`/`OUTCLR` register writes via the shared `common/i80bus/gpio_bitbang.c` backend (same algorithm as pydisplay’s viper `I80Bus`). Supports **8 data pins** via `data0` (eight consecutive) or `data_pins` (sequential or LUT layout). ParallelBus kwargs: optional `read` / `reset`, default `frequency` 30 MHz.
 
 - No dedicated 8080 peripheral — throughput is lower than esp32-S3, rp2 PIO, or mimxrt FlexIO.
-- `frequency` is accepted for CircuitPython API compatibility; timing is not cycle-counted yet.
+- `frequency` is accepted for CP signature parity but unused (timing is not cycle-counted yet). **esp32**, **rp2**, and **mimxrt** wire `frequency` into the host.
+- Optional `read` is accepted for CP signature parity but unused (write-only path). **mimxrt** wires `read` into FlexIO `RDPinIndex`; esp32/rp2 also ignore it.
 - SAMD21 builds keep the import-only stub.
 
 On SAMD51, `rgbmatrix` uses the **Protomatter** backend (TC3 overflow ISR + PORT OUTSET/OUTCLR). `samd_irq_hook.c` patches the TC3 vector before scanout starts.

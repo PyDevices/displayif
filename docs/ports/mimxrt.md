@@ -29,6 +29,13 @@ proven ESP32 continuous-scanout / bounce-buffer / native-blit contract (Qualia),
 see [esp32.md](esp32.md) — match those Python-facing
 behaviors when extending this backend.
 
+CP timing/polarity kwargs are accepted; two are no-ops on this port:
+
+| Kwarg | mimxrt (eLCDIF) | esp32 (esp_lcd RGB) |
+|-------|-----------------|---------------------|
+| `overscan_left` | Accepted, ignored | Wired (`set_gap` / `h_res`) |
+| `pclk_idle_high` | Accepted, ignored | Wired into panel timing |
+
 ### `mipidsi` (RT1176)
 
 On **MIMXRT1176**, `mipidsi` drives the SoC MIPI DSI host (NXP `mipi_dsi_split`)
@@ -37,12 +44,12 @@ with an **LCDIFV2** video bridge to the DPI path. Primary hardware target:
 **TC358762** DSI-to-RGB bridge. Panel init is supplied via the pydisplay board
 config `init_sequence` bytes.
 
-`Display` accepts the same CircuitPython optional kwargs as esp32
-(`virtual_channel`, `rotation`, `brightness`, `native_frames_per_second`,
-`backlight_on_high`). `virtual_channel` must be `0` on this port (NXP path
-does not multiplex VC yet). Panel **reset** and **backlight** GPIO are owned
-by board_config (not `Display`); `brightness` / `backlight_on_high` are
-accepted for CP signature parity and stored as metadata.
+`Display` optional kwargs match esp32 displayif: `virtual_channel=0` and
+`color_depth=16`. `virtual_channel` must be `0` on this port (NXP path does
+not multiplex VC yet). Panel **reset** and **backlight** GPIO are owned by
+board_config (not `Display`). CircuitPython-only kwargs (`rotation`,
+`brightness`, `backlight_pin`, `backlight_on_high`, `native_frames_per_second`)
+are not accepted.
 
 Lifecycle: wires `displayif_mimxrt1176_dsi_*_deinit/stop` into the shared
 soft-reset registry. ESP32-P4 `mipidsi` is the soft-reset + blit reference —
@@ -55,14 +62,18 @@ On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel *
 **Pin constraints (minimal driver):**
 
 - **`data0`** or **`data_pins`**, and **`write`**, must be pads on `GPIO_B0_xx` / `GPIO_B1_xx` with **FLEXIO2** alternate function (ALT4), in **8 consecutive** FlexIO2 indices (e.g. `GPIO_B0_04`–`GPIO_B0_11` = FLEXIO2 D04–D11). `data0` expands to eight consecutive FlexIO2 pads.
-- Optional **`read`** (FlexIO2 pad) selects `RDPinIndex` when provided.
+- Optional **`read`** (FlexIO2 pad) selects `RDPinIndex` when provided. On
+  **esp32**, **rp2**, and **samd**, `read` is accepted for CP signature parity
+  but unused (write-only).
 - **`command`**, **`chip_select`**, and optional **`reset`** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
 - Only **one** `I80Bus` instance per board (single FLEXIO2 peripheral).
 - **IOMUX** for FlexIO pins is applied at construction; see pydisplay `teensy41_flexio_ili9341` for an example pin map.
 
 On **MIMXRT1060-EVK**, the LCDIF RGB pins on `GPIO_B0_04`–`GPIO_B0_11` overlap the typical FlexIO2 data mapping — do not use the RK043 RGB shield pins simultaneously with i80bus. Teensy 4.x boards can wire an external 8080 display to FLEXIO2-capable pads per the schematic.
 
-Default `frequency` is 30 MHz (CP ParallelBus default; byte rate on this port). Bulk transfers (≥64 bytes) use `FLEXIO_MCULCD_TransferBlocking` with `dataOnly=true`.
+Default `frequency` is 30 MHz (CP ParallelBus default; byte rate on this port;
+wired here, and on esp32/rp2 — ignored on **samd**). Bulk transfers (≥64 bytes)
+use `FLEXIO_MCULCD_TransferBlocking` with `dataOnly=true`.
 
 Example pydisplay config: `busdisplay/i80/teensy41_flexio_ili9341`.
 

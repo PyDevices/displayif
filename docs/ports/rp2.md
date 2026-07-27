@@ -37,7 +37,7 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 
 ### `i80bus`
 
-Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DMA** for bulk `send()` transfers. Constructor kwargs match CircuitPython `ParallelBus`: exactly one of `data0` or `data_pins`, plus `command`, `chip_select`, `write`, optional `read` / `reset`, and `frequency` (default 30 MHz).
+Uses a **PIO state machine** (8 consecutive data pins, WR on side-set) with **DMA** for bulk `send()` transfers. Constructor kwargs match CircuitPython `ParallelBus`: exactly one of `data0` or `data_pins`, plus `command`, `chip_select`, `write`, optional `read` / `reset`, and `frequency` (default 30 MHz). `frequency` is wired into the PIO clock divider. Optional `read` is accepted for CP signature parity but unused on this port (write-only path); **mimxrt** wires `read` into FlexIO `RDPinIndex`.
 
 ### `rgbmatrix`
 
