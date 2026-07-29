@@ -8,6 +8,8 @@ pydisplay MP board configs that raise `NotImplementedError` on import need firmw
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
 
+Use this repo when a pydisplay board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with the matching `USER_C_MODULES` path. If you are debugging a bring-up problem, begin with [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) and the port notes in [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
+
 **Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
 (**implemented**): [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md). Bring-up /
 failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
