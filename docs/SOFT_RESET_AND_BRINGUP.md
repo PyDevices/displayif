@@ -57,7 +57,7 @@ On MicroPython MCU ports the soft-reset exit path is typically:
 
 | Mechanism | When | What |
 |-----------|------|------|
-| `--wrap=gc_sweep_all` (`src/ports/common/soft_reset.c`) | **Before** heap wipe | `displayif_port_pre_gc_sweep()` then `displayif_soft_reset_all()` |
+| `--wrap=gc_sweep_all` (`src/ports/common/soft_reset.c`) | **Before** heap wipe | `displayif_port_pre_gc_sweep()`, optional weak and initialization-guarded `lv_deinit()`, then `displayif_soft_reset_all()` |
 | `--wrap=mp_deinit` (same file) | After sweep | Idempotent second `displayif_soft_reset_all()` |
 | `displayif_register_soft_reset(fn)` | At first ctor | Per-interface host teardown (mipidsi, displayif/DotClock, i80bus, picodvi, rgbmatrix, …) |
 | `displayif_port_pre_gc_sweep()` | Strong symbol on esp32 | Stop `machine.Timer` / clear handlers (weak empty default elsewhere) |
@@ -148,6 +148,7 @@ approach. Do not stack silent fallbacks.
 | Symptom | Likely cause | Fix location |
 |---------|--------------|--------------|
 | Soft-reset then `import` → Guru Meditation / Load access fault in LVGL (`get_native_obj`, `set_draw_buffers`, weird `.type` pointing at a method) | `machine.Timer` / `esp_timer` still armed; fires into swept Python callbacks | `displayif_port_pre_gc_sweep()` (esp32); do **not** leave this only in micropython `main.c` |
+| Soft-reset then second LVGL UI → Instruction/Store access fault in `lv_draw_finalize_task_creation` / `lv_ll_ins_tail` | LVGL native display/draw state was not deinitialized before its GC-backed global root was swept | Common pre-GC weak `lv_deinit()` before displayif host teardown |
 | Soft-reset then reconstruct → `ESP_ERR_NOT_FOUND` / “No free interrupt” (DSI bridge, RGB panel, etc.) | Host bus/panel/IRQ not released; `__del__` never ran | `displayif_register_soft_reset` + complete `*_host_teardown`; must run before heap wipe |
 | Black panel, process “works” (`mipidsi`) | Missing `show` / `refresh_cb`, backlight off, wrong fb path | `displaysys` + board_config; keep presentation wired |
 | Black / backlight-only (`dotclockframebuffer.DotClockFramebuffer` Qualia) | Separate malloc FB + `refresh_on_demand=1`, panel never started, or wrong data-pin order | Continuous scanout (`refresh_on_demand=0`), panel FB via `esp_lcd_rgb_panel_get_frame_buffer`, start DMA at ctor; Qualia needs **BGR** 5/6/5 pin tuple (not LCD-EV learn-guide order) |

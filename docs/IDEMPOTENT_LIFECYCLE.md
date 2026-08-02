@@ -98,7 +98,7 @@ Verify with grep if unsure (`displayif_register_soft_reset`, `*_host_teardown`).
 | `picodvi` rp2 | yes | yes | yes | Static HW shadow; no dangling `active_picodvi` |
 | `rgbmatrix` | yes | yes | yes (Protomatter) | PM core in BSS; bitbang path has no host IRQs |
 
-Shared: `src/include/displayif/soft_reset.h` + `src/ports/common/soft_reset.c` (`--wrap=gc_sweep_all` primary; `--wrap=mp_deinit` idempotent second pass). ESP32 also implements `displayif_port_pre_gc_sweep()` to stop `machine.Timer` before the sweep.
+Shared: `src/include/displayif/soft_reset.h` + `src/ports/common/soft_reset.c` (`--wrap=gc_sweep_all` primary; `--wrap=mp_deinit` idempotent second pass). ESP32 also implements `displayif_port_pre_gc_sweep()` to stop `machine.Timer` before the sweep. When initialized LVGL is linked, the common pre-GC path weakly checks `lv_is_initialized()` and calls `lv_deinit()` after timers stop and before display hardware teardown, while LVGL's GC-backed global root is still valid.
 
 ---
 

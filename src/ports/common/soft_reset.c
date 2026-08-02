@@ -2,6 +2,7 @@
 // Soft-reset teardown dispatcher for displayif (see src/include/displayif/soft_reset.h).
 
 #include <stddef.h>
+#include <stdbool.h>
 
 #include "displayif/soft_reset.h"
 
@@ -11,6 +12,13 @@
 
 static displayif_soft_reset_fn_t s_fns[DISPLAYIF_SOFT_RESET_MAX];
 static unsigned s_count;
+
+/* LVGL keeps its global state in the MicroPython GC heap, but owns nested
+ * native draw/display allocations that must be released while that root is
+ * still valid.  The symbol is optional so displayif remains independent of
+ * LVGL on builds that do not include the binding. */
+extern void lv_deinit(void) __attribute__((weak));
+extern bool lv_is_initialized(void) __attribute__((weak));
 
 void displayif_register_soft_reset(displayif_soft_reset_fn_t fn) {
     if (fn == NULL) {
@@ -67,6 +75,9 @@ extern void __real_gc_sweep_all(void);
 
 void __wrap_gc_sweep_all(void) {
     displayif_port_pre_gc_sweep();
+    if (lv_deinit != NULL && lv_is_initialized != NULL && lv_is_initialized()) {
+        lv_deinit();
+    }
     displayif_soft_reset_all();
     __real_gc_sweep_all();
 }
