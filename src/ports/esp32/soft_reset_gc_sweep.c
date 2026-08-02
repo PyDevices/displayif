@@ -14,9 +14,9 @@
 
 void displayif_port_pre_gc_sweep(void) {
     for (machine_timer_obj_t *t = MP_STATE_PORT(machine_timer_obj_head); t != NULL; t = t->next) {
-        machine_timer_stop(t);
+        machine_timer_disable(t);
         /* Drop the callback so a late ISR cannot schedule into freed heap. */
         t->handler = NULL;
-        t->handler_ctx = NULL;
+        t->callback = mp_const_none;
     }
 }
