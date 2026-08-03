@@ -429,6 +429,27 @@ static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_refresh_obj, mipidsi_display_refresh);
 
+/* Cache-sync only the rows LVGL changed.  The DPI engine continuously scans
+ * self->buf, so it does not need esp_lcd_panel_draw_bitmap() to be resubmitted
+ * after the initial setup. */
+static mp_obj_t mipidsi_display_refresh_rect(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->panel == NULL || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("MIPI DSI display is deinited"));
+    }
+    int x = mp_obj_get_int(args[1]);
+    int y = mp_obj_get_int(args[2]);
+    int w = mp_obj_get_int(args[3]);
+    int h = mp_obj_get_int(args[4]);
+    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > self->width || y + h > self->height) {
+        mp_raise_ValueError(MP_ERROR_TEXT("refresh rect out of range"));
+    }
+    mipidsi_msync_rows(self, y, h);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_display_refresh_rect_obj, 5, 5, mipidsi_display_refresh_rect);
+
 /* blit(buf, x, y, w, h) — fast RGB565 copy; Python memoryview row slices into
  * this SPIRAM FB are ~25ms/row on ESP32-P4 (LVGL partial flushes WDT). */
 static mp_obj_t mipidsi_display_blit(size_t n_args, const mp_obj_t *args) {
@@ -498,6 +519,9 @@ static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
         } else if (attr == MP_QSTR_refresh) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_refresh_obj);
             dest[1] = self_in;
+        } else if (attr == MP_QSTR_refresh_rect) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_refresh_rect_obj);
+            dest[1] = self_in;
         } else if (attr == MP_QSTR_blit) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_blit_obj);
             dest[1] = self_in;
@@ -519,6 +543,7 @@ static MP_DEFINE_CONST_DICT(mipidsi_bus_locals_dict, mipidsi_bus_locals_dict_tab
 
 static const mp_rom_map_elem_t mipidsi_display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&mipidsi_display_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_refresh_rect), MP_ROM_PTR(&mipidsi_display_refresh_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&mipidsi_display_blit_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mipidsi_display_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mipidsi_display_deinit_obj) },
