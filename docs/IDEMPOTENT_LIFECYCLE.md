@@ -1,7 +1,7 @@
 # Idempotent init / deinit — displayif contract
 
 **Audience:** Agents and humans changing host-owning displayif backends.  
-**Repo:** [PyDevices/displayif](https://github.com/PyDevices/displayif) (also under `cmods/displayif`).  
+**Repo:** [PyDevices/displayif](https://github.com/PyDevices/displayif).
 **Companions:** [AGENTS.md](../AGENTS.md), [PORT_MATRIX.md](PORT_MATRIX.md), [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md), [README.md](../README.md).  
 **Related pydisplay:** `displaysys` expects idempotent `deinit()` — native modules must match.
 
@@ -189,7 +189,7 @@ src/ports/common/rgbmatrix/mod_rgbmatrix.c
 tests/test_lifecycle_api.py
 ```
 
-Build via sibling MicroPython + `USER_C_MODULES` (see README). Optional: cmods `build_mp.sh` when working inside that workspace — do **not** rewrite public docs to require cmods.
+Build via sibling MicroPython + `USER_C_MODULES` (see README). See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 ---
 

@@ -6,7 +6,7 @@ Native display **interface** modules for pydisplay. Portable code in `src/ports/
 
 Several pydisplay MicroPython `board_config.py` files currently raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
 
-**Workspace:** clone as a sibling of `micropython/` (e.g. via [PyDevices/cmods](https://github.com/PyDevices/cmods), which is an optional convenience wrapper, not a requirement).
+**Workspace:** clone as a sibling of `micropython/`.
 
 **No Python re-export layer in this repo.** Native C modules register directly.
 Parallel RGB on MicroPython is **`import dotclockframebuffer` → `dotclockframebuffer.DotClockFramebuffer`**,
@@ -123,7 +123,7 @@ cd micropython/ports/rp2 && make BOARD=RPI_PICO2_W USER_C_MODULES=../../../displ
 cd micropython/ports/esp32 && make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
 ```
 
-([cmods](https://github.com/PyDevices/cmods) `./build_mp.sh` is optional — e.g. `./build_mp.sh --port rp2 --board RPI_PICO2_W`.)
+See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 No `manifest.py` frozen package required unless we later add pure-Python helpers (not planned).
 

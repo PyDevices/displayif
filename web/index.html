@@ -22,7 +22,6 @@
       </a>
       <nav class="nav">
         <a href="https://pydevices.github.io/pydisplay/">pydisplay</a>
-        <a href="https://pydevices.github.io/cmods/">cmods</a>
         <a href="https://github.com/PyDevices/displayif">Source</a>
       </nav>
       <button type="button" class="theme-toggle" id="theme-toggle" aria-label="Toggle color theme" title="Toggle color theme">
@@ -43,8 +42,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-1-2.6c3-.3 6-1.5 6-6.5a5 5 0 0 0-1.4-3.5 4.6 4.6 0 0 0-.1-3.5s-1.1-.3-3.5 1.3a12 12 0 0 0-6 0C6.6 1.7 5.5 2 5.5 2a4.6 4.6 0 0 0-.1 3.5A5 5 0 0 0 4 9c0 5 3 6.2 6 6.5a3.4 3.4 0 0 0-1 2.6V22"/></svg>
         Source on GitHub
       </a>
-      <a class="btn" href="https://github.com/PyDevices/cmods/blob/main/docs/MP_EXAMPLE.md">Hardware bring-up</a>
-      <a class="btn" href="https://pydevices.github.io/cmods/">cmods</a>
+      <a class="btn" href="https://github.com/PyDevices/displayif/blob/main/docs/SOFT_RESET_AND_BRINGUP.md">Bring-up notes</a>
     </div>
   </section>
 
@@ -104,16 +102,14 @@ make USER_C_MODULES=../../.. \
       RGB and DSI framebuffers prefer PSRAM (<code>MALLOC_CAP_SPIRAM</code>). Enable and size
       <code>CONFIG_SPIRAM</code> in your board <code>sdkconfig</code> before building — see
       <a href="https://github.com/PyDevices/displayif/blob/main/docs/PORT_MATRIX.md">docs/PORT_MATRIX.md</a>.
-      For a full ESP32-P4 + touch walkthrough, use
-      <a href="https://github.com/PyDevices/cmods/blob/main/docs/MP_EXAMPLE.md">cmods MP_EXAMPLE.md</a>.
+      See also <a href="https://github.com/PyDevices/displayif/blob/main/docs/SOFT_RESET_AND_BRINGUP.md">SOFT_RESET_AND_BRINGUP.md</a>.
     </p>
 
     <div class="section-head" style="margin-top: 36px;">
       <h2>Related</h2>
     </div>
     <ul class="linklist">
-      <li><a href="https://pydevices.github.io/cmods/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>cmods — optional build workspace</a></li>
-      <li><a href="https://github.com/PyDevices/cmods/blob/main/docs/MP_EXAMPLE.md"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>MP_EXAMPLE.md — ESP32-P4 hardware bring-up</a></li>
+      <li><a href="https://github.com/PyDevices/cmods"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>cmods — easier multi-module MicroPython builds</a></li>
       <li><a href="https://pydevices.github.io/pydisplay/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>pydisplay</a></li>
       <li><a href="https://pydevices.github.io/pygraphics/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>pygraphics — native FrameBuffer / Area</a></li>
     </ul>

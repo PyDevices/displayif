@@ -28,13 +28,13 @@ Root `micropython.mk` / `micropython.cmake` stay at the repo root for `USER_C_MO
 ## Hard rules
 
 - **Fix root causes in displayif** (or the owning binding). Do not require hard reset, and do not special-case board_configs to avoid second init.
-- **Do not patch `micropython/`** for soft-reset teardown when a usermod `--wrap` or registry hook will do (see soft-reset docs). Upstream clones under cmods must not be committed.
+- **Do not patch `micropython/`** for soft-reset teardown when a usermod `--wrap` or registry hook will do (see soft-reset docs). Do not commit upstream MicroPython trees.
 - **Every** accelerated backend that owns DMA/IRQ/PIO/SDK handles must register with `displayif_register_soft_reset()` and tear down from the same path used by `deinit` / `__del__` / idempotent ctors.
 - Host teardowns run from `--wrap=gc_sweep_all` (before the heap is wiped). They must **not** `m_free` GC memory — only release non-GC host resources.
 
 ## Build / flash (agent workflow)
 
-Public docs stay sibling-clone + stock `make` / `idf.py`. When working inside Brad’s cmods + mpftp setup for a connected MCU:
+Public docs stay sibling-clone + stock `make` / `idf.py`. When working with a connected MCU via mpftp:
 
 ```bash
 mpftp firmware build --port esp32 --board ESP32_GENERIC_P4 --variant C6_WIFI
