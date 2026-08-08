@@ -5,7 +5,8 @@
 # usermod.cmake also accepts a semicolon-separated list of module paths if you
 # want displayif plus other modules — no aggregator file required, e.g.:
 #   -DUSER_C_MODULES="/path/to/displayif;/path/to/other_mod"
-# Hardware interfaces build only on MCU ports — not unix, windows, etc.
+# Hardware interfaces build only on MCU ports. Desktop usdl2 is Make-only
+# (unix/windows via micropython.mk); no cmake desktop path yet.
 
 set(DISPLAYIF_MOD_DIR ${CMAKE_CURRENT_LIST_DIR})
 

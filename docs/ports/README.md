@@ -9,8 +9,9 @@ All interface code and **per-port build glue** live under `src/ports/`. Folder n
 | `mimxrt/` | mimxrt builds | `mimxrt` |
 | `samd/` | samd builds | `samd` |
 | `rp2/` | rp2 builds | `rp2` |
+| `desktop/usdl2/` | Desktop SDL (`import usdl2`) | `unix`, `windows` |
 
-Hardware-specific interfaces (`spibus`, `displayif`, …) do **not** build on desktop MicroPython ports (`unix`, `windows`, …).
+MCU hardware interfaces (`spibus`, `mipidsi`, …) do **not** build on desktop MicroPython ports. `usdl2` is the desktop exception.
 
 ## Build files in every port tree
 

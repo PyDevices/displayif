@@ -2,8 +2,8 @@
 #
 # Discovered via USER_C_MODULES pointing at the workspace directory that
 # contains this repo (its parent), e.g. `make USER_C_MODULES=../../..`.
-# Hardware interfaces (spibus, dotclockframebuffer, …) build only on MCU ports —
-# not unix, windows, or other desktop targets.
+# Hardware interfaces (spibus, dotclockframebuffer, …) build only on MCU ports.
+# Desktop SDL (`usdl2`) builds on unix and windows ports.
 
 DISPLAYIF_MOD_DIR := $(USERMOD_DIR)
 
@@ -13,6 +13,8 @@ DISPLAYIF_PORT_MIMXRT := $(findstring /ports/mimxrt,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_SAMD := $(findstring /ports/samd,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_RP2 := $(findstring /ports/rp2,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_STM32 := $(findstring /ports/stm32,$(PORT_DIR_ABS))
+DISPLAYIF_PORT_UNIX := $(findstring /ports/unix,$(PORT_DIR_ABS))
+DISPLAYIF_PORT_WINDOWS := $(findstring /ports/windows,$(PORT_DIR_ABS))
 
 ifeq ($(DISPLAYIF_PORT_ESP32),)
 DISPLAYIF_PORT_ESP32 := 0
@@ -42,6 +44,18 @@ ifeq ($(DISPLAYIF_PORT_STM32),)
 DISPLAYIF_PORT_STM32 := 0
 else
 DISPLAYIF_PORT_STM32 := 1
+endif
+
+ifeq ($(DISPLAYIF_PORT_UNIX),)
+DISPLAYIF_PORT_UNIX := 0
+else
+DISPLAYIF_PORT_UNIX := 1
+endif
+
+ifeq ($(DISPLAYIF_PORT_WINDOWS),)
+DISPLAYIF_PORT_WINDOWS := 0
+else
+DISPLAYIF_PORT_WINDOWS := 1
 endif
 
 DISPLAYIF_IS_MCU := 0
@@ -101,4 +115,9 @@ endif
 
 ifeq ($(DISPLAYIF_PORT_STM32),1)
 include $(DISPLAYIF_MOD_DIR)/src/ports/stm32/micropython.mk
+endif
+
+# Desktop SDL bindings (`import usdl2`) for SDLDisplay / multimer.
+ifneq ($(DISPLAYIF_PORT_UNIX)$(DISPLAYIF_PORT_WINDOWS),00)
+include $(DISPLAYIF_MOD_DIR)/src/ports/desktop/usdl2/micropython.mk
 endif

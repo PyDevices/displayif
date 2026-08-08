@@ -4,7 +4,7 @@ Native display **interface** modules for pydisplay. Portable code in `src/ports/
 
 pydisplay MP board configs that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
 
-**CircuitPython** has its own display stack (`dotclockframebuffer`, `mipidsi`, `picodvi`, …). displayif does not ship CP bindings — use pydisplay `cp_`* board configs with CP firmware.
+**CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use pydisplay `cp_*` board configs with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) is built from this repo via `./apply_cp_patches.sh` + CircuitPython unix.
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
 
@@ -27,6 +27,7 @@ failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
 | `mipidsi`           | `esp32` (P4), `mimxrt` (1176)                                                                   | **FBDisplay**     |
 | `picodvi`           | `rp2` (RP2040 PIO / RP2350 HSTX)                                                                | **FBDisplay**     |
 | `rgbmatrix`         | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2`                                        | **FBDisplay**     |
+| `usdl2`             | `desktop` (MicroPython `unix` / `windows`; CircuitPython unix via `apply_cp_patches.sh`)       | **SDLDisplay**    |
 | stubs               | `samd` / `rp2` / non-1062 mimxrt (`dotclockframebuffer.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`); non-S3 `qspibus` | ctor raises |
 
 
@@ -70,6 +71,16 @@ To build this module **plus** other usermods on a CMake port, pass a semicolon-s
 make BOARD=ESP32_GENERIC_S3 \
   USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lv_micropython_cmod"
 ```
+
+**Desktop SDL (`usdl2`):** builds automatically on MicroPython `unix` / `windows` when this repo is on the `USER_C_MODULES` scan path. Unix needs `libsdl2-dev`. Windows (MinGW) needs an unpacked [SDL2 MinGW development ZIP](https://github.com/libsdl-org/SDL/releases) and `SDL2_DEV` pointing at its root (see [`tools/sdl2_dev_env.sh`](tools/sdl2_dev_env.sh)).
+
+```bash
+cd micropython/ports/unix && make USER_C_MODULES=../../..
+# windows: export SDL2_DEV=/path/to/SDL2-2.x.x first
+cd micropython/ports/windows && make USER_C_MODULES=../../..
+```
+
+CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
 
 See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
