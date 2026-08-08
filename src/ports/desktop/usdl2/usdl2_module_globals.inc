@@ -3,6 +3,9 @@
     { MP_ROM_QSTR(MP_QSTR_SDL_InitSubSystem), MP_ROM_PTR(&SDL_InitSubSystem_fun_obj) },
     { MP_ROM_QSTR(MP_QSTR_SDL_Quit), MP_ROM_PTR(&SDL_Quit_fun_obj) },
     { MP_ROM_QSTR(MP_QSTR_SDL_GetError), MP_ROM_PTR(&SDL_GetError_fun_obj) },
+    { MP_ROM_QSTR(MP_QSTR_SDL_SetHint), MP_ROM_PTR(&SDL_SetHint_fun_obj) },
+    // Same string as pure-Python usdl2 / SDL_HINT_ORIENTATIONS (SDL_IOS_ORIENTATIONS).
+    { MP_ROM_QSTR(MP_QSTR_SDL_HINT_ORIENTATIONS), MP_ROM_QSTR(MP_QSTR_SDL_IOS_ORIENTATIONS) },
     { MP_ROM_QSTR(MP_QSTR_SDL_CreateWindow), MP_ROM_PTR(&SDL_CreateWindow_fun_obj) },
     { MP_ROM_QSTR(MP_QSTR_SDL_DestroyWindow), MP_ROM_PTR(&SDL_DestroyWindow_fun_obj) },
     { MP_ROM_QSTR(MP_QSTR_SDL_GetWindowID), MP_ROM_PTR(&SDL_GetWindowID_fun_obj) },

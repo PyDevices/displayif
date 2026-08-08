@@ -444,6 +444,13 @@ mp_obj_t usdl2_get_error(void) {
     return mp_obj_new_str(err, strlen(err));
 }
 
+mp_obj_t usdl2_set_hint(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    const char *name = mp_obj_str_get_str(args[0]);
+    const char *value = mp_obj_str_get_str(args[1]);
+    return mp_obj_new_int(SDL_SetHint(name, value) ? 1 : 0);
+}
+
 mp_obj_t usdl2_window_title(mp_obj_t title_in) {
     if (mp_obj_is_str(title_in)) {
         return title_in;
@@ -1129,6 +1136,11 @@ static mp_obj_t SDL_GetError_obj(void) {
     return usdl2_get_error();
 }
 MP_DEFINE_CONST_FUN_OBJ_0(SDL_GetError_fun_obj, SDL_GetError_obj);
+
+static mp_obj_t SDL_SetHint_obj(size_t n_args, const mp_obj_t *args) {
+    return usdl2_set_hint(n_args, args);
+}
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(SDL_SetHint_fun_obj, 2, 2, SDL_SetHint_obj);
 
 static mp_obj_t SDL_CreateWindow_obj(size_t n_args, const mp_obj_t *args) {
     return usdl2_create_window(n_args, args);

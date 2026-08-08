@@ -1,5 +1,8 @@
 // Extra QSTRs for usdl2 module globals (CP shared-bindings include path).
 // *FORMAT-OFF*
+Q(SDL_SetHint)
+Q(SDL_HINT_ORIENTATIONS)
+Q(SDL_IOS_ORIENTATIONS)
 Q(SDL_PumpEvents)
 Q(SDL_GetDisplayUsableBounds)
 Q(SDL_GetDesktopDisplayMode)

@@ -6,6 +6,8 @@ import usdl2
 
 # SDL_INIT_VIDEO
 assert usdl2.SDL_INIT_VIDEO == 0x00000020
+assert usdl2.SDL_HINT_ORIENTATIONS == "SDL_IOS_ORIENTATIONS"
+assert callable(usdl2.SDL_SetHint)
 assert usdl2.SDL_Init(usdl2.SDL_INIT_VIDEO) == 0
 
 # Joystick subsystem API (parity with pydisplay sdldisplay PR #37)
