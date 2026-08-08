@@ -6,9 +6,18 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "usdl2.h"
+#include "displayif/soft_reset.h"
 
 #include <stdlib.h>
 #include <string.h>
+
+/* Lifecycle: idempotent SDL_Quit + timer free via soft-reset registry
+ * (see displayif/docs/IDEMPOTENT_LIFECYCLE.md). BSS survives soft reset. */
+static bool s_soft_reset_registered;
+static bool s_sdl_inited;
+
+static void usdl2_host_teardown(void);
+static void usdl2_ensure_soft_reset_registered(void);
 
 // --- SDL_DEFINE_PIXELFORMAT --------------------------------------
 
@@ -405,17 +414,25 @@ SDL_Rect *usdl2_optional_rect(mp_obj_t obj, SDL_Rect *storage) {
 
 mp_obj_t usdl2_init(size_t n_args, const mp_obj_t *args) {
     (void)n_args;
+    usdl2_ensure_soft_reset_registered();
     int rc = SDL_Init((Uint32)mp_obj_get_int(args[0]));
+    if (rc == 0) {
+        s_sdl_inited = true;
+    }
     return mp_obj_new_int(rc);
 }
 
 mp_obj_t usdl2_init_subsystem(mp_obj_t flags_in) {
+    usdl2_ensure_soft_reset_registered();
     int rc = SDL_InitSubSystem((Uint32)mp_obj_get_int(flags_in));
+    if (rc == 0) {
+        s_sdl_inited = true;
+    }
     return mp_obj_new_int(rc);
 }
 
 mp_obj_t usdl2_quit(void) {
-    SDL_Quit();
+    usdl2_host_teardown();
     return mp_const_none;
 }
 
@@ -438,6 +455,7 @@ mp_obj_t usdl2_window_title(mp_obj_t title_in) {
 
 mp_obj_t usdl2_create_window(size_t n_args, const mp_obj_t *args) {
     (void)n_args;
+    usdl2_ensure_soft_reset_registered();
     const char *title = mp_obj_str_get_str(usdl2_window_title(args[0]));
     SDL_Window *window = SDL_CreateWindow(
         title,
@@ -446,6 +464,9 @@ mp_obj_t usdl2_create_window(size_t n_args, const mp_obj_t *args) {
         (int)mp_obj_get_int(args[3]),
         (int)mp_obj_get_int(args[4]),
         (Uint32)mp_obj_get_int(args[5]));
+    if (window != NULL) {
+        s_sdl_inited = true;
+    }
     return usdl2_ptr_obj(window);
 }
 
@@ -936,6 +957,37 @@ MP_DEFINE_CONST_OBJ_TYPE(
     );
 
 MP_REGISTER_ROOT_POINTER(struct usdl2_timer_entry *usdl2_timer_list);
+
+// --- Soft-reset / idempotent host teardown -----------------------
+
+static void usdl2_host_teardown(void) {
+    /* Stop SDL timers and free malloc'd entries before the heap is swept.
+     * Do not m_free GC objects — only release non-GC host resources. */
+    usdl2_timer_entry_t *entry = usdl2_timer_list;
+    usdl2_timer_list = NULL;
+    while (entry != NULL) {
+        usdl2_timer_entry_t *next = entry->next;
+        if (entry->id != 0) {
+            SDL_RemoveTimer(entry->id);
+        }
+        usdl2_timer_free_slot(entry);
+        free(entry);
+        entry = next;
+    }
+    memset(usdl2_timer_by_slot, 0, sizeof(usdl2_timer_by_slot));
+
+    if (s_sdl_inited || SDL_WasInit(0) != 0) {
+        SDL_Quit();
+    }
+    s_sdl_inited = false;
+}
+
+static void usdl2_ensure_soft_reset_registered(void) {
+    if (!s_soft_reset_registered) {
+        displayif_register_soft_reset(usdl2_host_teardown);
+        s_soft_reset_registered = true;
+    }
+}
 
 // --- Module bindings (shared by MP and CP) -----------------------
 

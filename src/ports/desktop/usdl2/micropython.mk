@@ -57,7 +57,13 @@ ifeq ($(SDL2_CFLAGS),)
 $(error displayif usdl2 SDL2 not found — unix: install libsdl2-dev; windows: set SDL2_DEV to unpacked SDL2 MinGW dev zip (see displayif/tools/sdl2_dev_env.sh))
 endif
 
-CFLAGS_USERMOD += $(SDL2_CFLAGS) -I$(USDL2_DIR) -Wno-sign-compare -Wno-unused-parameter -Wno-shadow
+CFLAGS_USERMOD += $(SDL2_CFLAGS) -I$(USDL2_DIR) -I$(DISPLAYIF_MOD_DIR)/src/include \
+	-Wno-sign-compare -Wno-unused-parameter -Wno-shadow
+CFLAGS_USERMOD += -DDISPLAYIF_WRAP_GC_SWEEP=1 -DDISPLAYIF_WRAP_MP_DEINIT=1
+
+# Soft-reset: tear down SDL before gc_sweep_all; mp_deinit is a second pass.
+# Desktop ports use gcc-as-linker (same as esp32/rp2).
+LDFLAGS_USERMOD += -Wl,--wrap=gc_sweep_all -Wl,--wrap=mp_deinit
 
 # MicroPython only appends LDFLAGS_USERMOD (see py/py.mk); do not use LIBS_USERMOD.
 LDFLAGS_USERMOD += $(SDL2_LIBS)
@@ -66,6 +72,8 @@ else
 LDFLAGS_USERMOD += -static-libgcc
 endif
 
-SRC_USERMOD_C += $(USDL2_DIR)/usdl2_mp.c
+SRC_USERMOD_C += \
+	$(USDL2_DIR)/usdl2_mp.c \
+	$(DISPLAYIF_MOD_DIR)/src/ports/common/soft_reset.c
 
 endif

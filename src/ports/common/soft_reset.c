@@ -72,6 +72,7 @@ __attribute__((weak)) void displayif_port_pre_gc_sweep(void) {
  * gc_sweep_all() then mp_deinit(); host teardown must not wait for the latter.
  * Teardowns must not m_free GC memory — only release non-GC host resources. */
 extern void __real_gc_sweep_all(void);
+void __wrap_gc_sweep_all(void);
 
 void __wrap_gc_sweep_all(void) {
     displayif_port_pre_gc_sweep();
@@ -86,6 +87,7 @@ void __wrap_gc_sweep_all(void) {
 #if defined(DISPLAYIF_WRAP_MP_DEINIT)
 /* Linker --wrap=mp_deinit: idempotent second pass after the sweep. */
 extern void __real_mp_deinit(void);
+void __wrap_mp_deinit(void);
 
 void __wrap_mp_deinit(void) {
     displayif_soft_reset_all();

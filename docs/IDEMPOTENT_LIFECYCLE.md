@@ -77,7 +77,7 @@ Stubs under `src/ports/common/notimpl/` and ctor-raise stubs stay stubs (no hard
 | `picodvi` | `picodvi` | `src/ports/rp2/mod_picodvi.c` (+ `picodvi_rp2040.*`, `picodvi_rp2350.*`) | FBDisplay |
 | `rgbmatrix` | `rgbmatrix` | `src/ports/common/rgbmatrix/mod_rgbmatrix.c` (+ per-port `rgbmatrix_pm.c`) | FBDisplay |
 
-**Out of scope:** CircuitPython bindings (displayif does not ship CP); changing pydisplay board_configs to avoid re-init.
+**Out of scope:** MCU CircuitPython bindings (stock CP display stack); changing pydisplay board_configs to avoid re-init. Desktop `usdl2` is the CP exception (unix).
 
 ---
 
@@ -97,8 +97,9 @@ Verify with grep if unsure (`displayif_register_soft_reset`, `*_host_teardown`).
 | `mipidsi` mimxrt | Bus + Display | yes | yes | Wires `*_bus_deinit` / `*_display_stop` |
 | `picodvi` rp2 | yes | yes | yes | Static HW shadow; no dangling `active_picodvi` |
 | `rgbmatrix` | yes | yes | yes (Protomatter) | PM core in BSS; bitbang path has no host IRQs |
+| `usdl2` desktop | via `SDL_Quit` | n/a (module) | yes | Stops SDL timers (`malloc` entries), `SDL_Quit`; MP unix/windows + CP unix |
 
-Shared: `src/include/displayif/soft_reset.h` + `src/ports/common/soft_reset.c` (`--wrap=gc_sweep_all` primary; `--wrap=mp_deinit` idempotent second pass). ESP32 also implements `displayif_port_pre_gc_sweep()` to stop `machine.Timer` before the sweep. When initialized LVGL is linked, the common pre-GC path weakly checks `lv_is_initialized()` and calls `lv_deinit()` after timers stop and before display hardware teardown, while LVGL's GC-backed global root is still valid.
+Shared: `src/include/displayif/soft_reset.h` + `src/ports/common/soft_reset.c` (`--wrap=gc_sweep_all` primary; `--wrap=mp_deinit` idempotent second pass). ESP32 also implements `displayif_port_pre_gc_sweep()` to stop `machine.Timer` before the sweep. When initialized LVGL is linked, the common pre-GC path weakly checks `lv_is_initialized()` and calls `lv_deinit()` after timers stop and before display hardware teardown, while LVGL's GC-backed global root is still valid. Desktop `usdl2` links the same wraps from `src/ports/desktop/usdl2/micropython.mk` / root `circuitpython.mk`.
 
 ---
 

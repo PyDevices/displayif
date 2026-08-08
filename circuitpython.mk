@@ -24,12 +24,15 @@ ifeq ($(SDL2_CFLAGS),)
 $(error pkg-config sdl2 failed — install libsdl2-dev)
 endif
 
-CFLAGS += $(SDL2_CFLAGS) -I$(USDL2_DIR) -DCIRCUITPY_USDL2=1
-LDFLAGS += $(SDL2_LIBS)
+CFLAGS += $(SDL2_CFLAGS) -I$(USDL2_DIR) -I$(USDL2_MOD_DIR)/src/include \
+	-DCIRCUITPY_USDL2=1 -DDISPLAYIF_WRAP_GC_SWEEP=1 -DDISPLAYIF_WRAP_MP_DEINIT=1
+LDFLAGS += $(SDL2_LIBS) -Wl,--wrap=gc_sweep_all -Wl,--wrap=mp_deinit
 
 QSTR_DEFS += $(USDL2_DIR)/usdl2_qstrdefs.h
 
-USDL2_SOURCES := $(USDL2_DIR)/usdl2_mp.c
+USDL2_SOURCES := \
+	$(USDL2_DIR)/usdl2_mp.c \
+	$(USDL2_MOD_DIR)/src/ports/common/soft_reset.c
 
 USDL2_SUPPRESS_CFLAGS := -Wno-sign-compare -Wno-unused-parameter -Wno-shadow
 $(foreach _usdl,$(USDL2_SOURCES),$(eval $(BUILD)/$(_usdl:.c=.o): CFLAGS += $(USDL2_SUPPRESS_CFLAGS)))
