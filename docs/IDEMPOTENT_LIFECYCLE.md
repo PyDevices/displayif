@@ -3,7 +3,7 @@
 **Audience:** Agents and humans changing host-owning displayif backends.  
 **Repo:** [PyDevices/displayif](https://github.com/PyDevices/displayif).
 **Companions:** [AGENTS.md](../AGENTS.md), [PORT_MATRIX.md](PORT_MATRIX.md), [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md), [README.md](../README.md).  
-**Related pydisplay:** `displaysys` expects idempotent `deinit()` — native modules must match.
+**Related pydisplay:** `displaydev` expects idempotent `deinit()` — native modules must match.
 
 **Status (2026-07):** Implemented for all real backends listed below. Soft-reset + reconstruct is the acceptance test. This doc is the **contract and inventory**, not a todo brief.
 
