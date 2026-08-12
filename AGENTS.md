@@ -9,7 +9,7 @@ interfaces stay on stock CP; only `usdl2` uses `./apply_cp_patches.sh` (unix).
 
 1. [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md) — required `deinit` / soft-reset contract (**implemented** for all real backends)
 2. [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) — proven failure modes and methods from **ESP32-P4 `mipidsi`** and **Qualia S3 `dotclockframebuffer.DotClockFramebuffer`** (+ LVGL); applies to other ports/interfaces
-3. [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md) — module/port matrix and micropython-hardware board-config map
+3. [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md) — module/port matrix and pydevices board-config map
 
 Those two interfaces are the reference bring-ups: keep their scanout / blit /
 attr / soft-reset patterns when changing siblings.
@@ -31,7 +31,7 @@ Desktop also: root `circuitpython.mk` + `apply_cp_patches.sh` (unix `usdl2` only
 
 ## Hard rules
 
-- **Fix root causes in displayif** (or the owning binding). Do not require hard reset, and do not special-case micropython-hardware board configs to avoid second init.
+- **Fix root causes in displayif** (or the owning binding). Do not require hard reset, and do not special-case pydevices board configs to avoid second init.
 - **Do not patch `micropython/`** for soft-reset teardown when a usermod `--wrap` or registry hook will do (see soft-reset docs). Do not commit upstream MicroPython trees.
 - **Every** accelerated backend that owns DMA/IRQ/PIO/SDK handles must register with `displayif_register_soft_reset()` and tear down from the same path used by `deinit` / `__del__` / idempotent ctors.
 - Desktop `usdl2` registers the same way (SDL timers + `SDL_Quit`); wired on unix/windows MP and CP unix.

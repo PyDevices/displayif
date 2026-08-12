@@ -4,7 +4,7 @@ Native display **interface** modules for PyDevices `displaydev`. Portable code i
 
 **Start here for agents:** [AGENTS.md](../AGENTS.md) → [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) → [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) (soft-reset wraps, symptom table, bring-up methods).
 
-Several `micropython-hardware` MicroPython `board_config.py` files raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
+Several `pydevices` MicroPython `board_config.py` files raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
 
 **Workspace:** clone as a sibling of `micropython/`.
 
@@ -13,7 +13,7 @@ Parallel RGB on MicroPython is **`import dotclockframebuffer` → `dotclockframe
 matching CircuitPython’s module name. Other interfaces keep their own module
 names (`mipidsi`, `i80bus`, `picodvi`, …).
 
-**CircuitPython:** displayif does **not** ship CP bindings. CircuitPython already provides `dotclockframebuffer`, `mipidsi`, `paralleldisplaybus`, `picodvi`, etc. — use those for CP board configs under `micropython-hardware/board_configs/cp/`.
+**CircuitPython:** displayif does **not** ship CP bindings. CircuitPython already provides `dotclockframebuffer`, `mipidsi`, `paralleldisplaybus`, `picodvi`, etc. — use those for CP board configs under `pydevices/board_configs/cp/`.
 
 ---
 
@@ -40,7 +40,7 @@ There is no separate `RGBDisplay` / `present()` path. CircuitPython board config
 
 ---
 
-## micropython-hardware board configs (MicroPython)
+## pydevices board configs (MicroPython)
 
 These configs import displayif modules when firmware is built with the matching cmod:
 
@@ -132,7 +132,7 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 ## Suggested work sequence
 
 1. Scaffold — done
-2. micropython-hardware board configs on `dotclockframebuffer.DotClockFramebuffer` + `FBDisplay` — done
+2. pydevices board configs on `dotclockframebuffer.DotClockFramebuffer` + `FBDisplay` — done
 3. `spibus` + smoke tests — done
 4. esp32 `dotclockframebuffer`, `i80bus`, `mipidsi` — done
 5. mimxrt eLCDIF `dotclockframebuffer`, RT1176 `mipidsi`, FlexIO `i80bus` — done
@@ -146,8 +146,8 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
    - **Pending:** RK043 (mimxrt eLCDIF), RT1170 DSI, Pico DVI full panel soak
 10. Lifecycle / soft-reset registry for all host-owning backends — **done**
     ([IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md))
-11. mimxrt i80bus: board-specific micropython-hardware config, optional DMA bulk path — pending
-12. `displaydev`: remove legacy `RGBDisplay` package — done in micropython-hardware
+11. mimxrt i80bus: board-specific pydevices config, optional DMA bulk path — pending
+12. `displaydev`: remove legacy `RGBDisplay` package — done in pydevices
 
 ---
 

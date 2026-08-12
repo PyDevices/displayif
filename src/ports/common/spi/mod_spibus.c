@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Native SPIBus matching micropython-hardware/drivers/bus/spibus.py (keyword-only ctor).
+// Native SPIBus matching pydevices/drivers/bus/spibus.py (keyword-only ctor).
 // Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>

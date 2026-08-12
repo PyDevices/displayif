@@ -41,7 +41,7 @@ CP timing/polarity kwargs are accepted; two are no-ops on this port:
 On **MIMXRT1176**, `mipidsi` drives the SoC MIPI DSI host (NXP `mipi_dsi_split`)
 with an **LCDIFV2** video bridge to the DPI path. Primary hardware target:
 **MIMXRT1170-EVK** + Waveshare 5" DSI on J84 — panel **50H-800480-IPS** with a
-**TC358762** DSI-to-RGB bridge. Panel init is supplied via the micropython-hardware board
+**TC358762** DSI-to-RGB bridge. Panel init is supplied via the pydevices board
 config `init_sequence` bytes.
 
 `Display` optional kwargs match esp32 displayif: `virtual_channel=0` and
@@ -67,7 +67,7 @@ On **MIMXRT1062**, `i80bus` uses the NXP SDK **FlexIO MCULCD** driver in Intel *
   but unused (write-only).
 - **`command`**, **`chip_select`**, and optional **`reset`** are ordinary **GPIO** outputs via `machine.Pin` / `displayif_pin` helpers (any free GPIO).
 - Only **one** `I80Bus` instance per board (single FLEXIO2 peripheral).
-- **IOMUX** for FlexIO pins is applied at construction; see micropython-hardware `teensy41_flexio_ili9341` for an example pin map.
+- **IOMUX** for FlexIO pins is applied at construction; see pydevices `teensy41_flexio_ili9341` for an example pin map.
 
 On **MIMXRT1060-EVK**, the LCDIF RGB pins on `GPIO_B0_04`–`GPIO_B0_11` overlap the typical FlexIO2 data mapping — do not use the RK043 RGB shield pins simultaneously with i80bus. Teensy 4.x boards can wire an external 8080 display to FLEXIO2-capable pads per the schematic.
 
@@ -75,13 +75,13 @@ Default `frequency` is 30 MHz (CP ParallelBus default; byte rate on this port;
 wired here, and on esp32/rp2 — ignored on **samd**). Bulk transfers (≥64 bytes)
 use `FLEXIO_MCULCD_TransferBlocking` with `dataOnly=true`.
 
-Example micropython-hardware config: `busdisplay/i80/teensy41_flexio_ili9341`.
+Example pydevices config: `busdisplay/i80/teensy41_flexio_ili9341`.
 
 ### Stubs
 
 Non-1062 mimxrt boards get stub `dotclockframebuffer`; non-1176 boards get stub `mipidsi`. Stub modules import but raise `NotImplementedError` from the constructor.
 
-## micropython-hardware board configs
+## pydevices board configs
 
 | Config | Module | Hardware |
 |--------|--------|----------|
@@ -91,7 +91,7 @@ Non-1062 mimxrt boards get stub `dotclockframebuffer`; non-1176 boards get stub 
 | `fbdisplay/rgb_matrix_featherwing_teensy41_64x32` | `rgbmatrix` | Teensy 4.1 + FeatherWing |
 | `busdisplay/i80/teensy41_flexio_ili9341` | `i80bus` | Teensy 4.1 + external ILI9341 (FlexIO2) |
 
-CircuitPython board configs for the same hardware live under `micropython-hardware/board_configs/cp/` (use CP native modules, not displayif).
+CircuitPython board configs for the same hardware live under `pydevices/board_configs/cp/` (use CP native modules, not displayif).
 
 On MIMXRT1062 boards, `rgbmatrix` uses the **Protomatter** backend (PIT timer ISR + GPIO set/clear registers). Other mimxrt chips still get `rgbmatrix` with GPIO bitbang `refresh()`; `tile>1` requires Protomatter.
 

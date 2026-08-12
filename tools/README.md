@@ -24,4 +24,4 @@ Hardware / developer smoke scripts. Unit tests live in [`tests/`](../tests/).
 ./micropython/ports/esp32/build-*/micropython displayif/tools/test_dotclockframebuffer_smoke.py
 ```
 
-Do not install micropython-hardware's viper `spibus` in the same firmware as displayif `spibus`.
+Do not install pydevices's viper `spibus` in the same firmware as displayif `spibus`.

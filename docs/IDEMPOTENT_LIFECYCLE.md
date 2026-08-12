@@ -77,7 +77,7 @@ Stubs under `src/ports/common/notimpl/` and ctor-raise stubs stay stubs (no hard
 | `picodvi` | `picodvi` | `src/ports/rp2/mod_picodvi.c` (+ `picodvi_rp2040.*`, `picodvi_rp2350.*`) | FBDisplay |
 | `rgbmatrix` | `rgbmatrix` | `src/ports/common/rgbmatrix/mod_rgbmatrix.c` (+ per-port `rgbmatrix_pm.c`) | FBDisplay |
 
-**Out of scope:** MCU CircuitPython bindings (stock CP display stack); changing micropython-hardware board configs to avoid re-init. Desktop `usdl2` is the CP exception (unix).
+**Out of scope:** MCU CircuitPython bindings (stock CP display stack); changing pydevices board configs to avoid re-init. Desktop `usdl2` is the CP exception (unix).
 
 ---
 

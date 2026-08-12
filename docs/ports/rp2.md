@@ -45,7 +45,7 @@ Uses the **Protomatter** backend (PWM slice 7 wrap IRQ + GPIO set/clr). Pin argu
 
 Stub modules (`dotclockframebuffer`, `mipidsi`) import on all boards but raise `NotImplementedError` from the constructor. **RP2350 has no MIPI DSI host** — use `picodvi` (HSTX/DVI) or SPI/I80 buses instead. CircuitPython `mipidsi` is not available on Pico 2; it targets SoCs like ESP32-P4.
 
-## micropython-hardware board configs
+## pydevices board configs
 
 | Config | Module |
 |--------|--------|

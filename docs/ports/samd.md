@@ -15,7 +15,7 @@ Microchip SAMD display interfaces for MicroPython `samd` port.
 
 ### `i80bus` (GPIO bit-bang)
 
-On **SAMD51**, `i80bus` uses PORT `OUTSET`/`OUTCLR` register writes via the shared `common/i80bus/gpio_bitbang.c` backend (same algorithm as micropython-hardware's viper `I80Bus`). Supports **8 data pins** via `data0` (eight consecutive) or `data_pins` (sequential or LUT layout). ParallelBus kwargs: optional `read` / `reset`, default `frequency` 30 MHz.
+On **SAMD51**, `i80bus` uses PORT `OUTSET`/`OUTCLR` register writes via the shared `common/i80bus/gpio_bitbang.c` backend (same algorithm as pydevices's viper `I80Bus`). Supports **8 data pins** via `data0` (eight consecutive) or `data_pins` (sequential or LUT layout). ParallelBus kwargs: optional `read` / `reset`, default `frequency` 30 MHz.
 
 - No dedicated 8080 peripheral — throughput is lower than esp32-S3, rp2 PIO, or mimxrt FlexIO.
 - `frequency` is accepted for CP signature parity but unused (timing is not cycle-counted yet). **esp32**, **rp2**, and **mimxrt** wire `frequency` into the host.
@@ -34,7 +34,7 @@ make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
 make USER_C_MODULES=../../.. BOARD=ADAFRUIT_FEATHER_M4_EXPRESS
 ```
 
-## micropython-hardware board configs
+## pydevices board configs
 
 | Config | Notes |
 |--------|-------|
