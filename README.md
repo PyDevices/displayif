@@ -69,7 +69,7 @@ To build this module **plus** other usermods on a CMake port, pass a semicolon-s
 
 ```bash
 make BOARD=ESP32_GENERIC_S3 \
-  USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lv_micropython_cmod"
+  USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lvgl-micropython"
 ```
 
 **Desktop SDL (`usdl2`):** builds automatically on MicroPython `unix` / `windows` when this repo is on the `USER_C_MODULES` scan path. Unix needs `libsdl2-dev`. Windows (MinGW) needs an unpacked [SDL2 MinGW development ZIP](https://github.com/libsdl-org/SDL/releases) and `SDL2_DEV` pointing at its root (see [`tools/sdl2_dev_env.sh`](tools/sdl2_dev_env.sh)).

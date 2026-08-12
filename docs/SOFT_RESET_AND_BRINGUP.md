@@ -155,7 +155,7 @@ approach. Do not stack silent fallbacks.
 | Horizontal “sliding” / tearing under load (Qualia 720×720) | PSRAM cannot sustain 16bpp DPI alone | `bounce_buffer_size_px = 20 * h_res` + dirty-row `esp_cache_msync` in native blit/fill/`refresh` |
 | `AttributeError: 'DotClockFramebuffer' object has no attribute 'refresh'` (or `blit`) | Custom `attr` replaces `locals_dict` lookup | Expose methods in `attr` (same pattern as `mipidsi.Display`) |
 | UI ~1–2 FPS / multi‑second full redraws | Python per-pixel / `memoryview` path into SPIRAM FB (MP has no `memoryview.cast`) | Buffer typecode `'B'` + native `blit` / `fill_rect`; `fbdisplay` calls them when present |
-| Illegal instruction / crash inside LVGL draw or early init (not only soft-reset) | `LV_GLOBAL_CUSTOM` not rooted in `MP_STATE_VM(mp_lv_roots)` | `lv_bindings` conf / emit / generated |
+| Illegal instruction / crash inside LVGL draw or early init (not only soft-reset) | `LV_GLOBAL_CUSTOM` not rooted in `MP_STATE_VM(mp_lv_roots)` | `lvgl-bindings` conf / emit / generated |
 | LVGL seconds advance ~½ wall clock | Fixed `tick_inc(period)` vs real elapsed | `lv.tick_inc(elapsed_ms)` from wall time in the timer callback |
 | Crash / corruption if Runtime timer runs during LVGL DisplayDriver setup | Tick into half-initialized LVGL | Stop Runtime timer around setup; arm loop only when ready (`display_driver`) |
 | Touch down never seen / stuck pressed | indev `read_cb` polls but does not always write PRESSED/RELEASED | Always call the touch callback after poll so LVGL sees edges |

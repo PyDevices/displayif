@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // Compile Adafruit Protomatter with its CIRCUITPY arch paths on MicroPython
-// without defining CIRCUITPY for the whole firmware (that breaks lv_bindings
+// without defining CIRCUITPY for the whole firmware (that breaks lvgl-bindings
 // and any other code that treats CIRCUITPY as "we are CircuitPython").
 //
 // Also define DISPLAYIF_RGBMATRIX_USE_PROTOMATTER here so qstr preprocess
