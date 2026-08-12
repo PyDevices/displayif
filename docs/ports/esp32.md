@@ -54,7 +54,7 @@ Behavioral contract (proven on Qualia S3 + TL040HDS20):
 | Fast paths | Native `blit` / `fill_rect` (expose via custom `attr`) |
 | Lifecycle | Idempotent `deinit` / `__del__` / ctor + soft-reset teardown |
 
-See [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md#reference-dotclockframebufferdotclockframebuffer-on-qualia-esp32-s3).
+See [soft-reset-and-bring-up.md](../soft-reset-and-bring-up.md#reference-dotclockframebufferdotclockframebuffer-on-qualia-esp32-s3).
 
 ### `mipidsi` (ESP32-P4 DSI)
 
@@ -79,10 +79,10 @@ are not accepted.
 | Lifecycle | BSS host mirror; `esp_lcd_del_*` + LDO + SPIRAM free on soft-reset |
 | Methods | Custom `attr` exports `refresh` / `blit` / `deinit` / `__del__` |
 
-See [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md) and
-[IDEMPOTENT_LIFECYCLE.md](../IDEMPOTENT_LIFECYCLE.md).
+See [soft-reset-and-bring-up.md](../soft-reset-and-bring-up.md) and
+[idempotent-lifecycle.md](../idempotent-lifecycle.md).
 
-Large framebuffers use **PSRAM** when available — see [PORT_MATRIX.md](../PORT_MATRIX.md#esp32-psram--sdkconfig-large-framebuffers).
+Large framebuffers use **PSRAM** when available — see [port-matrix.md](../port-matrix.md#esp32-psram--sdkconfig-large-framebuffers).
 
 ## Build
 

@@ -2,7 +2,7 @@
 
 **Audience:** Agents and humans changing host-owning displayif backends.  
 **Repo:** [PyDevices/displayif](https://github.com/PyDevices/displayif).
-**Companions:** [AGENTS.md](../AGENTS.md), [PORT_MATRIX.md](PORT_MATRIX.md), [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md), [README.md](../README.md).  
+**Companions:** [AGENTS.md](../AGENTS.md), [port-matrix.md](port-matrix.md), [soft-reset-and-bring-up.md](soft-reset-and-bring-up.md), [README.md](../README.md).
 **Related PyDevices package:** `displaydev` expects idempotent `deinit()` — native modules must match.
 
 **Status (2026-07):** Implemented for all real backends listed below. Soft-reset + reconstruct is the acceptance test. This doc is the **contract and inventory**, not a todo brief.
@@ -31,7 +31,7 @@ OSError: ESP-IDF error 261 (ESP_ERR_NOT_FOUND)
 
 **Cause:** soft reset clears the Python heap; it does **not** release ESP-IDF DSI/DPI interrupt allocations. Without host teardown, a second ctor fails.
 
-**Fix:** `src/ports/esp32/mod_mipidsi.c` mirrors bus/panel/LDO/FB handles in BSS, registers `mipidsi_host_teardown` with `displayif_register_soft_reset()`, and uses the same teardown from `deinit` / `__del__` / idempotent ctors (`esp_lcd_del_*`, LDO release, `heap_caps_free`). See [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md).
+**Fix:** `src/ports/esp32/mod_mipidsi.c` mirrors bus/panel/LDO/FB handles in BSS, registers `mipidsi_host_teardown` with `displayif_register_soft_reset()`, and uses the same teardown from `deinit` / `__del__` / idempotent ctors (`esp_lcd_del_*`, LDO release, `heap_caps_free`). See [soft-reset-and-bring-up.md](soft-reset-and-bring-up.md).
 
 The same class of bug applies to every accelerated bus that owns DMA, IRQs, PIO SMs, FlexIO, eLCDIF, HSTX, RGB panel handles, etc. — including **`dotclockframebuffer.DotClockFramebuffer`** on ESP32-S3 (Qualia).
 
@@ -161,7 +161,7 @@ For **each** real module/port above:
 5. **Import board_config twice across soft reset** — no `ESP_ERR_NOT_FOUND` / interrupt failure (proven on ESP32-P4 `mipidsi` and Qualia `dotclockframebuffer.DotClockFramebuffer`).  
 6. Stubs unchanged (still raise / notimpl).  
 7. No silent “ignore error and continue” that leaves hardware half-initialized.  
-8. Tests: `tests/test_lifecycle_api.py` (import-only); hardware soft-reset smoke documented in `tools/README.md` / [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md).
+8. Tests: `tests/test_lifecycle_api.py` (import-only); hardware soft-reset smoke documented in `tools/README.md` / [soft-reset-and-bring-up.md](soft-reset-and-bring-up.md).
 
 ---
 

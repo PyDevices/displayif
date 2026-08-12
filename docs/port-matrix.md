@@ -2,7 +2,7 @@
 
 Native display **interface** modules for PyDevices `displaydev`. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/` (names from `micropython/ports/`).
 
-**Start here for agents:** [AGENTS.md](../AGENTS.md) → [IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md) → [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md) (soft-reset wraps, symptom table, bring-up methods).
+**Start here for agents:** [AGENTS.md](../AGENTS.md) → [idempotent-lifecycle.md](idempotent-lifecycle.md) → [soft-reset-and-bring-up.md](soft-reset-and-bring-up.md) (soft-reset wraps, symptom table, bring-up methods).
 
 Several `pydevices` MicroPython `board_config.py` files raise `NotImplementedError` until the matching displayif module exists — **that is what this repo builds**.
 
@@ -142,10 +142,10 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 9. **Hardware validation**
    - **Done:** ESP32-P4 `mipidsi` + LVGL soft-reset (`lv_test_timer`); Qualia S3
      `dotclockframebuffer.DotClockFramebuffer` + touch (`lv_test_timer`) — see
-     [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md)
+     [soft-reset-and-bring-up.md](soft-reset-and-bring-up.md)
    - **Pending:** RK043 (mimxrt eLCDIF), RT1170 DSI, Pico DVI full panel soak
 10. Lifecycle / soft-reset registry for all host-owning backends — **done**
-    ([IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md))
+    ([idempotent-lifecycle.md](idempotent-lifecycle.md))
 11. mimxrt i80bus: board-specific pydevices config, optional DMA bulk path — pending
 12. `displaydev`: remove legacy `RGBDisplay` package — done in pydevices
 

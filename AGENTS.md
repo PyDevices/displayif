@@ -7,9 +7,9 @@ interfaces stay on stock CP; only `usdl2` uses `./apply_cp_patches.sh` (unix).
 
 **Before editing lifecycle / soft-reset / a new board bring-up**, read:
 
-1. [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md) — required `deinit` / soft-reset contract (**implemented** for all real backends)
-2. [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) — proven failure modes and methods from **ESP32-P4 `mipidsi`** and **Qualia S3 `dotclockframebuffer.DotClockFramebuffer`** (+ LVGL); applies to other ports/interfaces
-3. [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md) — module/port matrix and pydevices board-config map
+1. [docs/idempotent-lifecycle.md](docs/idempotent-lifecycle.md) — required `deinit` / soft-reset contract (**implemented** for all real backends)
+2. [docs/soft-reset-and-bring-up.md](docs/soft-reset-and-bring-up.md) — proven failure modes and methods from **ESP32-P4 `mipidsi`** and **Qualia S3 `dotclockframebuffer.DotClockFramebuffer`** (+ LVGL); applies to other ports/interfaces
+3. [docs/port-matrix.md](docs/port-matrix.md) — module/port matrix and pydevices board-config map
 
 Those two interfaces are the reference bring-ups: keep their scanout / blit /
 attr / soft-reset patterns when changing siblings.

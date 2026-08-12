@@ -6,14 +6,14 @@ MicroPython board configs in `pydevices` that raise `NotImplementedError` on imp
 
 **CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use `pydevices/board_configs/cp/` with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) is built from this repo via `./apply_cp_patches.sh` + CircuitPython unix.
 
-**Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
+**Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/port-matrix.md](docs/port-matrix.md).
 
-Use this repo when a `pydevices` board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with the matching `USER_C_MODULES` path. If you are debugging a bring-up problem, begin with [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) and the port notes in [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
+Use this repo when a `pydevices` board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with the matching `USER_C_MODULES` path. If you are debugging a bring-up problem, begin with [docs/soft-reset-and-bring-up.md](docs/soft-reset-and-bring-up.md) and the port notes in [docs/port-matrix.md](docs/port-matrix.md).
 
 **Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
-(**implemented**): [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md). Bring-up /
+(**implemented**): [docs/idempotent-lifecycle.md](docs/idempotent-lifecycle.md). Bring-up /
 failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
-[docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md).
+[docs/soft-reset-and-bring-up.md](docs/soft-reset-and-bring-up.md).
 
 ## Native modules
 
@@ -35,7 +35,7 @@ Parallel dot-clock RGB uses **`dotclockframebuffer.DotClockFramebuffer`** (same 
 
 ## ESP32 large framebuffers
 
-RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_SPIRAM` is enabled and sized in your board `sdkconfig` before building — see [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md#esp32-psram--sdkconfig-large-framebuffers).
+RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_SPIRAM` is enabled and sized in your board `sdkconfig` before building — see [docs/port-matrix.md](docs/port-matrix.md#esp32-psram--sdkconfig-large-framebuffers).
 
 ## 🚀 Build
 
@@ -86,7 +86,7 @@ See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way 
 
 ## Related
 
-- [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md) — port matrix, hardware validation, RP2350 DSI notes
+- [docs/port-matrix.md](docs/port-matrix.md) — port matrix, hardware validation, RP2350 DSI notes
 - [docs/ports/esp32.md](docs/ports/esp32.md) — Qualia DotClock + P4 mipidsi behavioral notes
 - [PyDevices/pydevices](https://github.com/PyDevices/pydevices) — canonical drivers and board configs
 - [PyDevices/pydevices-examples](https://github.com/PyDevices/pydevices-examples) — examples and gallery

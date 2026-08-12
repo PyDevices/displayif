@@ -5,8 +5,8 @@ under mpftp soft-reset (July 2026).
 
 Patterns apply when porting **any** displayif interface on **any** MCU port
 (esp32 / rp2 / mimxrt / samd). Lifecycle contract:
-[IDEMPOTENT_LIFECYCLE.md](IDEMPOTENT_LIFECYCLE.md). Matrix:
-[PORT_MATRIX.md](PORT_MATRIX.md). Entry: [AGENTS.md](../AGENTS.md).
+[idempotent-lifecycle.md](idempotent-lifecycle.md). Matrix:
+[port-matrix.md](port-matrix.md). Entry: [AGENTS.md](../AGENTS.md).
 
 ### Board matrix (this chat / July 2026)
 

@@ -12,7 +12,7 @@
 #include <string.h>
 
 /* Lifecycle: idempotent SDL_Quit + timer free via soft-reset registry
- * (see displayif/docs/IDEMPOTENT_LIFECYCLE.md). BSS survives soft reset. */
+ * (see displayif/docs/idempotent-lifecycle.md). BSS survives soft reset. */
 static bool s_soft_reset_registered;
 static bool s_sdl_inited;
 

@@ -7,8 +7,8 @@
 // Reference board: ESP32-P4-WIFI6-Touch-LCD-4B + LVGL.
 //
 // Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown
-// (see src/include/displayif/soft_reset.h, docs/IDEMPOTENT_LIFECYCLE.md,
-// docs/SOFT_RESET_AND_BRINGUP.md).
+// (see src/include/displayif/soft_reset.h, docs/idempotent-lifecycle.md,
+// docs/soft-reset-and-bring-up.md).
 
 #include <string.h>
 #include <stdlib.h>

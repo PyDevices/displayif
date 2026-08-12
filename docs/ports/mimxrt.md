@@ -24,7 +24,7 @@ shield (J49). Requires CircuitPython-style `red`/`green`/`blue` (5/6/5) pin
 tuples; EVK IOMUX is fixed to LCDIF D0..D15 in B0..B4, G0..G5, R0..R4 order.
 
 Lifecycle: idempotent `deinit` / `__del__` / ctor + soft-reset teardown (stops
-eLCDIF; see [IDEMPOTENT_LIFECYCLE.md](../IDEMPOTENT_LIFECYCLE.md)). For the
+eLCDIF; see [idempotent-lifecycle.md](../idempotent-lifecycle.md)). For the
 proven ESP32 continuous-scanout / bounce-buffer / native-blit contract (Qualia),
 see [esp32.md](esp32.md) — match those Python-facing
 behaviors when extending this backend.
@@ -53,7 +53,7 @@ are not accepted.
 
 Lifecycle: wires `displayif_mimxrt1176_dsi_*_deinit/stop` into the shared
 soft-reset registry. ESP32-P4 `mipidsi` is the soft-reset + blit reference —
-see [SOFT_RESET_AND_BRINGUP.md](../SOFT_RESET_AND_BRINGUP.md).
+see [soft-reset-and-bring-up.md](../soft-reset-and-bring-up.md).
 
 ### `i80bus` (FlexIO MCULCD)
 

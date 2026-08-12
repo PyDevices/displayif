@@ -17,8 +17,8 @@
 //
 // Buffer typecode 'B', native blit/fill_rect. Reference: Qualia S3 + TL040HDS20.
 // Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown
-// (see src/include/displayif/soft_reset.h, docs/IDEMPOTENT_LIFECYCLE.md,
-// docs/SOFT_RESET_AND_BRINGUP.md).
+// (see src/include/displayif/soft_reset.h, docs/idempotent-lifecycle.md,
+// docs/soft-reset-and-bring-up.md).
 
 #include <string.h>
 #include <stdlib.h>
