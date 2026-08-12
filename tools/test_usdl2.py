@@ -10,7 +10,7 @@ assert usdl2.SDL_HINT_ORIENTATIONS == "SDL_IOS_ORIENTATIONS"
 assert callable(usdl2.SDL_SetHint)
 assert usdl2.SDL_Init(usdl2.SDL_INIT_VIDEO) == 0
 
-# Joystick subsystem API (parity with pydisplay sdldisplay PR #37)
+# Joystick subsystem API (parity with the original displaydev SDL implementation)
 assert usdl2.SDL_InitSubSystem(usdl2.SDL_INIT_JOYSTICK) == 0
 assert isinstance(usdl2.SDL_NumJoysticks(), int)
 
@@ -97,7 +97,7 @@ wrapped = usdl2.SDL_Event(btn_evt)
 assert wrapped.jbutton.button == 7
 assert usdl2.SDL_Event(btn_evt) is btn_evt
 
-# Timer API (multimer / pydisplay)
+# Timer API (multimer / displaydev)
 assert usdl2.SDL_INIT_TIMER == 0x00000001
 assert usdl2.SDL_Init(usdl2.SDL_INIT_TIMER) == 0
 assert usdl2.SDL_InitSubSystem(usdl2.SDL_INIT_TIMER) == 0

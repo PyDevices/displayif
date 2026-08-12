@@ -5,7 +5,7 @@
   <script>try{if(localStorage.getItem('pydevices-theme')==='light'){document.documentElement.setAttribute('data-theme','light');}}catch(e){}</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>displayif — PyDevices</title>
-  <meta name="description" content="Native display bus and framebuffer modules for MicroPython — SPI, I80, RGB, MIPI DSI, PicoDVI, and RGB matrix under pydisplay.">
+  <meta name="description" content="Native display bus and framebuffer modules for the PyDevices displaydev stack on MicroPython.">
   <link rel="icon" type="image/svg+xml" href="https://pydevices.github.io/assets/img/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,8 +23,8 @@
       </div>
       <h1>displayif</h1>
     </div>
-    <p>Native display-bus and framebuffer modules for MicroPython. Portable code lives in <code>src/ports/common/</code>; SoC-specific paths under <code>src/ports/&lt;mp-port&gt;/</code>. pydisplay board configs that raise <code>NotImplementedError</code> need firmware built with the matching module — natives register directly, with no Python re-export layer in this repo.</p>
-    <p>CircuitPython has its own display stack (<code>dotclockframebuffer</code>, <code>mipidsi</code>, <code>picodvi</code>, …). This repo does not ship CP bindings — use pydisplay <code>cp_*</code> board configs with CP firmware.</p>
+    <p>Native display-bus and framebuffer modules for MicroPython. Portable code lives in <code>src/ports/common/</code>; SoC-specific paths under <code>src/ports/&lt;mp-port&gt;/</code>. MicroPython board configs in <code>micropython-hardware</code> that raise <code>NotImplementedError</code> need firmware built with the matching module — natives register directly, with no Python re-export layer in this repo.</p>
+    <p>CircuitPython has its own display stack (<code>dotclockframebuffer</code>, <code>mipidsi</code>, <code>picodvi</code>, …). This repo does not ship CP bindings — use <code>micropython-hardware/board_configs/cp/</code> with CP firmware.</p>
     <div class="cta">
       <a class="btn primary" href="https://github.com/PyDevices/displayif">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.9a3.4 3.4 0 0 0-1-2.6c3-.3 6-1.5 6-6.5a5 5 0 0 0-1.4-3.5 4.6 4.6 0 0 0-.1-3.5s-1.1-.3-3.5 1.3a12 12 0 0 0-6 0C6.6 1.7 5.5 2 5.5 2a4.6 4.6 0 0 0-.1 3.5A5 5 0 0 0 4 9c0 5 3 6.2 6 6.5a3.4 3.4 0 0 0-1 2.6V22"/></svg>
@@ -42,7 +42,7 @@
     <div class="grid">
       <div class="card">
         <h3>BusDisplay</h3>
-        <p><code>spibus</code> / <code>i2cbus</code> (common) — SPI and I²C panel buses for pydisplay BusDisplay.</p>
+        <p><code>spibus</code> / <code>i2cbus</code> (common) — SPI and I²C panel buses for <code>displaydev.BusDisplay</code>.</p>
       </div>
       <div class="card">
         <h3>FBDisplay</h3>
@@ -98,6 +98,7 @@ make USER_C_MODULES=../../.. \
     </div>
     <ul class="linklist">
       <li><a href="https://github.com/PyDevices/cmods"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>cmods — easier multi-module MicroPython builds</a></li>
+      <li><a href="https://pydevices.github.io/micropython-hardware/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>micropython-hardware — canonical drivers and board configs</a></li>
       <li><a href="https://pydevices.github.io/pydisplay/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>pydisplay</a></li>
       <li><a href="https://pydevices.github.io/pygraphics/"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>pygraphics — native FrameBuffer / Area</a></li>
     </ul>

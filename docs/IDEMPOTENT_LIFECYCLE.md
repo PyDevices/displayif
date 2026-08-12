@@ -3,7 +3,7 @@
 **Audience:** Agents and humans changing host-owning displayif backends.  
 **Repo:** [PyDevices/displayif](https://github.com/PyDevices/displayif).
 **Companions:** [AGENTS.md](../AGENTS.md), [PORT_MATRIX.md](PORT_MATRIX.md), [SOFT_RESET_AND_BRINGUP.md](SOFT_RESET_AND_BRINGUP.md), [README.md](../README.md).  
-**Related pydisplay:** `displaydev` expects idempotent `deinit()` — native modules must match.
+**Related PyDevices package:** `displaydev` expects idempotent `deinit()` — native modules must match.
 
 **Status (2026-07):** Implemented for all real backends listed below. Soft-reset + reconstruct is the acceptance test. This doc is the **contract and inventory**, not a todo brief.
 
@@ -66,7 +66,7 @@ Each module that owns host resources registers a **soft-reset teardown hook** th
 
 Stubs under `src/ports/common/notimpl/` and ctor-raise stubs stay stubs (no hardware to free).
 
-| Module | Python import | Real implementations | pydisplay backend |
+| Module | Python import | Real implementations | `displaydev` backend |
 |--------|---------------|----------------------|-------------------|
 | `spibus` | `spibus` | `src/ports/common/spi/mod_spibus.c` | BusDisplay |
 | `i2cbus` | `i2cbus` | `src/ports/common/i2c/mod_i2cbus.c` | BusDisplay |
@@ -77,7 +77,7 @@ Stubs under `src/ports/common/notimpl/` and ctor-raise stubs stay stubs (no hard
 | `picodvi` | `picodvi` | `src/ports/rp2/mod_picodvi.c` (+ `picodvi_rp2040.*`, `picodvi_rp2350.*`) | FBDisplay |
 | `rgbmatrix` | `rgbmatrix` | `src/ports/common/rgbmatrix/mod_rgbmatrix.c` (+ per-port `rgbmatrix_pm.c`) | FBDisplay |
 
-**Out of scope:** MCU CircuitPython bindings (stock CP display stack); changing pydisplay board_configs to avoid re-init. Desktop `usdl2` is the CP exception (unix).
+**Out of scope:** MCU CircuitPython bindings (stock CP display stack); changing micropython-hardware board configs to avoid re-init. Desktop `usdl2` is the CP exception (unix).
 
 ---
 
@@ -197,5 +197,5 @@ Build via sibling MicroPython + `USER_C_MODULES` (see README). See the [cmods wo
 ## Non-goals
 
 - Making display drivers “reentrant” for nested IRQ callbacks.  
-- Changing LVGL / pydisplay app logic except where a tiny `display.deinit()` call helps symmetry (prefer native soft-reset so apps need not change).  
+- Changing LVGL / application logic except where a tiny `display.deinit()` call helps symmetry (prefer native soft-reset so apps need not change).
 - Supporting concurrent two displays on one DSI/RGB host unless hardware truly allows it — singleton-per-unit is fine.

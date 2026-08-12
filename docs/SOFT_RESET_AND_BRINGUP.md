@@ -1,6 +1,6 @@
 # Soft-reset & board bring-up — agent notes
 
-Lessons from hardware bring-ups with pydisplay + LVGL (`lv_test_timer`)
+Lessons from hardware bring-ups with PyDevices `displaydev` + LVGL (`lv_test_timer`)
 under mpftp soft-reset (July 2026).
 
 Patterns apply when porting **any** displayif interface on **any** MCU port
@@ -10,7 +10,7 @@ Patterns apply when porting **any** displayif interface on **any** MCU port
 
 ### Board matrix (this chat / July 2026)
 
-| Interface | Board (pydisplay `fbdisplay/…`) | Panel | Notes |
+| Interface | Board (`micropython-hardware/board_configs/fbdisplay/…`) | Panel | Notes |
 |-----------|----------------------------------|-------|-------|
 | `mipidsi` | `esp32-p4-wifi6-touch-lcd-4b` | MIPI DSI | Soft-reset / timer lifecycle reference |
 | `DotClockFramebuffer` | `qualia_tl040hds20` (+ CP `cp_qualia_tl040hds20`) | 720×720 RGB-666→565 | First MP DotClock bring-up; bounce + double-FB |
@@ -91,7 +91,7 @@ Use this loop on a new board / interface instead of guessing from one symptom.
 ### 2. Prefer fast package install over serial spam
 
 - Push only thin host-side files with mpftp (`wifi.py`, `secrets.py`).
-- Use **`mip.install` over Wi‑Fi** for pydisplay board packages / libs — much
+- Use **`mip.install` over Wi‑Fi** for micropython-hardware board packages / libs — much
   faster than recursive mpftp/mpremote for large trees.
 - Soft-reset between major FS changes so imports see a clean heap.
 
@@ -225,7 +225,7 @@ When adding or porting a backend that owns host resources:
       implement the strong hook for that port
 7. [ ] Large framebuffers: PSRAM / sdkconfig sized (see PORT_MATRIX); prefer native
       blit paths into SPIRAM
-8. [ ] pydisplay board_config: touch axes, backlight, `FBDisplay` refresh wiring
+8. [ ] micropython-hardware board_config: touch axes, backlight, `FBDisplay` refresh wiring
 9. [ ] If custom `attr` is set: export `refresh` / `blit` / `fill_rect` /
       `deinit` / `__del__` there (locals_dict alone is skipped)
 10. [ ] Dot-clock RGB: continuous scanout + panel FB (not malloc + on-demand);
@@ -236,14 +236,14 @@ Stubs under `src/ports/common/notimpl/` stay stubs — no soft-reset registratio
 
 ---
 
-## pydisplay / LVGL interaction (outside this repo)
+## PyDevices / LVGL interaction (outside this repo)
 
 These are not displayif bugs but show up during the same bring-up:
 
 - **`eventsys.Runtime` + `multimer`:** one shared periodic timer; LVGL claims
   presentation via `runtime.claim_display_refresh()` / `display_driver`.
 - **Interactive REPL / mpftp:** `run_forever` / select paths must not assume a
-  non-interactive process (see pydisplay `eventsys` / `multimer`).
+  non-interactive process (see `eventsys` / `multimer` in micropython-hardware).
 - **Do not leave flash logging** in `display_driver`, examples, or board_config
   on the touch/refresh path.
 

@@ -753,7 +753,7 @@ typedef struct usdl2_timer_entry {
     Uint32 last_interval;
     uint8_t slot;
     // Set while a dispatch is queued/running so SDL ticks coalesce instead of
-    // flooding MICROPY_SCHEDULER_DEPTH (see pydisplay SDL timer queue full).
+    // flooding MICROPY_SCHEDULER_DEPTH (see displaydev SDL timer queue full).
     volatile uint8_t pending;
 } usdl2_timer_entry_t;
 
@@ -1341,7 +1341,7 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(SDL_GetDesktopDisplayMode_fun_obj, 1, 2, SDL
 
 #if !CIRCUITPY
 
-//| """Desktop SDL2 subset for pydisplay (linked against libSDL2)."""
+//| """Desktop SDL2 subset for PyDevices displaydev (linked against libSDL2)."""
 
 static const mp_rom_map_elem_t usdl2_module_globals_table[] = {
 #include "usdl2_module_globals.inc"

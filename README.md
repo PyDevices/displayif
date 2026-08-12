@@ -1,14 +1,14 @@
 # displayif
 
-Native display **interface** modules for pydisplay. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/`.
+Native display **interface** modules for PyDevices `displaydev`. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/`.
 
-pydisplay MP board configs that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
+MicroPython board configs in `micropython-hardware` that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
 
-**CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use pydisplay `cp_*` board configs with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) is built from this repo via `./apply_cp_patches.sh` + CircuitPython unix.
+**CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use `micropython-hardware/board_configs/cp/` with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) is built from this repo via `./apply_cp_patches.sh` + CircuitPython unix.
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
 
-Use this repo when a pydisplay board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with the matching `USER_C_MODULES` path. If you are debugging a bring-up problem, begin with [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) and the port notes in [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
+Use this repo when a `micropython-hardware` board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with the matching `USER_C_MODULES` path. If you are debugging a bring-up problem, begin with [docs/SOFT_RESET_AND_BRINGUP.md](docs/SOFT_RESET_AND_BRINGUP.md) and the port notes in [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md).
 
 **Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
 (**implemented**): [docs/IDEMPOTENT_LIFECYCLE.md](docs/IDEMPOTENT_LIFECYCLE.md). Bring-up /
@@ -18,7 +18,7 @@ failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
 ## Native modules
 
 
-| Module              | Port tree                                                                                       | pydisplay backend |
+| Module              | Port tree                                                                                       | `displaydev` backend |
 | ------------------- | ----------------------------------------------------------------------------------------------- | ----------------- |
 | `spibus` / `i2cbus` | `common`                                                                                        | **BusDisplay**    |
 | `dotclockframebuffer` | `esp32` (RGB LCD), `mimxrt` (1062 eLCDIF)                                              | **FBDisplay**     |
@@ -88,5 +88,5 @@ See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way 
 
 - [docs/PORT_MATRIX.md](docs/PORT_MATRIX.md) — port matrix, hardware validation, RP2350 DSI notes
 - [docs/ports/esp32.md](docs/ports/esp32.md) — Qualia DotClock + P4 mipidsi behavioral notes
-- [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay)
-
+- [PyDevices/micropython-hardware](https://github.com/PyDevices/micropython-hardware) — canonical drivers and board configs
+- [PyDevices/pydisplay](https://github.com/PyDevices/pydisplay) — examples and gallery

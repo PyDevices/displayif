@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// pydisplay-compatible I2C display bus (SSD1306-class OLED controllers).
+// displaydev-compatible I2C display bus (SSD1306-class OLED controllers).
 // Lifecycle: idempotent deinit/__del__ (I2C bus is Python-owned).
 
 #include <string.h>

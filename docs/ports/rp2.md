@@ -4,7 +4,7 @@ Raspberry Pi RP2040/RP2350 display interfaces for MicroPython `rp2` port.
 
 ## Native modules
 
-| Source | Python import | SoC | pydisplay backend |
+| Source | Python import | SoC | `displaydev` backend |
 |--------|---------------|-----|-------------------|
 | `src/ports/common/spi/mod_spibus.c` | `spibus.SPIBus` | RP2040 / RP2350 | **BusDisplay** |
 | `src/ports/common/i2c/mod_i2cbus.c` | `i2cbus.I2CBus` | RP2040 / RP2350 | **BusDisplay** |
@@ -45,7 +45,7 @@ Uses the **Protomatter** backend (PWM slice 7 wrap IRQ + GPIO set/clr). Pin argu
 
 Stub modules (`dotclockframebuffer`, `mipidsi`) import on all boards but raise `NotImplementedError` from the constructor. **RP2350 has no MIPI DSI host** — use `picodvi` (HSTX/DVI) or SPI/I80 buses instead. CircuitPython `mipidsi` is not available on Pico 2; it targets SoCs like ESP32-P4.
 
-## pydisplay board configs
+## micropython-hardware board configs
 
 | Config | Module |
 |--------|--------|

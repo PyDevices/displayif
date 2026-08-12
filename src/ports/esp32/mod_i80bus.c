@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Intel 8080 parallel display bus for ESP32-S3 (pydisplay i80bus contract).
+// Intel 8080 parallel display bus for ESP32-S3 (PyDevices i80bus contract).
 // Lifecycle: idempotent deinit/__del__/ctor + soft-reset teardown (see soft_reset.h).
 
 #include <string.h>

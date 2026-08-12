@@ -4,7 +4,7 @@ ESP-IDF display interfaces for MicroPython `esp32` port / CircuitPython `espress
 
 ## Native modules
 
-| C source | Python import | SoC | pydisplay backend |
+| C source | Python import | SoC | `displaydev` backend |
 |----------|---------------|-----|-------------------|
 | `mod_dotclockframebuffer.c` | `dotclockframebuffer.DotClockFramebuffer` | RGB LCD (`SOC_LCD_RGB_SUPPORTED`) | **FBDisplay** |
 | `mod_i80bus.c` | `i80bus.I80Bus` | S3 (`SOC_LCD_I80_SUPPORTED`) | bus driver |

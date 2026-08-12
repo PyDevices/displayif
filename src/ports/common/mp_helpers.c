@@ -12,7 +12,7 @@ bool displayif_obj_is_pin(mp_obj_t obj) {
 }
 
 bool displayif_pin_spec_unset(mp_obj_t pin_spec) {
-    // Match pydisplay sentinels: omitted / None / -1 mean "no pin".
+    // Match PyDevices sentinels: omitted / None / -1 mean "no pin".
     if (pin_spec == MP_OBJ_NULL || pin_spec == mp_const_none) {
         return true;
     }
@@ -119,7 +119,7 @@ static mp_obj_t displayif_call_pos_kwdict(mp_obj_t fun, size_t n_pos, const mp_o
 }
 
 mp_obj_t displayif_machine_pin_cfg(mp_obj_t pin_spec, mp_int_t mode, mp_int_t value) {
-    // Match pydisplay: Pin(id|name|Pin, mode, value=value)
+    // Match PyDevices: Pin(id|name|Pin, mode, value=value)
     // mimxrt accepts board names ("D9") and Pin.board.* objects; esp/rp2 use ints.
     if (displayif_pin_spec_unset(pin_spec)) {
         mp_raise_ValueError(MP_ERROR_TEXT("pin must be specified"));
@@ -135,12 +135,12 @@ mp_obj_t displayif_machine_pin_cfg(mp_obj_t pin_spec, mp_int_t mode, mp_int_t va
 }
 
 mp_obj_t displayif_machine_pin(mp_int_t pin_id, mp_int_t mode, mp_int_t value) {
-    // Match pydisplay: Pin(id, mode, value=value)
+    // Match PyDevices: Pin(id, mode, value=value)
     return displayif_machine_pin_cfg(mp_obj_new_int(pin_id), mode, value);
 }
 
 mp_obj_t displayif_machine_spi(mp_obj_t kwargs) {
-    // Match pydisplay SPIBus: SPI(id, baudrate=..., sck=..., ...)
+    // Match PyDevices SPIBus: SPI(id, baudrate=..., sck=..., ...)
     mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
     mp_obj_t spi_type = mp_load_attr(machine_mod, MP_QSTR_SPI);
     mp_map_elem_t *elem = mp_map_lookup(mp_obj_dict_get_map(kwargs), MP_OBJ_NEW_QSTR(MP_QSTR_id), MP_MAP_LOOKUP);
@@ -152,7 +152,7 @@ mp_obj_t displayif_machine_spi(mp_obj_t kwargs) {
 }
 
 mp_obj_t displayif_machine_softspi(mp_obj_t kwargs) {
-    // Match pydisplay: SoftSPI(baudrate=..., sck=..., mosi=..., ...) — no bus id.
+    // Match PyDevices: SoftSPI(baudrate=..., sck=..., mosi=..., ...) — no bus id.
     mp_obj_t machine_mod = mp_import_name(MP_QSTR_machine, DISPLAYIF_EMPTY_DICT, MP_OBJ_NULL);
     mp_obj_t softspi_type = mp_load_attr(machine_mod, MP_QSTR_SoftSPI);
     return displayif_call_pos_kwdict(softspi_type, 0, NULL, kwargs);

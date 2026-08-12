@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// MIPI DSI host for ESP32-P4 (ESP-IDF esp_lcd DSI + DPI; FBDisplay / pydisplay).
+// MIPI DSI host for ESP32-P4 (ESP-IDF esp_lcd DSI + DPI; displaydev.FBDisplay).
 //
 // Bus + Display with SPIRAM framebuffer, native blit (Python row slices WDT),
 // buffer typecode 'B', custom attr for methods. Soft-reset must del DSI bus /

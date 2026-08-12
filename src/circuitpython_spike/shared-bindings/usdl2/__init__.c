@@ -7,7 +7,7 @@
 #include "py/runtime.h"
 #include "usdl2.h"
 
-//| """Unix-only SDL2 subset for pydisplay (linked against libSDL2)."""
+//| """Unix-only SDL2 subset for PyDevices displaydev (linked against libSDL2)."""
 
 static const mp_rom_map_elem_t usdl2_module_globals_table[] = {
 #include "usdl2_module_globals.inc"
