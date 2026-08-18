@@ -1,14 +1,15 @@
-# Soft-reset & board bring-up — agent notes
+# Soft-reset and board bring-up
 
-Lessons from hardware bring-ups with PyDevices `displaydev` + LVGL (`lv_test_timer`)
-under mpftp soft-reset (July 2026).
+Why an interface that works on first boot can fail after a soft reset, and how to
+make it survive one. Drawn from hardware bring-ups with PyDevices `displaydev`
+plus LVGL, exercised through `mpftp`'s soft reset.
 
-Patterns apply when porting **any** displayif interface on **any** MCU port
+These patterns apply when porting **any** displayif interface on **any** MCU port
 (esp32 / rp2 / mimxrt / samd). Lifecycle contract:
 [idempotent-lifecycle.md](idempotent-lifecycle.md). Matrix:
 [port-matrix.md](port-matrix.md). Entry: [AGENTS.md](../AGENTS.md).
 
-### Board matrix (this chat / July 2026)
+### Boards these patterns were verified on
 
 | Interface | Board (`pydevices/board_configs/fbdisplay/…`) | Panel | Notes |
 |-----------|----------------------------------|-------|-------|
