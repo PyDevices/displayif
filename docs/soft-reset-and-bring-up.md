@@ -241,10 +241,10 @@ Stubs under `src/ports/common/notimpl/` stay stubs — no soft-reset registratio
 
 These are not displayif bugs but show up during the same bring-up:
 
-- **`eventsys.Runtime` + `multimer`:** one shared periodic timer; LVGL claims
+- **`appdev.App` + `multimer`:** one shared periodic timer; LVGL claims
   presentation via `runtime.claim_display_refresh()` / `display_driver`.
 - **Interactive REPL / mpftp:** `run_forever` / select paths must not assume a
-  non-interactive process (see `eventsys` / `multimer` in pydevices).
+  non-interactive process (see `appdev` / `multimer` in pydevices).
 - **Do not leave flash logging** in `display_driver`, examples, or board_config
   on the touch/refresh path.
 
