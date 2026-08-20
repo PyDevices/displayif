@@ -158,13 +158,13 @@ approach. Do not stack silent fallbacks.
 | UI ~1–2 FPS / multi‑second full redraws | Python per-pixel / `memoryview` path into SPIRAM FB (MP has no `memoryview.cast`) | Buffer typecode `'B'` + native `blit` / `fill_rect`; `fbdisplay` calls them when present |
 | Illegal instruction / crash inside LVGL draw or early init (not only soft-reset) | `LV_GLOBAL_CUSTOM` not rooted in `MP_STATE_VM(mp_lv_roots)` | `lvgl-bindings` conf / emit / generated |
 | LVGL seconds advance ~½ wall clock | Fixed `tick_inc(period)` vs real elapsed | `lv.tick_inc(elapsed_ms)` from wall time in the timer callback |
-| Crash / corruption if Runtime timer runs during LVGL DisplayDriver setup | Tick into half-initialized LVGL | Stop Runtime timer around setup; arm loop only when ready (`display_driver`) |
+| Crash / corruption if the app timer runs during LVGL DisplayDriver setup | Tick into half-initialized LVGL | Stop the app timer around setup; arm loop only when ready (`display_driver`) |
 | Touch down never seen / stuck pressed | indev `read_cb` polls but does not always write PRESSED/RELEASED | Always call the touch callback after poll so LVGL sees edges |
 | Touch mirrored / inverted | GT911 (or similar) axis flags wrong for panel orientation | `board_config` `reverse_axis` / `reverse_y` (validate by tapping known UI targets) |
 | Flicker only while “debugging” | Flash writes from agent NDJSON / probe files on the hot path | Delete instrumentation; keep functional fixes |
 | Faint flicker / black with one edge while UI animates (DotClock + LVGL) | Painting the **live** bounce-source FB mid-scan (single panel FB); or full-frame / per-blit msync fighting bounce on SPI0 | Keep bounce; **double panel FBs** + `refresh()`/`show()` present; skip FB msync when bounce on; `auto_refresh=False`. Do **not** “fix” by dropping bounce |
 | Black / white panel but FB memory has color (DotClock) | Double-FB: paint hit back buffer; panel still scanning front; no `show()`/`refresh()` | Call `display_drv.show()` after paint; LVGL must use `refresh_cb=show` (`display_driver`) |
-| LVGL seconds stuck at 0 after `import display_driver` then `import lv_test_timer` | `lv_test_timer` top-level `runtime.stop_timer()` wipes `on_tick` subs; `event_loop._timer_sub` left dangling so `_arm_sync_timer` no-ops | Only `stop_timer` before first `display_driver` import; `_arm_sync_timer` must re-arm if `runtime._timer` is gone |
+| LVGL seconds stuck at 0 after `import display_driver` then `import lv_test_timer` | `lv_test_timer` top-level `app.stop_timer()` wipes `on_tick` subs; `event_loop._timer_sub` left dangling so `_arm_sync_timer` no-ops | Only `stop_timer` before first `display_driver` import; `_arm_sync_timer` must re-arm if `app._timer` is gone |
 
 ---
 
@@ -242,8 +242,8 @@ Stubs under `src/ports/common/notimpl/` stay stubs — no soft-reset registratio
 These are not displayif bugs but show up during the same bring-up:
 
 - **`appdev.App` + `multimer`:** one shared periodic timer; LVGL claims
-  presentation via `runtime.claim_display_refresh()` / `display_driver`.
-- **Interactive REPL / mpftp:** `run_forever` / select paths must not assume a
+  presentation via `app.pause_refresh()` / `display_driver`.
+- **Interactive REPL / mpftp:** `app.run()` / select paths must not assume a
   non-interactive process (see `appdev` / `multimer` in pydevices).
 - **Do not leave flash logging** in `display_driver`, examples, or board_config
   on the touch/refresh path.
