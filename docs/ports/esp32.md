@@ -74,10 +74,19 @@ are not accepted.
 | Topic | Behavior |
 |-------|----------|
 | `refresh()` | Full-FB `esp_cache_msync` + `esp_lcd_panel_draw_bitmap` |
+| `refresh_rect(x, y, w, h)` | Dirty-row msync **+ banded `draw_bitmap` of those rows**. Widened to full rows: `row_stride == width * 2`, so a band is contiguous and needs no staging copy |
+| Scanout | **On-demand, not continuous.** Every frame needs a `draw_bitmap`; the DPI engine does not keep re-reading the buffer. Contrast `DotClockFramebuffer`, which *is* continuous DMA — see below |
 | Fast path | Native `Display.blit` + dirty-row msync (Python row slices WDT) |
 | Buffer protocol | typecode `'B'` |
 | Lifecycle | BSS host mirror; `esp_lcd_del_*` + LDO + SPIRAM free on soft-reset |
 | Methods | Custom `attr` exports `refresh` / `blit` / `deinit` / `__del__` |
+
+> **Do not copy `DotClockFramebuffer`'s continuous-DMA scanout model here.**
+> A cache sync alone does not present on DSI. `refresh_rect` once synced the
+> cache only, on the assumption the DPI engine kept scanning the framebuffer;
+> it does not, so a GUI rendering straight into the shared framebuffer painted
+> one frame and then froze. Verified on a 720x720 P4 panel: a UI stuck on its
+> first frame animated as soon as a `draw_bitmap` ran per frame.
 
 See [soft-reset-and-bring-up.md](../soft-reset-and-bring-up.md) and
 [idempotent-lifecycle.md](../idempotent-lifecycle.md).

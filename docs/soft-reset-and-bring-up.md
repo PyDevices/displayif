@@ -177,6 +177,11 @@ CP sibling: `fbdisplay/cp_qualia_tl040hds20`. Native:
 
 ### Scanout model (MP LVGL vs CircuitPython)
 
+> Scope: this section describes **`DotClockFramebuffer`** (RGB LCD). The
+> **`mipidsi`** DSI panel is the opposite — on-demand, so every frame needs a
+> `draw_bitmap` and a cache sync alone never reaches the panel. Check which
+> model a backend uses before reusing any of the patterns below.
+
 - **Continuous DMA** (`refresh_on_demand = 0`), not on-demand draw_bitmap of a
   separate malloc buffer.
 - Use the **panel’s own framebuffers** (`esp_lcd_rgb_panel_get_frame_buffer`);
