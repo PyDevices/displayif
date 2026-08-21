@@ -429,9 +429,19 @@ static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_refresh_obj, mipidsi_display_refresh);
 
-/* Cache-sync only the rows LVGL changed.  The DPI engine continuously scans
- * self->buf, so it does not need esp_lcd_panel_draw_bitmap() to be resubmitted
- * after the initial setup. */
+/* Present the rows LVGL changed: cache-sync them, then submit that row band.
+ *
+ * An earlier version synced the cache only, assuming the DPI engine keeps
+ * scanning self->buf on its own.  It does not on this panel -- without a
+ * draw_bitmap the framebuffer is sampled once and never again, so a GUI
+ * rendering straight into the shared framebuffer froze on whatever frame
+ * happened to be present when something last called refresh().  Verified on an
+ * ESP32-P4 720x720 DSI panel: a UI stuck on its first frame animated smoothly
+ * as soon as show() was called per frame.
+ *
+ * Rows are packed (row_stride == width * 2), so the dirty band is contiguous
+ * and can be handed to the panel without a staging copy.  Only the changed
+ * rows are submitted, which is what makes this cheaper than a full refresh. */
 static mp_obj_t mipidsi_display_refresh_rect(size_t n_args, const mp_obj_t *args) {
     (void)n_args;
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(args[0]);
@@ -446,6 +456,11 @@ static mp_obj_t mipidsi_display_refresh_rect(size_t n_args, const mp_obj_t *args
         mp_raise_ValueError(MP_ERROR_TEXT("refresh rect out of range"));
     }
     mipidsi_msync_rows(self, y, h);
+    /* x/w are widened to the full row: the band stays contiguous either way,
+     * and partial-width source rows are not a layout esp_lcd accepts. */
+    mipidsi_raise_esp_err(esp_lcd_panel_draw_bitmap(
+        self->panel, 0, y, self->width, y + h,
+        self->buf + (size_t)y * self->row_stride));
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_display_refresh_rect_obj, 5, 5, mipidsi_display_refresh_rect);
