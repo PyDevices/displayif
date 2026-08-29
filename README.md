@@ -1,5 +1,7 @@
 # displayif
 
+**Status:** source-integrated component — built into firmware from source as a `USER_C_MODULES` usermod, not installed as a package. By design it has no versioned releases and is **not** in PyDevices' publishing set (unlike `pydevices` / `pydevices-desktop`). Maturity: **Alpha**. Issues: [PyDevices/displayif/issues](https://github.com/PyDevices/displayif/issues).
+
 Native display **interface** modules for PyDevices `displaydev`. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/`.
 
 MicroPython board configs in `pydevices` that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
@@ -38,6 +40,9 @@ Parallel dot-clock RGB uses **`dotclockframebuffer.DotClockFramebuffer`** (same 
 RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_SPIRAM` is enabled and sized in your board `sdkconfig` before building — see [docs/port-matrix.md](docs/port-matrix.md#esp32-psram--sdkconfig-large-framebuffers).
 
 ## 🚀 Build
+
+Tested against MicroPython v1.28.0, the CircuitPython 10.2.1 oracle, and SDL2 >= 2.0
+(desktop `usdl2`) — see [UPSTREAM](UPSTREAM) for exact pins and how to verify them locally.
 
 Clone as a sibling of `micropython/`:
 
@@ -83,6 +88,40 @@ cd micropython/ports/windows && make USER_C_MODULES=../../..
 CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
 
 See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
+
+### First run (unix `usdl2` smoke)
+
+Once the unix port above is built, prove it imports and can drive SDL2:
+
+```bash
+./micropython/ports/unix/build-standard/micropython -c "
+import usdl2
+assert usdl2.SDL_Init(usdl2.SDL_INIT_VIDEO) == 0, usdl2.SDL_GetError()
+win = usdl2.SDL_CreateWindow(
+    'displayif smoke', usdl2.SDL_WINDOWPOS_UNDEFINED, usdl2.SDL_WINDOWPOS_UNDEFINED,
+    320, 240, usdl2.SDL_WINDOW_SHOWN)
+print('usdl2 OK:', win)
+usdl2.SDL_DestroyWindow(win)
+usdl2.SDL_Quit()"
+```
+
+A live SDL window appears on a desktop session. Headless CI runs the same
+import/init smoke with `SDL_VIDEODRIVER=dummy` so it works without a display
+server — see [.github/workflows/clean-build.yml](.github/workflows/clean-build.yml).
+
+Then run the lifecycle API test under the same interpreter:
+
+```bash
+./micropython/ports/unix/build-standard/micropython tests/test_lifecycle_api.py
+```
+
+## Third-party
+
+`src/ports/common/rgbmatrix/protomatter/` vendors
+[adafruit/Adafruit_Protomatter](https://github.com/adafruit/Adafruit_Protomatter)
+(BSD). See [UPSTREAM](UPSTREAM) and
+[the protomatter/ README](src/ports/common/rgbmatrix/protomatter/README.md)
+for the identified upstream revision and license text.
 
 ## Related
 

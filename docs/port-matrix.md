@@ -238,26 +238,9 @@ No `manifest.py` frozen package required unless we later add pure-Python helpers
 
 ---
 
-## Suggested work sequence
-
-1. Scaffold — done
-2. pydevices board configs on `dotclockframebuffer.DotClockFramebuffer` + `FBDisplay` — done
-3. `spibus` + smoke tests — done
-4. esp32 `dotclockframebuffer`, `i80bus`, `mipidsi` — done
-5. mimxrt eLCDIF `dotclockframebuffer`, RT1176 `mipidsi`, FlexIO `i80bus` — done
-6. rp2 `picodvi`, PIO `i80bus` — done
-7. samd GPIO `i80bus` via `common/i80bus/gpio_bitbang.c` — done
-8. `rgbmatrix` Protomatter backends — done
-9. **Hardware validation**
-   - **Done:** ESP32-P4 `mipidsi` + LVGL soft-reset (`lv_test_timer`); Qualia S3
-     `dotclockframebuffer.DotClockFramebuffer` + touch (`lv_test_timer`) — see
-     [soft-reset-and-bring-up.md](soft-reset-and-bring-up.md)
-   - **Pending:** RK043 (mimxrt eLCDIF), RT1170 DSI, Pico DVI full panel soak
-10. Lifecycle / soft-reset registry for all host-owning backends — **done**
-    ([idempotent-lifecycle.md](idempotent-lifecycle.md))
-11. mimxrt i80bus: board-specific pydevices config, optional DMA bulk path — pending
-12. `displaydev`: remove legacy `RGBDisplay` package — done in pydevices
+See [docs/roadmap-notes.md](roadmap-notes.md) for the work-sequence checklist
+(scaffold-to-hardware-validation history and what's still pending).
 
 ---
 
-*Updated 2026-07-26 — Python module `dotclockframebuffer.DotClockFramebuffer` (CP-aligned name); P4 + Qualia bring-up; soft-reset lifecycle; MicroPython-only.*
+*Updated 2026-08-29 — Python module `dotclockframebuffer.DotClockFramebuffer` (CP-aligned name); P4 + Qualia bring-up; soft-reset lifecycle; MicroPython native modules plus the CircuitPython `usdl2` desktop path (`apply_cp_patches.sh`).*

@@ -1,0 +1,64 @@
+# Scenario: a stranger builds displayif from this repository and upstream
+# MicroPython alone -- no cmods workspace, no clone-and-pin harness (unlike
+# audioif, displayif's other native dependencies are either vendored in
+# src/ports/common/rgbmatrix/protomatter/ or supplied by the OS SDK, e.g.
+# libsdl2-dev). This is the standalone build's proof, run on every push.
+name: Clean standalone build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unix-usdl2:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: displayif
+
+      - name: Check out upstream MicroPython v1.28.0
+        uses: actions/checkout@v4
+        with:
+          repository: micropython/micropython
+          ref: v1.28.0
+          path: micropython
+
+      - name: Install SDL2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev
+
+      - name: Build the unix port with the displayif usermod
+        # USER_C_MODULES is the PARENT directory: py.mk globs
+        # $(USER_C_MODULES)/*/micropython.mk exactly one level down.
+        run: |
+          make -C micropython/mpy-cross -j2
+          make -C micropython/ports/unix submodules
+          make -C micropython/ports/unix -j2 \
+            USER_C_MODULES=$GITHUB_WORKSPACE
+
+      - name: Smoke the result (usdl2 import + window init, headless)
+        env:
+          SDL_VIDEODRIVER: dummy
+        run: |
+          ./micropython/ports/unix/build-standard/micropython -c "
+          import usdl2
+          assert usdl2.SDL_Init(usdl2.SDL_INIT_VIDEO) == 0, usdl2.SDL_GetError()
+          win = usdl2.SDL_CreateWindow(
+              'displayif smoke', usdl2.SDL_WINDOWPOS_UNDEFINED, usdl2.SDL_WINDOWPOS_UNDEFINED,
+              320, 240, usdl2.SDL_WINDOW_SHOWN)
+          assert win, usdl2.SDL_GetError()
+          print('standalone displayif OK: usdl2 window created:', win)
+          usdl2.SDL_DestroyWindow(win)
+          usdl2.SDL_Quit()"
+
+      - name: Run tests/test_lifecycle_api.py under the built interpreter
+        run: |
+          ./micropython/ports/unix/build-standard/micropython displayif/tests/test_lifecycle_api.py

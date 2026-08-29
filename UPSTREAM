@@ -1,0 +1,29 @@
+# Upstream pins for displayif builds and its vendored code.
+#
+# displayif is source-integrated: it has no versioned releases of its own
+# (see README "Status"). This file records what a build is tested against
+# and where the one vendored third-party source tree came from.
+
+## MicroPython
+Org-pinned upstream (matches cmods/micropython): v1.28.0
+  https://github.com/micropython/micropython @ v1.28.0
+  Verify locally with: git -C ../cmods/micropython describe --tags
+
+## CircuitPython (usdl2 desktop path only, via apply_cp_patches.sh)
+Org oracle (same pin as audioif/CIRCUITPYTHON_ORACLE): 10.2.1
+  https://github.com/adafruit/circuitpython @ bcfcb511352652d7cb62d3b415e4a624380f1830
+
+## SDL2 (desktop usdl2 backend)
+Minimum: >= 2.0 (SDL_* API used by src/ports/desktop/usdl2/)
+Tested locally against: 2.30.0 (`pkg-config --modversion sdl2`)
+CI installs Ubuntu's `libsdl2-dev` package (see .github/workflows/clean-build.yml).
+
+## Protomatter (vendored, src/ports/common/rgbmatrix/protomatter/)
+Vendored from https://github.com/adafruit/Adafruit_Protomatter (BSD).
+Identified upstream revision: tag 1.7.1, commit
+  629d5007f0dfeba244ae81759ce2ba568224cd8a
+core.c and core.h are byte-identical to that revision once whitespace/
+formatting is normalized (pointer-spacing and brace style differ only;
+no logic differences). See src/ports/common/rgbmatrix/protomatter/README.md
+for how this was verified and what is not yet known (exact import date,
+whether arch/*.h received the same local reformatting).
