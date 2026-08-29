@@ -9,6 +9,7 @@
 
 #include "py/runtime.h"
 #include "py/obj.h"
+#include "py/mperrno.h"
 #include "displayif/soft_reset.h"
 #include "displayif_esp32_pins.h"
 
