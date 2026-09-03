@@ -87,7 +87,7 @@ cd micropython/ports/windows && make USER_C_MODULES=../../..
 
 CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
 
-See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
+See the [org's optional aggregator workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 ### First run (unix `usdl2` smoke)
 

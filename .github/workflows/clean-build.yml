@@ -1,5 +1,5 @@
 # Scenario: a stranger builds displayif from this repository and upstream
-# MicroPython alone -- no cmods workspace, no clone-and-pin harness (unlike
+# MicroPython alone -- no aggregator workspace, no clone-and-pin harness (unlike
 # audioif, displayif's other native dependencies are either vendored in
 # src/ports/common/rgbmatrix/protomatter/ or supplied by the OS SDK, e.g.
 # libsdl2-dev). This is the standalone build's proof, run on every push.

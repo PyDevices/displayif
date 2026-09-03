@@ -474,5 +474,5 @@ elif [ "$APPLY" = 1 ]; then
     log "Next:"
     log "  cd $PORT_DIR && make -j VARIANT=$VARIANT"
     log "  $PORT_DIR/build-$VARIANT/micropython $USDL2_MOD_DIR/tools/test_usdl2.py"
-    log "See https://github.com/PyDevices/cmods for an easier way to build with other extensions."
+    log "For an easier way to build with other extensions, see the org's optional aggregator workspace: https://github.com/PyDevices/cmods"
 fi

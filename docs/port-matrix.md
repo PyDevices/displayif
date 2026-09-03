@@ -232,7 +232,7 @@ cd micropython/ports/rp2 && make BOARD=RPI_PICO2_W USER_C_MODULES=../../../displ
 cd micropython/ports/esp32 && make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
 ```
 
-See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
+See the [org's optional aggregator workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 No `manifest.py` frozen package required unless we later add pure-Python helpers (not planned).
 

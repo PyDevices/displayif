@@ -3,7 +3,7 @@
 # Linux/unix: libsdl2-dev + pkg-config sdl2
 # Windows (MinGW): SDL2 official MinGW development zip (not vendored).
 #   export SDL2_DEV=~/SDL2-2.x.x   # unpacked zip root (x86_64-w64-mingw32/ inside)
-#   See displayif/tools/sdl2_dev_env.sh and cmods/build_mp.sh.
+#   See displayif/tools/sdl2_dev_env.sh (the org's optional aggregator build script auto-detects SDL2_DEV).
 
 USDL2_DIR := $(DISPLAYIF_MOD_DIR)/src/ports/desktop/usdl2
 

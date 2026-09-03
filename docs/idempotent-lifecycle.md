@@ -190,7 +190,7 @@ src/ports/common/rgbmatrix/mod_rgbmatrix.c
 tests/test_lifecycle_api.py
 ```
 
-Build via sibling MicroPython + `USER_C_MODULES` (see README). See the [cmods workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
+Build via sibling MicroPython + `USER_C_MODULES` (see README). See the [org's optional aggregator workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 ---
 

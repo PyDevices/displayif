@@ -5,7 +5,7 @@
 # and where the one vendored third-party source tree came from.
 
 ## MicroPython
-Org-pinned upstream (matches cmods/micropython): v1.28.0
+Org-pinned upstream (matches the MicroPython checkout in the org's optional aggregator workspace): v1.28.0
   https://github.com/micropython/micropython @ v1.28.0
   Verify locally with: git -C ../cmods/micropython describe --tags
 
