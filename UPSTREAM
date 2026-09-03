@@ -7,7 +7,7 @@
 ## MicroPython
 Org-pinned upstream (matches the MicroPython checkout in the org's optional aggregator workspace): v1.28.0
   https://github.com/micropython/micropython @ v1.28.0
-  Verify locally with: git -C ../cmods/micropython describe --tags
+  Verify locally with: git -C <your micropython checkout> describe --tags   # expect v1.28.0
 
 ## CircuitPython (usdl2 desktop path only, via apply_cp_patches.sh)
 Org oracle (same pin as audioif/CIRCUITPYTHON_ORACLE): 10.2.1
