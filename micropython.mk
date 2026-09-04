@@ -3,7 +3,7 @@
 # Discovered via USER_C_MODULES pointing at the workspace directory that
 # contains this repo (its parent), e.g. `make USER_C_MODULES=../../..`.
 # Hardware interfaces (spibus, dotclockframebuffer, …) build only on MCU ports.
-# Desktop SDL (`usdl2`) builds on unix and windows ports.
+# Desktop SDL (`usdl2`) builds on unix and windows ports. `jpegio` builds everywhere.
 
 DISPLAYIF_MOD_DIR := $(USERMOD_DIR)
 
@@ -121,3 +121,6 @@ endif
 ifneq ($(DISPLAYIF_PORT_UNIX)$(DISPLAYIF_PORT_WINDOWS),00)
 include $(DISPLAYIF_MOD_DIR)/src/ports/desktop/usdl2/micropython.mk
 endif
+
+# JPEG decoder (`import jpegio`): platform-neutral C, built on every port.
+include $(DISPLAYIF_MOD_DIR)/src/jpegio/micropython.mk

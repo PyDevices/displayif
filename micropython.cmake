@@ -6,7 +6,8 @@
 # want displayif plus other modules — no aggregator file required, e.g.:
 #   -DUSER_C_MODULES="/path/to/displayif;/path/to/other_mod"
 # Hardware interfaces build only on MCU ports. Desktop usdl2 is Make-only
-# (unix/windows via micropython.mk); no cmake desktop path yet.
+# (unix/windows via micropython.mk); no cmake desktop path yet. `jpegio`
+# builds everywhere.
 
 set(DISPLAYIF_MOD_DIR ${CMAKE_CURRENT_LIST_DIR})
 
@@ -74,3 +75,6 @@ endif()
 if(DISPLAYIF_PORT_STM32)
     include(${DISPLAYIF_MOD_DIR}/src/ports/stm32/micropython.cmake)
 endif()
+
+# JPEG decoder (`import jpegio`): platform-neutral C, built on every port.
+include(${DISPLAYIF_MOD_DIR}/src/jpegio/micropython.cmake)
