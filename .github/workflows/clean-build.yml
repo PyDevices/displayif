@@ -68,3 +68,95 @@ jobs:
         # the Pillow reference and TJpgDec's golden digests (no Pillow needed).
         run: |
           ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio.py
+
+      - name: Run tests/jpegio/test_jpegio_lvgl.py (must print SKIP -- no lvgl here)
+        run: |
+          ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio_lvgl.py | tee lvgl.out
+          grep -q '^SKIP' lvgl.out
+
+  # Scenario: the same stranger adds the LVGL family. jpegio Phase 2 (org
+  # docs/jpegio-vision.md, "no LVGL fork"): LVGL's own TJPGD is off by config
+  # in lvgl-bindings' lv_conf.h, displayif's vendored TJpgDec is the firmware's
+  # only one, and src/jpegio/lvgl_decoder.c registers it as LVGL's JPEG
+  # decoder when the lvgl-micropython sibling is on the USER_C_MODULES scan
+  # path (D4: displayif self-detects; nothing is passed by hand).
+  unix-lvgl-jpegio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: displayif
+
+      - name: Check out upstream MicroPython v1.28.0
+        uses: actions/checkout@v7
+        with:
+          repository: micropython/micropython
+          ref: v1.28.0
+          path: micropython
+
+      # Pinned to the lvgl-bindings commit that turns LV_USE_TJPGD off on
+      # MicroPython/CircuitPython (tjpgd_init/deinit CPython-only) and the
+      # lvgl-micropython sync that consumes it. Move both together: the
+      # lvgl-micropython build refuses a bindings checkout that does not
+      # match its LVGL_BINDINGS_COMMIT pin.
+      - name: Check out lvgl-bindings (LV_USE_TJPGD 0 on MicroPython)
+        uses: actions/checkout@v7
+        with:
+          repository: PyDevices/lvgl-bindings
+          ref: aa6c6bc449aed6936b644ab45b11e453945a18ee
+          path: lvgl-bindings
+          submodules: true
+
+      - name: Check out lvgl-micropython (pins that lvgl-bindings commit)
+        uses: actions/checkout@v7
+        with:
+          repository: PyDevices/lvgl-micropython
+          ref: d7ea1938a6d53cd03a6559f9f46fc7f07f7c2300
+          path: lvgl-micropython
+
+      - name: Install SDL2
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev
+
+      - name: Build the unix port with displayif + lvgl-micropython + lvgl-bindings
+        # USER_C_MODULES is the PARENT directory again; displayif's jpegio
+        # sees $(USER_C_MODULES)/lvgl-micropython/micropython.mk and compiles
+        # its LVGL decoder. FROZEN_MANIFEST freezes lvgl-micropython's
+        # display_driver.py / fs_driver.py (the file-source test uses the
+        # latter), the same command the local proof used.
+        run: |
+          make -C micropython/mpy-cross -j2
+          make -C micropython/ports/unix submodules
+          make -C micropython/ports/unix -j2 \
+            USER_C_MODULES=$GITHUB_WORKSPACE \
+            FROZEN_MANIFEST=$GITHUB_WORKSPACE/lvgl-micropython/manifest.py
+
+      - name: One TJpgDec in the firmware, and it is jpegio's
+        # Exactly one object defines jd_prepare (displayif's tjpgd.o; LVGL's
+        # tjpgd.o is empty under LV_USE_TJPGD 0), no jpegio_jd_ prefix left,
+        # and both jpegio.o and lvgl_decoder.o import it.
+        run: |
+          cd micropython/ports/unix/build-standard
+          find . -name '*.o' -exec nm -A {} + 2>/dev/null | grep -E ' T jd_(prepare|decomp)$' | tee jd.txt
+          test "$(grep -c ' T jd_prepare$' jd.txt)" = 1
+          grep -q '^./displayif/src/jpegio/tjpgd/tjpgd.o:.* T jd_prepare$' jd.txt
+          ! find . -name '*.o' -exec nm -A {} + 2>/dev/null | grep -q 'jpegio_jd_'
+          nm displayif/src/jpegio/jpegio.o | grep -q ' U jd_prepare$'
+          nm displayif/src/jpegio/lvgl_decoder.o | grep -q ' U jd_decomp$'
+          test "$(find . -name tjpgd.o | wc -l)" = 2
+
+      - name: Run tests/jpegio/test_jpegio.py (goldens unchanged beside LVGL)
+        run: |
+          ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio.py
+
+      - name: Run tests/jpegio/test_jpegio_lvgl.py (the LVGL half of the Phase 2 gate)
+        run: |
+          ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio_lvgl.py | tee lvgl.out
+          ! grep -q '^SKIP' lvgl.out
+          grep -q 'digests exact through lv.image: 3 of 3' lvgl.out
+
+      - name: Run lvgl-bindings' smoke test (tjpgd_init absent on MicroPython)
+        run: |
+          ./micropython/ports/unix/build-standard/micropython lvgl-bindings/tools/test_lvgl_smoke.py
