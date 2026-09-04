@@ -62,3 +62,9 @@ jobs:
       - name: Run tests/test_lifecycle_api.py under the built interpreter
         run: |
           ./micropython/ports/unix/build-standard/micropython displayif/tests/test_lifecycle_api.py
+
+      - name: Run tests/jpegio/test_jpegio.py under the built interpreter
+        # The jpegio Phase 1 gate: the corpus in tests/jpegio/frames against
+        # the Pillow reference and TJpgDec's golden digests (no Pillow needed).
+        run: |
+          ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio.py

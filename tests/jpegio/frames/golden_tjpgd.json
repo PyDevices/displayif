@@ -1,0 +1,54 @@
+{
+ "_about": [
+  "TJpgDec's own sha256 per corpus frame and scale: the RGB565 buffer decode() fills",
+  "(native-order uint16, row-major, tight), written by test_jpegio.py --record.",
+  "A parity digest, not a fidelity claim: its evidence is the Pillow mean/positional",
+  "check test_jpegio.py prints beside it.  Re-record deliberately after a TJpgDec or",
+  "tjpgdcnf.h change, never to make a red run green."
+ ],
+ "decoder": "TJpgDec R0.03 patch1, CircuitPython tjpgdcnf.h (JD_FORMAT 1, JD_USE_SCALE 1, JD_TBLCLIP 1, JD_FASTDECODE 1)",
+ "frames": {
+  "baseline_jfif_320x240.jpg": {
+   "0": "b1389764a87b3c7949f051ff3fb2df5e830b5eb15991c08449b50668e2c843ca",
+   "1": "5f70235f837ffbc039a7d24056a858842cfb97a8f5418032c1717692ac1760cc",
+   "2": "2803b507fe5b4398777760a3ea709d3d6b744716f95bcec2b3da98a0b1e27a8b",
+   "3": "af3fbe0dfb79d9ecbe69ce69b6ce354f2830b70fa0a920c2bde5c58c994734e6"
+  },
+  "baseline_jfif_64x48.jpg": {
+   "0": "e37b05e74f33fe5a56f94360d4c85da583737f6cf46e7ad3280978f4dc003854",
+   "1": "ffcacc9c3660c8e844fd0d1eadcc4c42f775e7083f4728de30b64c29d1a9861f",
+   "2": "77abed476e2f8a2b0df59abdd8353277befccd18b8c3a930934cc55bcf632943",
+   "3": "a0cf8ceacc1a08eee1f87912a3aab3eda0a8f2158df16907f40647fba2b1c2fb"
+  },
+  "c920e_320x240_dri.jpg": {
+   "0": "16a1a1d915dd9bb6aa3928c5d0159fafff7efa6290e2057ab246092928f10601",
+   "1": "8aec12f9bb63300b10bf5e44b49f137f38378bbe96d670c816cbc18123e2631e",
+   "2": "d1e9c8d30c94bfc6feefc1c82c02f36a4e1e48dda36cf698417c258822d2c89a",
+   "3": "ba71fde493c325181d0245dc84220b155c3dfbc353569e6fe8355c579cb30619"
+  },
+  "dri_first_mjpeg_style_320x240.jpg": {
+   "0": "b1389764a87b3c7949f051ff3fb2df5e830b5eb15991c08449b50668e2c843ca",
+   "1": "5f70235f837ffbc039a7d24056a858842cfb97a8f5418032c1717692ac1760cc",
+   "2": "2803b507fe5b4398777760a3ea709d3d6b744716f95bcec2b3da98a0b1e27a8b",
+   "3": "af3fbe0dfb79d9ecbe69ce69b6ce354f2830b70fa0a920c2bde5c58c994734e6"
+  },
+  "grayscale_64x48.jpg": {
+   "0": "0a4103719690dbd645aa6f6a7c585fc7266ad4381b7d972f6fe88dc00172f09b",
+   "1": "adb719cd2c9cfe78f47939aad24a79a2b6d46b0717ac94171da48c71ef47ef3b",
+   "2": "ec01ea904325fec99f132fd2d057cc5e6e7f893d4deb896e8fac8244f5c4d5bf",
+   "3": "ae8733651fbcddbc5ec85b9c86c8dfb146fdbb121c2907b1509954973bd1093d"
+  },
+  "odd_size_37x29.jpg": {
+   "0": "c7f297319d2666abd73ae584ac202e06f62c2b253f8c5b73056fd9401f826e0d",
+   "1": "516b75fd1f3ce9cecd8eeacbac4f320b3ac497f39fa68a7a69b539fe9c800c56",
+   "2": "d81c2bec78fce0624cc903c65493c1798b582e73c32911e507813cc6829c42d8",
+   "3": "bd0fedb6afda2231d7b57b8d080fd9060151f7a9db184cbc217acf2649f3a44c"
+  },
+  "restart_dri_320x240.jpg": {
+   "0": "b1389764a87b3c7949f051ff3fb2df5e830b5eb15991c08449b50668e2c843ca",
+   "1": "5f70235f837ffbc039a7d24056a858842cfb97a8f5418032c1717692ac1760cc",
+   "2": "2803b507fe5b4398777760a3ea709d3d6b744716f95bcec2b3da98a0b1e27a8b",
+   "3": "af3fbe0dfb79d9ecbe69ce69b6ce354f2830b70fa0a920c2bde5c58c994734e6"
+  }
+ }
+}

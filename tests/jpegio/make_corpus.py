@@ -209,7 +209,9 @@ def readme():
         " Pillow fidelity reference written by [`../reference.py`](../reference.py) -- per"
         " baseline frame and scale 0..3: RGB565 buffer sha256 and per-channel means. It is a"
         " tolerance reference, not a bit-exact golden (TJpgDec and libjpeg differ in IDCT"
-        " rounding and chroma upsampling)." % Image.__version__,
+        " rounding and chroma upsampling). `golden_tjpgd.json` is the bit-exact one: TJpgDec's"
+        " own sha256 per frame and scale, written by [`../test_jpegio.py`](../test_jpegio.py)"
+        " `--record` and asserted on every run." % Image.__version__,
         "",
         "Synthetic frames share one procedural pattern: colour bars (top 40 %), an x/y/diagonal"
         " RGB gradient (40-70 %), a 1-px black/white checker (bottom left) and a red|blue"
