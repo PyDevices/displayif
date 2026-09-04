@@ -11,13 +11,15 @@ The Phase 1 gate of the org's docs/jpegio-vision.md, checked mechanically:
   2. the callback target covers the decoded image exactly once at every
      scale, in raster order, and reassembles to the buffer target's bytes;
   3. the buffer target honours x / y / stride, leaves the rest of a larger
-     buffer alone, and refuses bad geometry with the numbers in the message;
+     buffer alone, and refuses bad geometry -- x / y outside 0..65535, a
+     stride / y product that wraps size_t -- with the numbers in the message;
   4. the DHT-less frame is refused with JDR_FMT1 -- the Phase 1 contract;
   5. the progressive frame, truncated frames, a bare SOI, and non-JPEG bytes
      all raise (never crash), and open() rejects non-source objects;
   6. the restart-marker frames decode to the baseline frame's digests;
   7. real c920e_* camera frames open, decode at every scale and are digested;
-  8. one decoder object re-opens across frames and source kinds;
+  8. one decoder object re-opens across frames and source kinds, and
+     width / height follow the last open() (a failed one reports nothing);
   9. 50 decodes do not trend gc.mem_free() down.
 
 Run from the displayif root (or anywhere: paths come from __file__) with the
@@ -391,6 +393,17 @@ def main():
     expect_raises(Stop, lambda: dec.decode(stop), "at (0, 0)")
     expect_raises(RuntimeError, lambda: dec.decode(bytearray(8)), "decode() without open()")
     expect_raises(TypeError, lambda: (dec.open(full), dec.decode(sink, stride=5)), "stride")
+    # x, y are bounded like the image size (0..65535) on this path too, and
+    # inside the bound the callback gets them whole: before the fix 2**62
+    # went through MP_OBJ_NEW_SMALL_INT unchecked and arrived negative.
+    small = read_file("baseline_jfif_64x48.jpg")
+    dec.open(small)
+    expect_raises(ValueError, lambda: dec.decode(sink, 0, 2 ** 62, 0), "0..65535", str(2 ** 62))
+    expect_raises(ValueError, lambda: dec.decode(sink, 0, 0, 65536), "0..65535", "65536")
+    first = []
+    dec.decode(lambda x, y, w, h, mv: first.append((x, y)) if not first else None, 3, 65535, 65535)
+    assert first == [(65535, 65535)], first
+    print("callback x, y: 2**62 and 65536 refused (0..65535); at (65535, 65535) the first block reports (65535, 65535)")
 
     # 3. buffer path with x, y, stride; untouched region stays untouched; bad geometry
     print("== 3. buffer target: offsets, stride, untouched region, errors")
@@ -416,7 +429,10 @@ def main():
     w, h = dec.open(full)
     n = w * h * 2
     expect_raises(ValueError, lambda: dec.decode(bytearray(1000)), "320x240", "153600", "1000")
-    expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 1, 0), "1 + 320", "320")
+    # x > 0 with the default stride can never fit; the message says what to pass
+    expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 1, 0), "1 + 320", "default stride 320", "pass stride=")
+    e = expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 1, 0, stride=320), "1 + 320", "stride 320")
+    assert "default" not in str(e), e
     expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 0, 1), "(0, 1)", "154240", "153600")
     expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 0, 0, stride=319), "320", "319")
     expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 0, 0, stride=-5), "-5")
@@ -425,11 +441,31 @@ def main():
     expect_raises(ValueError, lambda: dec.decode(bytearray(n), 4), "4")
     expect_raises(ValueError, lambda: dec.decode(bytearray(n), -1), "-1")
     expect_raises(TypeError, lambda: dec.decode(b"\x00" * n))
+    # x, y are bounded like the image size (0..65535); the message keeps the
+    # value whole rather than printing it through an int
+    for bad in (65536, 2 ** 40, 2 ** 62):
+        expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, bad, 0), "0..65535", str(bad))
+        expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 0, bad), "0..65535", str(bad))
+    # the buffer-fit check must not wrap: (y + h - 1) * stride is 2**bits
+    # here, i.e. 0 in size_t, so an unchecked product sees only the last
+    # row's 320 pixels (640 bytes), passes a 1000-byte buffer, and the decode walks off
+    # it (SIGSEGV before the fix).  Then the product wrapping to a small
+    # non-zero count, which the 153600-byte buffer would also have passed.
+    bits = 64 if sys.maxsize > 2 ** 32 else 32
+    y_wrap = 2 ** 15 - (h - 1)
+    e = expect_raises(ValueError, lambda: dec.decode(bytearray(1000), 0, 0, y_wrap, stride=2 ** (bits - 15)),
+                      "target too small", "overflows size_t", "buffer has 1000")
+    print("wrapping geometry refused: %s" % e)
+    expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 0, y_wrap, stride=2 ** (bits - 15) + 1),
+                  "target too small", "overflows size_t")
+    # the widest legal placement is arithmetic the check must get right, not refuse
+    expect_raises(ValueError, lambda: dec.decode(bytearray(n), 0, 65535, 0, stride=65535 + 320),
+                  "target too small", "needs %d bytes" % ((239 * (65535 + 320) + 65535 + 320) * 2))
     # a rejected decode() does not consume the open(): retry without re-opening
     buf = bytearray(n)
     dec.decode(buf)
     assert sha256_hex(buf) == digests["baseline_jfif_320x240.jpg"][0]
-    print("bad geometry: 10 rejections named their numbers; the open() survived them and decoded")
+    print("bad geometry: 21 rejections named their numbers; the open() survived them and decoded")
 
     # 4. the DHT-less frame: Phase 1 refuses it (JDR_FMT1); nothing is injected
     print("== 4. nodht_320x240.jpg")
@@ -472,7 +508,7 @@ def main():
                        ("text file", open(FRAMES + "/README.md"))):
         expect_raises(TypeError, lambda: dec.open(src), "source must be")
     print("non-source objects (int, None, list, float, object, a Python read(), a text file): TypeError")
-    expect_raises(RuntimeError, lambda: jpegio.JpegDecoder().width, "before open()")
+    expect_raises(RuntimeError, lambda: jpegio.JpegDecoder().width, "width needs a successful open()")
 
     # 8. one decoder, many frames and source kinds
     print("== 8. re-open: frames in sequence, path / bytes / file / BytesIO / memoryview")
@@ -498,7 +534,21 @@ def main():
     dec.open(full)
     expect_raises(ValueError, lambda: dec.open(b"hello"))
     expect_raises(RuntimeError, lambda: dec.decode(buf), "decode() without open()")
-    print("second open() supersedes the first; a failed open() leaves nothing to decode")
+    # ... and width / height do not report the superseded image either
+    # (before the fix they still read 320x240 here)
+    expect_raises(RuntimeError, lambda: dec.width, "width needs a successful open()")
+    expect_raises(RuntimeError, lambda: dec.height, "height needs a successful open()")
+    for exc, fail in ((TypeError, lambda: dec.open(5)),
+                      (OSError, lambda: dec.open(FRAMES + "/does_not_exist.jpg")),
+                      (ValueError, lambda: dec.open(FRAMES + "/progressive_320x240.jpg"))):
+        assert dec.open(full) == (320, 240)
+        expect_raises(exc, fail)
+        expect_raises(RuntimeError, lambda: dec.width, "successful open()")
+    # after decode() they still read: blit_rect(buf, 0, 0, dec.width, dec.height)
+    dec.open(full)
+    dec.decode(buf)
+    assert (dec.width, dec.height) == (320, 240)
+    print("second open() supersedes the first; a failed open() leaves nothing to decode or report")
 
     # 9. memory: 50 decodes into the same buffer must not trend mem_free down
     print("== 9. memory over 50 decodes of 320x240 at scale 0")

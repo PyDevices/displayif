@@ -7,6 +7,7 @@
 // platform's RGB565 buffer or a per-block callback in place of
 // displayio.Bitmap. The API contract is in README.md next to this file.
 
+#include <stdint.h>
 #include <string.h>
 
 #include "py/obj.h"
@@ -36,7 +37,7 @@ typedef struct _jpegio_jpegdecoder_obj_t {
     mp_buffer_info_t bufinfo;   // unread remainder of a buffer source
     bool owns_source;           // opened from a str path by us: close it when done
     bool ready;                 // jd_prepare succeeded and decode() has not consumed it
-    uint16_t width, height;     // of the last opened image
+    uint16_t width, height;     // of the last successfully opened image; 0 after a failed open()
     // Target of the decode() in progress. Exactly one of callback / pixels is live.
     mp_obj_t callback;          // callable target, else MP_OBJ_NULL
     mp_obj_t target;            // buffer target object, kept alive while its pointer is used
@@ -47,6 +48,12 @@ typedef struct _jpegio_jpegdecoder_obj_t {
 } jpegio_jpegdecoder_obj_t;
 
 #define JPEGIO_MIN(a, b) ((a) < (b) ? (a) : (b))
+
+// decode()'s x / y limit: the image size is a uint16 in TJpgDec (and in
+// CircuitPython's Bitmap), so a placement beyond it is never meaningful. It
+// also keeps every coordinate sum below 2^17, so the buffer-fit arithmetic
+// cannot overflow and the callback's coordinates always fit a small int.
+#define JPEGIO_MAX_COORD 0xFFFF
 
 // --- TJpgDec result → exception --------------------------------------------
 
@@ -135,11 +142,11 @@ static int jpegio_buffer_output(JDEC *jd, void *data, JRECT *rect) {
     size_t w = (size_t)rect->right - rect->left + 1;
     size_t h = (size_t)rect->bottom - rect->top + 1;
     const uint16_t *src = data;
+    // decode() proved (y + dh - 1) * stride + x + dw <= the buffer's pixel
+    // count without overflowing, so every index formed here is inside it.
     uint16_t *dst = self->pixels + ((size_t)self->y + rect->top) * self->stride + (size_t)self->x + rect->left;
     for (size_t row = 0; row < h; row++) {
-        memcpy(dst, src, w * sizeof(uint16_t));
-        src += w;
-        dst += self->stride;
+        memcpy(dst + row * self->stride, src + row * w, w * sizeof(uint16_t));
     }
     return 1;
 }
@@ -219,6 +226,9 @@ static void jpegio_jpegdecoder_print(const mp_print_t *print, mp_obj_t self_in, 
 static mp_obj_t jpegio_jpegdecoder_open(mp_obj_t self_in, mp_obj_t source) {
     jpegio_jpegdecoder_obj_t *self = MP_OBJ_TO_PTR(self_in);
     jpegio_close(self);
+    // width / height track the last open(): a failed one reports nothing.
+    self->width = 0;
+    self->height = 0;
 
     bool owns = false;
     if (mp_obj_is_str(source)) {
@@ -296,8 +306,8 @@ static mp_obj_t jpegio_jpegdecoder_decode(size_t n_args, const mp_obj_t *pos_arg
     }
     mp_int_t x = args[ARG_x].u_int;
     mp_int_t y = args[ARG_y].u_int;
-    if (x < 0 || y < 0) {
-        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("x, y must be >= 0, not (%d, %d)"), (int)x, (int)y);
+    if (x < 0 || x > JPEGIO_MAX_COORD || y < 0 || y > JPEGIO_MAX_COORD) {
+        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("x, y must be 0..%d, not (%ld, %ld)"), JPEGIO_MAX_COORD, (long)x, (long)y);
     }
     size_t dw = self->width >> scale;
     size_t dh = self->height >> scale;
@@ -323,27 +333,48 @@ static mp_obj_t jpegio_jpegdecoder_decode(size_t n_args, const mp_obj_t *pos_arg
     } else {
         mp_buffer_info_t buf;
         mp_get_buffer_raise(target, &buf, MP_BUFFER_WRITE);
+        bool stride_given = args[ARG_stride].u_obj != mp_const_none;
         size_t stride = dw;
-        if (args[ARG_stride].u_obj != mp_const_none) {
+        if (stride_given) {
             mp_int_t s = mp_obj_get_int(args[ARG_stride].u_obj);
             if (s < 0) {
-                mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("%q must be >= 0, not %d"), MP_QSTR_stride, (int)s);
+                mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("%q must be >= 0, not %ld"), MP_QSTR_stride, (long)s);
             }
             stride = s;
         }
         if ((size_t)x + dw > stride) {
+            if (stride_given) {
+                mp_raise_msg_varg(&mp_type_ValueError,
+                    MP_ERROR_TEXT("x + decoded width (%d + %d) exceeds stride %lu"),
+                    (int)x, (int)dw, (unsigned long)stride);
+            }
+            // The default stride is the decoded width: x > 0 can never fit it.
             mp_raise_msg_varg(&mp_type_ValueError,
-                MP_ERROR_TEXT("x + decoded width (%d + %d) exceeds stride %d"),
+                MP_ERROR_TEXT("x + decoded width (%d + %d) exceeds the default stride %d (the decoded width): pass stride=<target row width in pixels> to place at x > 0"),
                 (int)x, (int)dw, (int)stride);
         }
-        size_t need = 0;
+        // Buffer fit. The last pixel written is at index last_row * stride +
+        // x + dw - 1, so the buffer needs last_row * stride + tail pixels.
+        // x, y, dw, dh are all < 2^16, so the sums cannot overflow; the
+        // product can (stride is any mp_int_t, and size_t is 32 bits on the
+        // MCU ports), so it is compared by division instead of computed --
+        // a wrapped product must not slip under buf.len.
         if (dw != 0 && dh != 0) {
-            need = (((size_t)y + dh - 1) * stride + (size_t)x + dw) * sizeof(uint16_t);
-        }
-        if (need > buf.len) {
-            mp_raise_msg_varg(&mp_type_ValueError,
-                MP_ERROR_TEXT("target too small: %dx%d at (%d, %d) with stride %d needs %d bytes, buffer has %d"),
-                (int)dw, (int)dh, (int)x, (int)y, (int)stride, (int)need, (int)buf.len);
+            size_t npix = buf.len / sizeof(uint16_t);
+            size_t tail = (size_t)x + dw;
+            size_t last_row = (size_t)y + dh - 1;
+            bool fits = tail <= npix && (last_row == 0 || stride <= (npix - tail) / last_row);
+            if (!fits) {
+                if (last_row == 0 || stride <= (SIZE_MAX / 2 - tail) / last_row) {
+                    size_t need = (last_row * stride + tail) * sizeof(uint16_t);
+                    mp_raise_msg_varg(&mp_type_ValueError,
+                        MP_ERROR_TEXT("target too small: %dx%d at (%d, %d) with stride %lu needs %lu bytes, buffer has %lu"),
+                        (int)dw, (int)dh, (int)x, (int)y, (unsigned long)stride, (unsigned long)need, (unsigned long)buf.len);
+                }
+                mp_raise_msg_varg(&mp_type_ValueError,
+                    MP_ERROR_TEXT("target too small: %dx%d at (%d, %d) with stride %lu: the last pixel's offset overflows size_t; buffer has %lu bytes"),
+                    (int)dw, (int)dh, (int)x, (int)y, (unsigned long)stride, (unsigned long)buf.len);
+            }
         }
         self->callback = MP_OBJ_NULL;
         self->target = target;
@@ -374,7 +405,8 @@ static mp_obj_t jpegio_jpegdecoder_decode(size_t n_args, const mp_obj_t *pos_arg
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(jpegio_jpegdecoder_decode_obj, 1, jpegio_jpegdecoder_decode);
 
-// width / height: read-only, valid after open().
+// width / height: read-only; track the last open() (valid after a successful
+// one, through its decode(), until the next open(); 0 after a failed one).
 static void jpegio_jpegdecoder_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     if (dest[0] != MP_OBJ_NULL) {
         return; // store / delete: not supported (leaves dest[0] set -> AttributeError)
@@ -382,7 +414,7 @@ static void jpegio_jpegdecoder_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest)
     if (attr == MP_QSTR_width || attr == MP_QSTR_height) {
         jpegio_jpegdecoder_obj_t *self = MP_OBJ_TO_PTR(self_in);
         if (self->width == 0 && self->height == 0) {
-            mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("%q before %q()"), attr, MP_QSTR_open);
+            mp_raise_msg_varg(&mp_type_RuntimeError, MP_ERROR_TEXT("%q needs a successful %q()"), attr, MP_QSTR_open);
         }
         dest[0] = MP_OBJ_NEW_SMALL_INT(attr == MP_QSTR_width ? self->width : self->height);
         return;

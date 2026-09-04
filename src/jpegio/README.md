@@ -46,9 +46,12 @@ Positional-only, like CP. `source` is one of:
   pure-Python objects that merely define `read()`, and anything else
   (`None`, an int, a list) are not accepted (TypeError).
 
-Parses the headers (`jd_prepare`) and returns the image size. After a
-successful `open()`, `width` and `height` are also readable as properties
-(RuntimeError if read before any successful `open()`).
+Parses the headers (`jd_prepare`) and returns the image size. `width` and
+`height` are also readable as properties and track the last `open()`:
+valid after a successful one (still valid after its `decode()`, so
+`blit_rect(buf, 0, 0, decoder.width, decoder.height)` works), RuntimeError
+`width needs a successful open()` before any `open()` or after one that
+failed — a failed `open()` never leaves the previous image's size behind.
 
 **What is sniffed: nothing beyond SOI.** The stream goes to `jd_prepare`,
 which scans for `FF D8` and then takes the segments in whatever order they
@@ -66,8 +69,9 @@ is consumed, so `open()` again before the next `decode()` (RuntimeError
 - `scale` 0..3 — downscale by 1, 1/2, 1/4, 1/8 (TJpgDec's `JD_USE_SCALE`).
   The decoded image is `(width >> scale) x (height >> scale)`; 1/8 is the
   cheap one (DC-only, no IDCT). Other values: ValueError.
-- `x`, `y` (>= 0) — where the decoded image's top-left corner lands, in
-  pixels, in both target modes.
+- `x`, `y` (0..65535, the range of the image size itself) — where the
+  decoded image's top-left corner lands, in pixels, in both target modes.
+  Anything else: ValueError.
 - `target` — either a **buffer** or a **callable**.
 
 **Buffer target.** A writable buffer-protocol object (`bytearray`,
@@ -78,9 +82,17 @@ decoded width, i.e. a tight buffer of exactly
 module checks `x + decoded_width <= stride` and that the last pixel written
 fits in the buffer; otherwise ValueError naming the numbers, e.g.
 `target too small: 320x240 at (0, 0) with stride 320 needs 153600 bytes,
-buffer has 1024`. A rejected call leaves the opened image in place, so
-`decode()` can be retried with a better target without another `open()`.
-Each TJpgDec output block is copied row by row into place.
+buffer has 1024`. The fit is decided without computing
+`(y + decoded_height - 1) * stride`, so a `stride` / `y` pair whose product
+wraps `size_t` (32 bits on the MCU ports) is refused too (`... the last
+pixel's offset overflows size_t`), never let through. Because the default
+`stride` is the decoded width, `x > 0` always needs `stride` — the row
+width of the target in pixels — and the error says so (`x + decoded width
+(5 + 320) exceeds the default stride 320 (the decoded width): pass
+stride=...`); `y > 0` needs only a buffer with enough rows. A rejected call
+leaves the opened image in place, so `decode()` can be retried with a
+better target without another `open()`. Each TJpgDec output block is
+copied row by row into place.
 
 **Callable target.** Called once per TJpgDec output block, in raster order:
 
