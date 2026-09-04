@@ -230,7 +230,10 @@ static mp_obj_t jpegio_jpegdecoder_open(mp_obj_t self_in, mp_obj_t source) {
     if (mp_get_buffer(source, &self->bufinfo, MP_BUFFER_READ)) {
         infunc = jpegio_buffer_input;
     } else {
-        const mp_stream_p_t *stream = mp_get_stream(source);
+        // Not mp_get_stream(): that reads the type's protocol slot unguarded,
+        // and a type without one (int, None, list, a Python class with a
+        // read() method) yields a wild pointer -- a segfault, not a TypeError.
+        const mp_stream_p_t *stream = MP_OBJ_TYPE_GET_SLOT_OR_NULL(mp_obj_get_type(source), protocol);
         if (stream != NULL && stream->read != NULL && !stream->is_text) {
             infunc = jpegio_stream_input;
         } else {

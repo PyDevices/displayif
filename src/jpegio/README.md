@@ -42,8 +42,9 @@ Positional-only, like CP. `source` is one of:
   not copied. Keep it alive and unchanged until `decode()` returns.
 - a binary stream: any object with MicroPython's native stream protocol
   (`open(...)` files, `io.BytesIO`, sockets). Unseekable streams are fine;
-  skipped segments are read through, never seeked. Text streams and
-  pure-Python objects that merely define `read()` are not accepted (TypeError).
+  skipped segments are read through, never seeked. Text streams,
+  pure-Python objects that merely define `read()`, and anything else
+  (`None`, an int, a list) are not accepted (TypeError).
 
 Parses the headers (`jd_prepare`) and returns the image size. After a
 successful `open()`, `width` and `height` are also readable as properties
@@ -77,7 +78,9 @@ decoded width, i.e. a tight buffer of exactly
 module checks `x + decoded_width <= stride` and that the last pixel written
 fits in the buffer; otherwise ValueError naming the numbers, e.g.
 `target too small: 320x240 at (0, 0) with stride 320 needs 153600 bytes,
-buffer has 1024`. Each TJpgDec output block is copied row by row into place.
+buffer has 1024`. A rejected call leaves the opened image in place, so
+`decode()` can be retried with a better target without another `open()`.
+Each TJpgDec output block is copied row by row into place.
 
 **Callable target.** Called once per TJpgDec output block, in raster order:
 
