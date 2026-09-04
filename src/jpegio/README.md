@@ -201,10 +201,18 @@ are unconditional* below.
 
 `tjpgd/tjpgd.c`, `tjpgd/tjpgd.h` and `tjpgd/tjpgdcnf.h` are ChaN's TJpgDec
 R0.03 with patch1, taken from CircuitPython's `lib/tjpgd/src/` (which
-imported it from http://elm-chan.org/fsw/tjpgd/00index.html), with one line
-changed: the RGB565 store in `mcu_output` is ChaN's original `*d++ = w;`
-where CircuitPython has `__builtin_bswap16(w)`. The files keep ChaN's
-license header:
+imported it from http://elm-chan.org/fsw/tjpgd/00index.html), with two
+deviations. First, the RGB565 store in `mcu_output` is ChaN's original
+`*d++ = w;` where CircuitPython has `__builtin_bswap16(w)`. Second, the
+`stdint.h` guard at the top of `tjpgd.h` tests for the header with
+`__has_include` rather than for `_WIN32`: upstream's comment says it means
+"a compiler without stdint.h", but mingw defines `_WIN32` *and* ships
+`stdint.h`, where `uint32_t` is `unsigned int` rather than the fallback's
+`unsigned long`, so every mingw cross-build failed with conflicting types
+(displayif#25). The fallback typedefs are kept for the compiler the comment
+was written for, MSVC before 2010. Both CircuitPython's copy and ChaN's
+R0.03 still carry the platform test; LVGL's fork sidesteps it by including
+`stdint.h` unconditionally. The files keep ChaN's license header:
 
 > Copyright (C) 2021, ChaN, all right reserved.
 >

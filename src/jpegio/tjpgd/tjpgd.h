@@ -11,14 +11,35 @@ extern "C" {
 #include "tjpgdcnf.h"
 #include <string.h>
 
-#if defined(_WIN32)	/* VC++ or some compiler without stdint.h */
+/* Deviation from ChaN R0.03 (see src/jpegio/README.md): upstream selects the
+/  fallback typedefs with `#if defined(_WIN32)`, while its own comment says the
+/  test is meant to be "a compiler without stdint.h". mingw is both at once --
+/  it defines _WIN32 and ships stdint.h, where uint32_t is `unsigned int`, not
+/  `unsigned long` -- so every mingw cross-build failed with conflicting types
+/  for uint32_t. Test for the header, and keep the fallback for the compiler
+/  the comment actually meant (MSVC before 2010 shipped no stdint.h). */
+#ifndef JD_HAS_STDINT	/* -DJD_HAS_STDINT=0/1 overrides the detection */
+#  if defined(__has_include)
+#    if __has_include(<stdint.h>)
+#      define JD_HAS_STDINT 1
+#    else
+#      define JD_HAS_STDINT 0
+#    endif
+#  elif defined(_MSC_VER) && _MSC_VER < 1600
+#    define JD_HAS_STDINT 0
+#  else
+#    define JD_HAS_STDINT 1
+#  endif
+#endif
+
+#if JD_HAS_STDINT
+#include <stdint.h>
+#else				/* VC++ before 2010, or another compiler without stdint.h */
 typedef unsigned char	uint8_t;
 typedef unsigned short	uint16_t;
 typedef short			int16_t;
 typedef unsigned long	uint32_t;
 typedef long			int32_t;
-#else				/* Embedded platform */
-#include <stdint.h>
 #endif
 
 #if JD_FASTDECODE >= 1
