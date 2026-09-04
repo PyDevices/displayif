@@ -91,13 +91,6 @@ struct JDEC {
 
 
 /* TJpgDec API functions */
-/* PyDevices jpegio: this vendored copy coexists with LVGL's TJpgDec in the
-   same firmware until Phase 2 of docs/jpegio-vision.md links one copy.
-   LVGL exports the same two entry points, so ours carry a prefix; every
-   other function in tjpgd.c is static. Remove with the Phase 2 change. */
-#define jd_prepare jpegio_jd_prepare
-#define jd_decomp  jpegio_jd_decomp
-
 JRESULT jd_prepare (JDEC* jd, size_t (*infunc)(JDEC*,uint8_t*,size_t), void* pool, size_t sz_pool, void* dev);
 JRESULT jd_decomp (JDEC* jd, int (*outfunc)(JDEC*,void*,JRECT*), uint8_t scale);
 

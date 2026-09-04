@@ -30,7 +30,7 @@ failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
 | `picodvi`           | `rp2` (RP2040 PIO / RP2350 HSTX)                                                                | **FBDisplay**     |
 | `rgbmatrix`         | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2`                                        | **FBDisplay**     |
 | `usdl2`             | `desktop` (MicroPython `unix` / `windows`; CircuitPython unix via `apply_cp_patches.sh`)       | **SDLDisplay**    |
-| `jpegio`            | every port (`src/jpegio/`, platform-neutral; CircuitPython has it natively)                     | any — decodes JPEG to RGB565 for `blit_rect` ([docs](src/jpegio/README.md)) |
+| `jpegio`            | every port (`src/jpegio/`, platform-neutral; CircuitPython has it natively)                     | any — decodes JPEG to RGB565 for `blit_rect`; beside `lvgl-micropython` it is also LVGL's JPEG decoder ([docs](src/jpegio/README.md)) |
 | stubs               | `samd` / `rp2` / non-1062 mimxrt (`dotclockframebuffer.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`); non-S3 `qspibus` | ctor raises |
 
 

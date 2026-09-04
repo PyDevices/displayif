@@ -23,6 +23,16 @@
 #error "jpegio needs TJpgDec built with JD_FORMAT 1 (RGB565) -- see tjpgd/tjpgdcnf.h"
 #endif
 
+// Defined by micropython.mk / micropython.cmake only when the lvgl-micropython
+// sibling usermod is in the same build: jpegio then also registers an LVGL
+// image decoder on its TJpgDec (lvgl_decoder.c).
+#ifndef JPEGIO_LVGL_DECODER
+#define JPEGIO_LVGL_DECODER 0
+#endif
+#if JPEGIO_LVGL_DECODER
+#include "lvgl_decoder.h"
+#endif
+
 // CircuitPython's work-area size (shared-module/jpegio/JpegDecoder.h). Holds
 // TJpgDec's 512-byte stream buffer, the quantiser and Huffman tables, and the
 // MCU + IDCT scratch for a 16x16 (4:2:0) MCU. Allocated once, inside the object.
@@ -438,11 +448,67 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &jpegio_jpegdecoder_locals_dict
     );
 
+// --- LVGL image decoder (beside the lvgl-micropython usermod only) ----------
+
+#if JPEGIO_LVGL_DECODER
+// register_lvgl_decoder() -> bool: register jpegio's decoder with the running
+// LVGL. True when this call added it, False when it was already registered
+// (a second registration never adds a second decoder). RuntimeError when
+// LVGL is not initialised: call lv.init() first. Needed after `import jpegio`
+// ran before lv.init(), and after every lv.deinit() / lv.init() cycle (LVGL
+// clears its decoder list on deinit).
+static mp_obj_t jpegio_register_lvgl_decoder(void) {
+    if (jpegio_lvgl_decoder_registered()) {
+        return mp_const_false;
+    }
+    if (!jpegio_lvgl_decoder_register()) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("register_lvgl_decoder() needs an initialised LVGL: lv.init() first"));
+    }
+    return mp_const_true;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(jpegio_register_lvgl_decoder_obj, jpegio_register_lvgl_decoder);
+
+// lvgl_decoders() -> tuple of str: the names of LVGL's registered image
+// decoders in the order LVGL consults them (`("jpegio", "LODEPNG", "BIN")`
+// once registered); empty before lv.init(). A diagnostic: MicroPython's
+// builtin-method self check keeps `lv.image_decoder_t.get_next(None)` from
+// walking the list in Python, and this is how the test proves a second
+// registration added nothing.
+static mp_obj_t jpegio_lvgl_decoders(void) {
+    size_t n = 0;
+    while (jpegio_lvgl_decoder_name_at(n) != NULL) {
+        n++;
+    }
+    mp_obj_tuple_t *names = MP_OBJ_TO_PTR(mp_obj_new_tuple(n, NULL));
+    for (size_t i = 0; i < n; i++) {
+        const char *name = jpegio_lvgl_decoder_name_at(i);
+        names->items[i] = mp_obj_new_str(name, strlen(name));
+    }
+    return MP_OBJ_FROM_PTR(names);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(jpegio_lvgl_decoders_obj, jpegio_lvgl_decoders);
+
+// Module __init__: MicroPython calls it on `import jpegio` (every import
+// statement, on ports with MICROPY_MODULE_BUILTIN_INIT). If LVGL is already
+// initialised, register now, so `import lvgl; lv.init(); import jpegio`
+// needs nothing more. Idempotent, and silent when LVGL is not up yet.
+static mp_obj_t jpegio___init__(void) {
+    jpegio_lvgl_decoder_register();     // no-op (false) until lv.init() has run
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(jpegio___init___obj, jpegio___init__);
+#endif
+
 // --- module -----------------------------------------------------------------
 
 static const mp_rom_map_elem_t jpegio_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_jpegio) },
     { MP_ROM_QSTR(MP_QSTR_JpegDecoder), MP_ROM_PTR(&jpegio_jpegdecoder_type) },
+    #if JPEGIO_LVGL_DECODER
+    { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&jpegio___init___obj) },
+    { MP_ROM_QSTR(MP_QSTR_register_lvgl_decoder), MP_ROM_PTR(&jpegio_register_lvgl_decoder_obj) },
+    { MP_ROM_QSTR(MP_QSTR_lvgl_decoders), MP_ROM_PTR(&jpegio_lvgl_decoders_obj) },
+    #endif
 };
 static MP_DEFINE_CONST_DICT(jpegio_module_globals, jpegio_module_globals_table);
 

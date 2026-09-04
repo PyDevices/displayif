@@ -10,6 +10,11 @@ Platform-neutral C: built on every port from the root `micropython.mk` /
 `micropython.cmake`. Output is native-order RGB565, block by block, straight
 from TJpgDec — no full-frame buffer inside the module.
 
+Beside the `lvgl-micropython` usermod it is also LVGL's JPEG decoder: the
+same TJpgDec, registered through LVGL's public `lv_image_decoder_create`
+API, so `lv.image` shows JPEGs (webcam MJPEG frames included) with one
+decoder in the firmware — see [LVGL image decoder](#lvgl-image-decoder).
+
 ```python
 import jpegio
 decoder = jpegio.JpegDecoder()          # allocates its ~3.7 KB work area once
@@ -159,7 +164,10 @@ to byte-swap for `RGB565_SWAPPED`); see above. And errors are typed
 ## Build
 
 - `jpegio.c` — the module (`MP_REGISTER_MODULE(MP_QSTR_jpegio, ...)`).
-- `tjpgd/` — vendored TJpgDec: `tjpgd.c`, `tjpgd.h`, `tjpgdcnf.h`.
+- `tjpgd/` — vendored TJpgDec: `tjpgd.c`, `tjpgd.h`, `tjpgdcnf.h`. The
+  firmware's only TJpgDec, always compiled.
+- `lvgl_decoder.c` / `lvgl_decoder.h` — the LVGL image decoder on that
+  TJpgDec; compiled only beside `lvgl-micropython` (below).
 - `micropython.mk` / `micropython.cmake` — glue, included unconditionally
   from displayif's root build files.
 
@@ -167,15 +175,25 @@ to byte-swap for `RGB565_SWAPPED`); see above. And errors are typed
 (RGB565), `JD_USE_SCALE 1`, `JD_TBLCLIP 1`, `JD_FASTDECODE 1`. `jpegio.c`
 refuses to build with any other `JD_FORMAT`.
 
-**Phase 2 hook — `JPEGIO_VENDOR_TJPGD`** (Make and CMake, default `1`):
-set it to `0` to leave `tjpgd/tjpgd.c` out of the build and link against a
-TJpgDec another usermod already provides (LVGL's, once `lv_tjpgd.c` honours
-`JD_FORMAT` and LVGL's `tjpgdcnf.h` matches this one). The header on the
-include path must then describe the same configuration, because `JDEC`'s
-layout depends on `JD_FASTDECODE`. Nothing detects LVGL yet; today a
-firmware that links both LVGL (with `LV_USE_TJPGD 1`) and this module gets
-two `jd_prepare` definitions and must pass `JPEGIO_VENDOR_TJPGD=0` by hand
-— that is exactly the Phase 2 work.
+**With LVGL (D4 of the org's `docs/jpegio-vision.md`: displayif
+self-detects).** LVGL's own TJPGD is off by config on MicroPython
+(`LV_USE_TJPGD 0` in lvgl-bindings' `lv_conf.h`), so nothing clashes with
+the vendored copy and LVGL has no JPEG decoder of its own; this module
+supplies one. Make ports: when
+`$(USER_C_MODULES)/lvgl-micropython/micropython.mk` exists — py.mk's own
+usermod glob, one level under `USER_C_MODULES` — `micropython.mk` compiles
+`lvgl_decoder.c` with `-DJPEGIO_LVGL_DECODER=1` and adds the bindings
+checkout (`lv_conf.h`) and its `lvgl/` (`lvgl.h`) to the include path.
+`JPEGIO_LVGL_BINDINGS_DIR` is derived the way `lvgl-micropython/micropython.mk`
+derives `BINDINGS_DIR` (the sibling `lvgl-bindings`), honours a
+`BINDINGS_DIR` given on the make command line, and can be overridden
+itself; `JPEGIO_LVGL=0` / `1` forces the decision. CMake ports: the default
+is the sibling `../lvgl-micropython/micropython.cmake` of this repo, or an
+`lv_micropython` target an earlier entry of a semicolon-separated
+`USER_C_MODULES` list already defined; `-DJPEGIO_LVGL=ON` plus
+`-DJPEGIO_LVGL_BINDINGS_DIR=...` covers any other layout. Without the
+sibling nothing changes: displayif's own clean-build CI is LVGL-less and
+stays so.
 
 ## NOTICE — TJpgDec
 
@@ -197,10 +215,81 @@ license header:
 `shared-module/jpegio` (Copyright (c) 2023 Jeff Epler for Adafruit
 Industries, MIT).
 
-## Two copies today, one tomorrow
+## LVGL image decoder
 
-In a firmware that also carries LVGL (with `LV_USE_TJPGD`), LVGL links its own TJpgDec and exports
-the same `jd_prepare`/`jd_decomp` symbols. `tjpgd/tjpgd.h` prefixes this module's two entry points
-(`jpegio_jd_*`) so both copies link — about 6 KB of duplicated code, deliberately temporary. Phase 2
-of `pydevices/docs/jpegio-vision.md` unifies the TJpgDec config (this module's, CP's) across LVGL and
-jpegio and sets `JPEGIO_VENDOR_TJPGD=0` when LVGL is present, leaving one copy.
+Built only beside `lvgl-micropython` (see Build). It is an ordinary LVGL
+image decoder named `"jpegio"` (`lv_image_decoder_t.name`), created with
+`lv_image_decoder_create`, so `lv.image(...).set_src(...)` and every other
+LVGL image path decode baseline JPEGs through this module's TJpgDec:
+
+```python
+import lvgl as lv
+import jpegio
+lv.init()
+jpegio.register_lvgl_decoder()     # needed only if `import jpegio` ran before lv.init()
+
+with open("/sd/photo.jpg", "rb") as f:
+    jpeg = f.read()
+dsc = lv.image_dsc_t({"header": {"w": 320, "h": 240, "cf": lv.COLOR_FORMAT.RAW},
+                      "data_size": len(jpeg), "data": jpeg})
+lv.image(lv.screen_active()).set_src(dsc)
+```
+
+**Registration.** Two ways, both idempotent — registering twice never adds
+a second decoder:
+
+- On `import jpegio`, if LVGL is already initialised (`lv.init()` ran), the
+  module registers itself. MicroPython runs a built-in module's `__init__`
+  on every `import` statement (`MICROPY_MODULE_BUILTIN_INIT`, on by default
+  at the "extra features" ROM level: unix, esp32, rp2, stm32, mimxrt,
+  SAMD51; not on SAMD21's "basic" level).
+- `jpegio.register_lvgl_decoder() -> bool` registers explicitly: `True`
+  when this call added the decoder, `False` when it was already there,
+  `RuntimeError` when LVGL is not initialised. Use it when `import jpegio`
+  came before `lv.init()`, and after every `lv.deinit()` / `lv.init()` cycle
+  (LVGL clears its decoder list on deinit).
+
+`jpegio.lvgl_decoders() -> tuple` lists LVGL's registered image decoders by
+name in the order LVGL consults them — `("jpegio", "LODEPNG", "BIN")` once
+registered (a new decoder goes to the head of LVGL's list), `()` before
+`lv.init()`. A diagnostic: the binding cannot walk that list from Python
+(MicroPython's builtin-method self check refuses
+`lv.image_decoder_t.get_next(None)`), and it is how the test proves that
+registering twice adds nothing.
+
+**Sources.** A variable source (`lv.image_dsc_t`) whose `data` starts with
+the SOI marker `FF D8`, or a file (through a registered `lv.fs_drv_t`, e.g.
+lvgl-bindings' `fs_driver.py`) whose first two bytes are `FF D8` — the
+extension is not consulted. Nothing more is sniffed: LVGL's own `is_jpg()`
+wants a 10-byte JFIF signature and so rejects every UVC MJPEG frame; here
+`jd_prepare` judges, for both source kinds, in the decoder's *info* step.
+So the image size LVGL sees is the stream's own — the `w`/`h` in your
+`lv.image_dsc_t` header are not echoed (LVGL's TJPGD echoed them) — and a
+pixel buffer that merely starts `FF D8` fails `jd_prepare` and falls
+through to LVGL's built-in decoder. `cf` in the header should be
+`lv.COLOR_FORMAT.RAW` (or `RAW_ALPHA`), the convention for "not pixels";
+`data_size` must be the JPEG's length.
+
+**Output.** `LV_COLOR_FORMAT_RGB565`, native byte order, stride `w * 2`,
+the same pixels `JpegDecoder.decode()` produces (the LVGL test asserts
+jpegio's own golden digests through `lv.image`). LVGL's software renderer
+blends RGB565 into an RGB565 display by row copy, its fast path.
+
+**Memory.** The decoder decodes the whole image in its *open* step into a
+draw buffer of `w * h * 2` bytes (from LVGL's image-cache allocator, i.e.
+the MicroPython heap), which LVGL frees at *close* — every refresh, unless
+LVGL's image cache is on (`LV_CACHE_DEF_SIZE`, 0 in lvgl-bindings). That is
+what LVGL's own full-decode decoders (`lv_lodepng.c`) do. It is not the
+block-wise, no-frame-buffer path `JpegDecoder.decode(callable)` offers:
+LVGL's `lv_tjpgd.c` decodes MCU by MCU only through exports it added to its
+private TJpgDec (`jd_mcu_load`, `jd_mcu_output`, `jd_restart`), which ChaN's
+R0.03 does not have, and `jd_decomp` is all-or-nothing. A camera preview
+that must not hold a frame buffer uses `jpegio.JpegDecoder` and
+`display_drv.blit_rect` directly. Scaling (`scale` 1..3) is a
+`JpegDecoder` feature, not exposed to LVGL (its zoom is its own).
+
+**Errors.** A source the decoder cannot open is simply not claimed
+(`LV_RESULT_INVALID`, so LVGL tries its other decoders and then draws
+nothing); a stream that fails mid-decode (truncated scan) is reported as
+an open failure the same way. No Python exception is raised from inside
+LVGL's draw path.

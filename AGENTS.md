@@ -21,7 +21,7 @@ attr / soft-reset patterns when changing siblings.
 |------|----------|
 | `src/include/` | Public headers (`displayif/` subdir) |
 | `src/ports/` | Port C sources + per-port `micropython.mk` / `.cmake` (`common/`, `esp32/`, `desktop/usdl2/`, …) |
-| `src/jpegio/` | `jpegio` JPEG decoder (CircuitPython API, vendored TJpgDec in `tjpgd/`); platform-neutral, built on every port — [src/jpegio/README.md](src/jpegio/README.md) |
+| `src/jpegio/` | `jpegio` JPEG decoder (CircuitPython API, vendored TJpgDec in `tjpgd/`); platform-neutral, built on every port; `lvgl_decoder.c` registers it as LVGL's JPEG decoder when the `lvgl-micropython` sibling usermod is in the build — [src/jpegio/README.md](src/jpegio/README.md) |
 | `src/circuitpython_spike/` | CP unix spike for `usdl2` (copied by `apply_cp_patches.sh`) |
 | `docs/` | Markdown docs (root keeps `README.md` and `AGENTS.md` only) |
 | `docs/ports/` | Per-port notes moved from former `ports/*/README.md` |
