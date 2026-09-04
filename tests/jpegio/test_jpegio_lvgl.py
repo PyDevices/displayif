@@ -44,7 +44,11 @@ mechanically:
 
 Skips (exit 0, prints SKIP) when `import lvgl` fails: the interpreter was
 built without the lvgl-micropython usermod, and displayif's LVGL-less
-clean-build CI runs this file too.
+clean-build CI runs this file too.  Before skipping it asserts the other
+half of the contract, the one that only a decoder-less build can check:
+jpegio.register_lvgl_decoder() and jpegio.lvgl_decoders() are module
+attributes on EVERY build, the first raising RuntimeError that names the
+missing sibling, the second returning ().
 
     ./micropython/ports/unix/build-standard/micropython tests/jpegio/test_jpegio_lvgl.py
 """
@@ -53,6 +57,22 @@ import sys
 try:
     import lvgl as lv
 except ImportError:
+    # No lvgl-micropython in this build, so lvgl_decoder.c was not compiled --
+    # but the two module attributes are unconditional (jpegio.c keeps them out
+    # of the #if, so the CMake ports' QSTR pass sees their names and the API
+    # never silently disappears).  This is the only build that can check it.
+    import jpegio
+
+    try:
+        jpegio.register_lvgl_decoder()
+    except RuntimeError as e:
+        assert "built without its LVGL decoder" in str(e), e
+        print("no LVGL decoder compiled in: register_lvgl_decoder() -> RuntimeError: %s" % e)
+    else:
+        raise AssertionError("register_lvgl_decoder() returned without the decoder compiled in")
+    assert jpegio.lvgl_decoders() == (), jpegio.lvgl_decoders()
+    print("no LVGL decoder compiled in: lvgl_decoders() == ()")
+
     print("SKIP: no `lvgl` module in this interpreter (build with the lvgl-micropython usermod)")
     sys.exit(0)
 

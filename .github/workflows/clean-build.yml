@@ -70,8 +70,15 @@ jobs:
           ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio.py
 
       - name: Run tests/jpegio/test_jpegio_lvgl.py (must print SKIP -- no lvgl here)
+        # This leg is the only one that can check the decoder-less contract:
+        # register_lvgl_decoder() and lvgl_decoders() are module attributes on
+        # every build (they must be, or the CMake ports' QSTR pass never sees
+        # their names -- see src/jpegio/README.md), the first raising
+        # RuntimeError here, the second returning ().
         run: |
           ./micropython/ports/unix/build-standard/micropython displayif/tests/jpegio/test_jpegio_lvgl.py | tee lvgl.out
+          grep -q 'register_lvgl_decoder() -> RuntimeError' lvgl.out
+          grep -q 'lvgl_decoders() == ()' lvgl.out
           grep -q '^SKIP' lvgl.out
 
   # Scenario: the same stranger adds the LVGL family. jpegio Phase 2 (org

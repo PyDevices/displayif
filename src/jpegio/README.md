@@ -192,8 +192,10 @@ is the sibling `../lvgl-micropython/micropython.cmake` of this repo, or an
 `lv_micropython` target an earlier entry of a semicolon-separated
 `USER_C_MODULES` list already defined; `-DJPEGIO_LVGL=ON` plus
 `-DJPEGIO_LVGL_BINDINGS_DIR=...` covers any other layout. Without the
-sibling nothing changes: displayif's own clean-build CI is LVGL-less and
-stays so.
+sibling nothing links against LVGL — displayif's own clean-build CI is
+LVGL-less and stays so — but the module still exports
+`register_lvgl_decoder()` and `lvgl_decoders()`; see *Why these two names
+are unconditional* below.
 
 ## NOTICE — TJpgDec
 
@@ -217,10 +219,12 @@ Industries, MIT).
 
 ## LVGL image decoder
 
-Built only beside `lvgl-micropython` (see Build). It is an ordinary LVGL
-image decoder named `"jpegio"` (`lv_image_decoder_t.name`), created with
-`lv_image_decoder_create`, so `lv.image(...).set_src(...)` and every other
-LVGL image path decode baseline JPEGs through this module's TJpgDec:
+The decoder itself (`lvgl_decoder.c`) is compiled only beside
+`lvgl-micropython` (see Build); the two Python names below exist on every
+build. It is an ordinary LVGL image decoder named `"jpegio"`
+(`lv_image_decoder_t.name`), created with `lv_image_decoder_create`, so
+`lv.image(...).set_src(...)` and every other LVGL image path decode
+baseline JPEGs through this module's TJpgDec:
 
 ```python
 import lvgl as lv
@@ -247,7 +251,10 @@ a second decoder:
   when this call added the decoder, `False` when it was already there,
   `RuntimeError` when LVGL is not initialised. Use it when `import jpegio`
   came before `lv.init()`, and after every `lv.deinit()` / `lv.init()` cycle
-  (LVGL clears its decoder list on deinit).
+  (LVGL clears its decoder list on deinit). On a build with no decoder in it
+  the call always raises `RuntimeError`, and the message names both the cause
+  and the way out: *no lvgl-micropython sibling at build time (rebuild with
+  `JPEGIO_LVGL=1` to force it)*.
 
 `jpegio.lvgl_decoders() -> tuple` lists LVGL's registered image decoders by
 name in the order LVGL consults them — `("jpegio", "LODEPNG", "BIN")` once
@@ -255,7 +262,27 @@ registered (a new decoder goes to the head of LVGL's list), `()` before
 `lv.init()`. A diagnostic: the binding cannot walk that list from Python
 (MicroPython's builtin-method self check refuses
 `lv.image_decoder_t.get_next(None)`), and it is how the test proves that
-registering twice adds nothing.
+registering twice adds nothing. On a build with no decoder in it, `()`
+always.
+
+**Why these two names are unconditional.** They are module attributes on
+every build, and only `lvgl_decoder.c` is conditional. Partly so the API
+never silently disappears when the sibling scan misses — a decoder-less
+build says so, in an exception, instead of raising `AttributeError` — and
+partly because the CMake ports cannot compile them any other way.
+MicroPython's `py/mkrules.cmake` builds the QSTR-extraction preprocessor
+flags from the *port target's* own `COMPILE_DEFINITIONS`
+(`get_target_property(MICROPY_CPP_DEF ${MICROPY_TARGET} COMPILE_DEFINITIONS)`),
+so a usermod's `INTERFACE` define — which is how `micropython.cmake`
+passes `JPEGIO_LVGL_DECODER=1` — never reaches `makeqstrdefs.py`. An
+`MP_QSTR_*` referenced only inside
+`#if JPEGIO_LVGL_DECODER` is therefore never collected on esp32, rp2, samd,
+mimxrt or stm32, and the build fails with
+`error: 'MP_QSTR_register_lvgl_decoder' undeclared`. (The Makefile ports put
+the define in global `CFLAGS_USERMOD` and their QSTR pass reads `CFLAGS`,
+which is why unix builds never showed it.) `MP_QSTR___init__` survives
+inside the `#if` only because MicroPython's core QSTR pool already has that
+name. Do not re-conditionalise either function.
 
 **Sources.** A variable source (`lv.image_dsc_t`) whose `data` starts with
 the SOI marker `FF D8`, or a file (through a registered `lv.fs_drv_t`, e.g.

@@ -448,16 +448,26 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &jpegio_jpegdecoder_locals_dict
     );
 
-// --- LVGL image decoder (beside the lvgl-micropython usermod only) ----------
+// --- LVGL image decoder ------------------------------------------------------
+//
+// register_lvgl_decoder() and lvgl_decoders() are module attributes on EVERY
+// build; only the decoder itself (lvgl_decoder.c) is conditional. Two reasons:
+// the API must not silently vanish when the sibling scan misses, and on the
+// CMake ports (esp32, rp2, samd, mimxrt, stm32) a QSTR referenced only inside
+// `#if JPEGIO_LVGL_DECODER` is never collected -- py/mkrules.cmake builds the
+// QSTR preprocessor flags from the port target's own COMPILE_DEFINITIONS, so a
+// usermod's INTERFACE define never reaches makeqstrdefs.py and the build fails
+// with `MP_QSTR_register_lvgl_decoder undeclared`. See README.md.
 
-#if JPEGIO_LVGL_DECODER
 // register_lvgl_decoder() -> bool: register jpegio's decoder with the running
 // LVGL. True when this call added it, False when it was already registered
 // (a second registration never adds a second decoder). RuntimeError when
 // LVGL is not initialised: call lv.init() first. Needed after `import jpegio`
 // ran before lv.init(), and after every lv.deinit() / lv.init() cycle (LVGL
-// clears its decoder list on deinit).
+// clears its decoder list on deinit). Without the decoder compiled in
+// (JPEGIO_LVGL_DECODER 0) it always raises RuntimeError, naming why.
 static mp_obj_t jpegio_register_lvgl_decoder(void) {
+    #if JPEGIO_LVGL_DECODER
     if (jpegio_lvgl_decoder_registered()) {
         return mp_const_false;
     }
@@ -465,6 +475,9 @@ static mp_obj_t jpegio_register_lvgl_decoder(void) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("register_lvgl_decoder() needs an initialised LVGL: lv.init() first"));
     }
     return mp_const_true;
+    #else
+    mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("jpegio was built without its LVGL decoder: no lvgl-micropython sibling at build time (rebuild with JPEGIO_LVGL=1 to force it)"));
+    #endif
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(jpegio_register_lvgl_decoder_obj, jpegio_register_lvgl_decoder);
 
@@ -473,8 +486,10 @@ static MP_DEFINE_CONST_FUN_OBJ_0(jpegio_register_lvgl_decoder_obj, jpegio_regist
 // once registered); empty before lv.init(). A diagnostic: MicroPython's
 // builtin-method self check keeps `lv.image_decoder_t.get_next(None)` from
 // walking the list in Python, and this is how the test proves a second
-// registration added nothing.
+// registration added nothing. Without the decoder compiled in
+// (JPEGIO_LVGL_DECODER 0) it is always the empty tuple.
 static mp_obj_t jpegio_lvgl_decoders(void) {
+    #if JPEGIO_LVGL_DECODER
     size_t n = 0;
     while (jpegio_lvgl_decoder_name_at(n) != NULL) {
         n++;
@@ -485,9 +500,13 @@ static mp_obj_t jpegio_lvgl_decoders(void) {
         names->items[i] = mp_obj_new_str(name, strlen(name));
     }
     return MP_OBJ_FROM_PTR(names);
+    #else
+    return mp_const_empty_tuple;
+    #endif
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(jpegio_lvgl_decoders_obj, jpegio_lvgl_decoders);
 
+#if JPEGIO_LVGL_DECODER
 // Module __init__: MicroPython calls it on `import jpegio` (every import
 // statement, on ports with MICROPY_MODULE_BUILTIN_INIT). If LVGL is already
 // initialised, register now, so `import lvgl; lv.init(); import jpegio`
@@ -506,9 +525,11 @@ static const mp_rom_map_elem_t jpegio_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_JpegDecoder), MP_ROM_PTR(&jpegio_jpegdecoder_type) },
     #if JPEGIO_LVGL_DECODER
     { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&jpegio___init___obj) },
+    #endif
+    // Unconditional: see the LVGL section above (the API stays, and the CMake
+    // ports' QSTR pass cannot see a name that lives only inside the #if).
     { MP_ROM_QSTR(MP_QSTR_register_lvgl_decoder), MP_ROM_PTR(&jpegio_register_lvgl_decoder_obj) },
     { MP_ROM_QSTR(MP_QSTR_lvgl_decoders), MP_ROM_PTR(&jpegio_lvgl_decoders_obj) },
-    #endif
 };
 static MP_DEFINE_CONST_DICT(jpegio_module_globals, jpegio_module_globals_table);
 
