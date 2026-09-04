@@ -196,3 +196,11 @@ license header:
 `jpegio.c` is a port of CircuitPython's `shared-bindings/jpegio` and
 `shared-module/jpegio` (Copyright (c) 2023 Jeff Epler for Adafruit
 Industries, MIT).
+
+## Two copies today, one tomorrow
+
+In a firmware that also carries LVGL (with `LV_USE_TJPGD`), LVGL links its own TJpgDec and exports
+the same `jd_prepare`/`jd_decomp` symbols. `tjpgd/tjpgd.h` prefixes this module's two entry points
+(`jpegio_jd_*`) so both copies link — about 6 KB of duplicated code, deliberately temporary. Phase 2
+of `pydevices/docs/jpegio-vision.md` unifies the TJpgDec config (this module's, CP's) across LVGL and
+jpegio and sets `JPEGIO_VENDOR_TJPGD=0` when LVGL is present, leaving one copy.
