@@ -276,13 +276,17 @@ flags from the *port target's* own `COMPILE_DEFINITIONS`
 so a usermod's `INTERFACE` define — which is how `micropython.cmake`
 passes `JPEGIO_LVGL_DECODER=1` — never reaches `makeqstrdefs.py`. An
 `MP_QSTR_*` referenced only inside
-`#if JPEGIO_LVGL_DECODER` is therefore never collected on esp32, rp2, samd,
-mimxrt or stm32, and the build fails with
-`error: 'MP_QSTR_register_lvgl_decoder' undeclared`. (The Makefile ports put
-the define in global `CFLAGS_USERMOD` and their QSTR pass reads `CFLAGS`,
-which is why unix builds never showed it.) `MP_QSTR___init__` survives
-inside the `#if` only because MicroPython's core QSTR pool already has that
-name. Do not re-conditionalise either function.
+`#if JPEGIO_LVGL_DECODER` is therefore never collected on a CMake port, and
+the build fails with `error: 'MP_QSTR_register_lvgl_decoder' undeclared`.
+In MicroPython v1.28.0 that means esp32 and rp2, the only two ports with a
+`CMakeLists.txt`; samd, mimxrt and stm32 carry CMake glue here for the day
+they gain one, and build through their Makefile today. (The Makefile ports
+put the define in `CFLAGS_USERMOD`, which `py/py.mk` folds into `CFLAGS`,
+and their QSTR pass reads `CFLAGS`, which is why unix builds never showed
+it.) `MP_QSTR___init__` survives inside the `#if` only because it is one of
+MicroPython's static-pool qstrs (`py/makeqstrdata.py`), not because
+anything here collects it, so any *new* `MP_QSTR_*` put under that `#if`
+brings the break straight back. Do not re-conditionalise either function.
 
 **Sources.** A variable source (`lv.image_dsc_t`) whose `data` starts with
 the SOI marker `FF D8`, or a file (through a registered `lv.fs_drv_t`, e.g.
