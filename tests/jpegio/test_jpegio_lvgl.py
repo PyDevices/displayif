@@ -15,16 +15,22 @@ mechanically:
      a real non-JFIF C920e frame -- the SOI-only sniff through LVGL) flushed
      to a 320x240 RGB565 frame buffer gives EXACTLY jpegio's own golden
      digests from frames/golden_tjpgd.json at scale 0.  Exact equality is the
-     expectation (RGB565 into RGB565 at opa 255 is a row copy); if a digest
-     differs the test says so LOUDLY, prints both digests and falls back to
-     the BARS positional pixels and the Pillow means of reference.json;
+     gate (RGB565 into RGB565 at opa 255 is a row copy): a digest that
+     differs FAILS the test, after printing both digests and, as
+     diagnostics only, the BARS positional pixels and the Pillow means of
+     reference.json -- those tell a gross fault (wrong colours, wrong
+     stride) from a subtle one (pixels shuffled) but never pass anything.
+     "Something was drawn" is witnessed against the digest of the screen
+     background alone, not against a zero buffer: LVGL paints the
+     background into every flush, so the buffer is never zero;
   3. decoder_info tells the truth, read back through lv.image's source size:
      the size LVGL reports is the stream's own (a wrong w/h in the
      lv.image_dsc_t header is not echoed); non-JPEG bytes and a bare SOI are
      not claimed by jpegio -- they fall through to LVGL's built-in decoder,
      which echoes the header (jpegio never does); and an RGB565 pixel buffer
      that happens to start FF D8 is drawn by that built-in decoder as pixels;
-  4. a truncated scan draws nothing and does not crash;
+  4. a truncated scan draws nothing (the frame is the background alone) and
+     does not crash;
   5. a file source through fs_driver.py (when frozen in) decodes the same;
   6. 20 refreshes (each an open/decode/close) do not trend gc.mem_free() down;
   7. lv.deinit() / lv.init() drops the decoder; registering again restores it
@@ -159,13 +165,6 @@ class Frame:
         self.flushes += 1
         disp.flush_ready()
 
-    def is_zero(self):
-        for b in self.buf:
-            if b:
-                return False
-        return True
-
-
 def setup_display(frame):
     """320x240 RGB565 display like lvgl-bindings/tools/test_lvgl_smoke.py's _setup_display."""
     disp = lv.display_create(W, H)
@@ -194,6 +193,17 @@ def show(disp, frame, src):
     scr.invalidate()
     lv.refr_now(disp)
     return img
+
+
+def background_digest(disp, frame):
+    """Digest of a refresh with nothing on the screen: what "nothing drawn" looks like."""
+    scr = lv.screen_active()
+    scr.clean()
+    frame.zero()
+    scr.invalidate()
+    lv.refr_now(disp)
+    assert frame.flushes > 0
+    return sha256_hex(frame.buf)
 
 
 def src_size(img):
@@ -235,31 +245,43 @@ def main():
     print("== 2. lv.image through the flush buffer vs golden_tjpgd.json (scale 0)")
     frame = Frame()
     disp, draw_buf = setup_display(frame)
+    bg = background_digest(disp, frame)
+    for name in CORPUS:
+        assert bg != golden[name]["0"], "the empty screen already hashes to %s's golden" % name
+    print("background-only refresh: sha256 %s.. (what 'nothing drawn' looks like)" % bg[:16])
     exact = 0
+    mismatched = []
     keep = []
     for name in CORPUS:
         dsc = image_dsc(jpegs[name])
         keep.append(dsc)
         img = show(disp, frame, dsc)
         assert frame.flushes > 0, "no flush during refr_now"
-        assert not frame.is_zero(), "%s: flush buffer still zero -- nothing was drawn" % name
         assert (img.get_width(), img.get_height()) == (W, H), (name, img.get_width(), img.get_height())
         digest = sha256_hex(frame.buf)
+        assert digest != bg, "%s: the frame is the background alone -- nothing was drawn" % name
         want = golden[name]["0"]
         if digest == want:
             exact += 1
             print("%-28s %d flush(es)  sha256 %s.. == golden: EXACT" % (name, frame.flushes, digest[:16]))
             continue
+        mismatched.append(name)
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print("!! %s: DIGEST MISMATCH through lv.image" % name)
+        print("!! %s: DIGEST MISMATCH through lv.image -- this fails the test" % name)
         print("!!   got    %s" % digest)
         print("!!   golden %s" % want)
-        print("!! falling back to the positional / mean checks -- NOT the exact gate")
+        print("!! diagnostics (never a pass): positional / mean checks")
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        err = check_means(name, frame.buf, reference)
-        checked = 0 if name.startswith("c920e_") else check_bars(name, frame.buf)
-        print("%-28s fallback passed: mean err r=%+.3f g=%+.3f b=%+.3f, %d bar samples" % (name, err[0], err[1], err[2], checked))
+        try:
+            err = check_means(name, frame.buf, reference)
+            checked = 0 if name.startswith("c920e_") else check_bars(name, frame.buf)
+            print("%-28s diagnostics: mean err r=%+.3f g=%+.3f b=%+.3f within %.1f, %d bar samples within %d"
+                  " -- colours and stride are right, so the pixels are shuffled (a subtle fault)"
+                  % (name, err[0], err[1], err[2], MEAN_TOL, checked, POS_TOL))
+        except AssertionError as e:
+            print("%-28s diagnostics: %s -- a gross fault (colours or stride)" % (name, e))
     print("digests exact through lv.image: %d of %d" % (exact, len(CORPUS)))
+    assert exact == len(CORPUS), "not the exact gate: %s differ from golden_tjpgd.json through lv.image" % mismatched
 
     # 3. decoder_info tells the truth (read back through the widget's source size)
     print("== 3. decoder_info: stream size wins, non-JPEG not claimed, FF D8 pixels not claimed")
@@ -267,8 +289,8 @@ def main():
     img = show(disp, frame, wrong)
     assert src_size(img) == (W, H), "header 1x1 was echoed: %s" % (src_size(img),)
     assert (img.get_width(), img.get_height()) == (W, H)
-    assert sha256_hex(frame.buf) == golden["c920e_320x240_dri.jpg"]["0"] or not frame.is_zero()
-    print("dsc header 1x1 -> lv.image sees %dx%d from jd_prepare" % src_size(img))
+    assert sha256_hex(frame.buf) == golden["c920e_320x240_dri.jpg"]["0"], "header 1x1: digest differs from golden"
+    print("dsc header 1x1 -> lv.image sees %dx%d from jd_prepare, digest EXACT" % src_size(img))
     # LVGL's built-in BIN decoder claims any variable source whose header cf
     # is not UNKNOWN (RAW included) and echoes the header; jpegio's decoder
     # sits ahead of it and never echoes (its size comes from jd_prepare or
@@ -296,8 +318,8 @@ def main():
     half_dsc = image_dsc(half)
     img = show(disp, frame, half_dsc)
     assert src_size(img) == (W, H), src_size(img)      # headers parse: info OK
-    assert sha256_hex(frame.buf) != golden["restart_dri_320x240.jpg"]["0"]
-    print("half a scan (%d of %d bytes): info OK, open refused, refr_now survived" % (len(half), len(rst)))
+    assert sha256_hex(frame.buf) == bg, "half a scan drew something: %s" % sha256_hex(frame.buf)
+    print("half a scan (%d of %d bytes): info OK, open refused, nothing drawn, refr_now survived" % (len(half), len(rst)))
 
     # 5. a file source through fs_driver.py (frozen in by lvgl-micropython's manifest)
     print("== 5. file source")
@@ -314,21 +336,18 @@ def main():
         assert src_size(img) == (W, H), src_size(img)
         digest = sha256_hex(frame.buf)
         want = golden["c920e_320x240_dri.jpg"]["0"]
-        if digest == want:
-            print("%s: sha256 %s.. == golden: EXACT" % (path, digest[:16]))
-        else:
-            print("!! file source DIGEST MISMATCH: got %s golden %s" % (digest, want))
-            check_means("c920e_320x240_dri.jpg", frame.buf, reference)
-            print("!! fallback (means) passed")
+        assert digest == want, "file source DIGEST MISMATCH: got %s golden %s" % (digest, want)
+        print("%s: sha256 %s.. == golden: EXACT" % (path, digest[:16]))
         img = show(disp, frame, "S:" + FRAMES + "/README.md")
         assert src_size(img) == (0, 0), src_size(img)
-        print("a non-JPEG file (README.md) is not claimed")
+        assert sha256_hex(frame.buf) == bg
+        print("a non-JPEG file (README.md) is not claimed, nothing drawn")
 
     # 6. memory over repeated refreshes (each: open -> decode -> close)
     print("== 6. memory over 20 refreshes of the C920e frame")
     dsc = image_dsc(jpegs["c920e_320x240_dri.jpg"])
     img = show(disp, frame, dsc)
-    assert sha256_hex(frame.buf) == golden["c920e_320x240_dri.jpg"]["0"] or not frame.is_zero()
+    assert sha256_hex(frame.buf) == golden["c920e_320x240_dri.jpg"]["0"]
     for _ in range(3):
         img.invalidate()
         lv.refr_now(disp)

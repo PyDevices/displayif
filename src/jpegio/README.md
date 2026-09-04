@@ -288,8 +288,13 @@ that must not hold a frame buffer uses `jpegio.JpegDecoder` and
 `display_drv.blit_rect` directly. Scaling (`scale` 1..3) is a
 `JpegDecoder` feature, not exposed to LVGL (its zoom is its own).
 
-**Errors.** A source the decoder cannot open is simply not claimed
-(`LV_RESULT_INVALID`, so LVGL tries its other decoders and then draws
-nothing); a stream that fails mid-decode (truncated scan) is reported as
-an open failure the same way. No Python exception is raised from inside
-LVGL's draw path.
+**Errors.** A source the decoder does not recognise in its *info* step (no
+`FF D8`, or `jd_prepare` refuses the headers: progressive, DHT-less, not a
+JPEG at all) is not claimed (`LV_RESULT_INVALID`), so LVGL tries its other
+decoders and, when none claims it, draws nothing. A source whose *info*
+succeeded but whose *open* fails (a truncated scan, a decode error inside
+the frame, no memory for the `w * h * 2` buffer) also draws nothing, but
+LVGL does **not** try another decoder after a failed open — its
+`lv_image_decoder.c` assumes a decoder that could read the info can open
+the image — so the failure is final for that draw and logged at
+`LV_LOG_WARN`. No Python exception is raised from inside LVGL's draw path.

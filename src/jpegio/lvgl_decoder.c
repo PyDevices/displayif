@@ -41,7 +41,7 @@
 #if JD_FORMAT != 1
 #error "jpegio's LVGL decoder labels its output RGB565: TJpgDec must be built with JD_FORMAT 1"
 #endif
-#if LV_COLOR_16_SWAP
+#if defined(LV_COLOR_16_SWAP) && LV_COLOR_16_SWAP   /* -Wundef clean: lv_conf.h does not define it */
 #error "jpegio's LVGL decoder emits native-order RGB565; LV_COLOR_16_SWAP is not supported"
 #endif
 
