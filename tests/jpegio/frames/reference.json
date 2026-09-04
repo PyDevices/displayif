@@ -1,0 +1,603 @@
+{
+ "_about": [
+  "Pillow fidelity reference for tests/jpegio/frames; written by tests/jpegio/reference.py.",
+  "scales[k]: decode at scale k (1/2**k) -> width x height RGB565 buffer, little-endian",
+  "uint16, row-major; sha256_rgb565 is the digest of that buffer; mean_rgb are per-channel",
+  "means of the 8-bit reference, mean_rgb565 the means of r&0xF8, g&0xFC, b&0xF8 (what a",
+  "decoder's RGB565 output unpacks to). Downscaling is a truncating integer box average of",
+  "the full libjpeg decode (as TJpgDec's mcu_output does), NOT draft()/reduce().",
+  "Compare with a tolerance: TJpgDec's IDCT, chroma replication and DC-only 1/8 differ."
+ ],
+ "pillow": "12.3.0",
+ "rgb565": "((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3), little-endian uint16 (native order on all PyDevices targets)",
+ "scale_dims": "width = source_width >> scale, height = source_height >> scale (partial-MCU remainder dropped, as TJpgDec does)",
+ "frames": {
+  "baseline_jfif_320x240.jpg": {
+   "sha256_file": "e94699a7290e129f8e1cfb24e3beef441aa9e0155fcfd3618807e0d044aed841",
+   "bytes": 11172,
+   "width": 320,
+   "height": 240,
+   "sof": "SOF0",
+   "sampling": "4:2:0",
+   "components": 3,
+   "dri": null,
+   "markers": "SOI APP0 DQT DQT SOF0 DHT DHT DHT DHT SOS EOI",
+   "scales": {
+    "0": {
+     "width": 320,
+     "height": 240,
+     "sha256_rgb565": "7080526506e0c21eb112b46ea79e2bbb6d6b0e730ed37f4d5c3cdd59a5324ef4",
+     "mean_rgb": [
+      127.2433,
+      108.2792,
+      125.872
+     ],
+     "mean_rgb565": [
+      123.8593,
+      106.9648,
+      122.5144
+     ]
+    },
+    "1": {
+     "width": 160,
+     "height": 120,
+     "sha256_rgb565": "9f57b34a205cf1f884a20c156ba5b92dffba66e9684e1a4032eaf311fa472ee1",
+     "mean_rgb": [
+      127.0509,
+      108.102,
+      125.6853
+     ],
+     "mean_rgb565": [
+      123.3308,
+      106.6765,
+      121.9887
+     ]
+    },
+    "2": {
+     "width": 80,
+     "height": 60,
+     "sha256_rgb565": "5b661b9fef344f03d4c9aaf193a999263f7f04c0cee291b7f46f00ff747054fb",
+     "mean_rgb": [
+      126.9865,
+      108.0429,
+      125.5894
+     ],
+     "mean_rgb565": [
+      123.1633,
+      106.5925,
+      121.64
+     ]
+    },
+    "3": {
+     "width": 40,
+     "height": 30,
+     "sha256_rgb565": "13dd202945e4b105bc0897b096362448c11add633446f61cfa602044bb7ca8bf",
+     "mean_rgb": [
+      126.9417,
+      108.0033,
+      125.5508
+     ],
+     "mean_rgb565": [
+      123.0333,
+      106.6033,
+      121.6333
+     ]
+    }
+   }
+  },
+  "baseline_jfif_64x48.jpg": {
+   "sha256_file": "15015df784e5947c294367f0eb2d2cca3d8d909fb5082b57c5aa18afdf68efb6",
+   "bytes": 1540,
+   "width": 64,
+   "height": 48,
+   "sof": "SOF0",
+   "sampling": "4:2:0",
+   "components": 3,
+   "dri": null,
+   "markers": "SOI APP0 DQT DQT SOF0 DHT DHT DHT DHT SOS EOI",
+   "scales": {
+    "0": {
+     "width": 64,
+     "height": 48,
+     "sha256_rgb565": "af9b927c88efdb1ca2b4e042f80dea2cc778fa13c829e71960dc2aae6814fb7f",
+     "mean_rgb": [
+      127.4395,
+      107.7321,
+      126.0452
+     ],
+     "mean_rgb565": [
+      124.0443,
+      106.3477,
+      122.7474
+     ]
+    },
+    "1": {
+     "width": 32,
+     "height": 24,
+     "sha256_rgb565": "00462f0ae49c146bcdad4288283d29c245814249945b2068631a0c5e38e6f992",
+     "mean_rgb": [
+      127.1458,
+      107.4505,
+      125.7721
+     ],
+     "mean_rgb565": [
+      123.7292,
+      106.0365,
+      122.3542
+     ]
+    },
+    "2": {
+     "width": 16,
+     "height": 12,
+     "sha256_rgb565": "c2de4bd14598e9ecfc06f8d977df5b812abc8c4676c530b0003c4b956aca3ca6",
+     "mean_rgb": [
+      127.0312,
+      107.3802,
+      125.6094
+     ],
+     "mean_rgb565": [
+      123.5417,
+      105.8542,
+      121.625
+     ]
+    },
+    "3": {
+     "width": 8,
+     "height": 6,
+     "sha256_rgb565": "082f5afec0ee17965ccdc3e90bbf05d667a19cdfcd578bfa04bd877a27480c73",
+     "mean_rgb": [
+      126.9375,
+      107.2917,
+      125.5208
+     ],
+     "mean_rgb565": [
+      123.0,
+      106.0,
+      121.3333
+     ]
+    }
+   }
+  },
+  "c920e_320x240_dri.jpg": {
+   "sha256_file": "31968f6632c73dd72703e18260bf684ab5adacc9e99529d7b21e331f3137f535",
+   "bytes": 8064,
+   "width": 320,
+   "height": 240,
+   "sof": "SOF0",
+   "sampling": "4:2:2",
+   "components": 3,
+   "dri": 0,
+   "markers": "SOI DQT SOF0 DHT DHT DHT DHT COM APP0 DRI SOS EOI TRAILING",
+   "scales": {
+    "0": {
+     "width": 320,
+     "height": 240,
+     "sha256_rgb565": "be7607923e546ad79e385ff86a96d7bdb8c0058a4d0603cccb8e97191d837772",
+     "mean_rgb": [
+      177.6693,
+      132.6757,
+      133.5783
+     ],
+     "mean_rgb565": [
+      173.9996,
+      131.185,
+      130.1168
+     ]
+    },
+    "1": {
+     "width": 160,
+     "height": 120,
+     "sha256_rgb565": "b25b3713700f792500ee2b359c9dd88412ace9bc8dfa7c9b38373f7abd4bdf7b",
+     "mean_rgb": [
+      177.3574,
+      132.3479,
+      133.2605
+     ],
+     "mean_rgb565": [
+      173.7704,
+      130.849,
+      129.8004
+     ]
+    },
+    "2": {
+     "width": 80,
+     "height": 60,
+     "sha256_rgb565": "505e9d03211b1aa89ab9c0e85f3a31f7cb53c629d01d734df64466aa358102b1",
+     "mean_rgb": [
+      177.2421,
+      132.2442,
+      133.159
+     ],
+     "mean_rgb565": [
+      173.705,
+      130.7358,
+      129.705
+     ]
+    },
+    "3": {
+     "width": 40,
+     "height": 30,
+     "sha256_rgb565": "1bdd157b7988cc7cbbe4a95eb2c24c834472c7f426d37ca5a20b10ba0bc35b3b",
+     "mean_rgb": [
+      177.21,
+      132.2125,
+      133.1092
+     ],
+     "mean_rgb565": [
+      173.7867,
+      130.6667,
+      129.6267
+     ]
+    }
+   }
+  },
+  "dri_first_mjpeg_style_320x240.jpg": {
+   "sha256_file": "fce7f537a5bacca2fd8dcebee4b3e6304cabd8f50fa5c442635d9dfb803dc0e8",
+   "bytes": 11348,
+   "width": 320,
+   "height": 240,
+   "sof": "SOF0",
+   "sampling": "4:2:0",
+   "components": 3,
+   "dri": 4,
+   "markers": "SOI DQT DQT SOF0 DHT DHT DHT DHT APP0 DRI SOS EOI",
+   "scales": {
+    "0": {
+     "width": 320,
+     "height": 240,
+     "sha256_rgb565": "7080526506e0c21eb112b46ea79e2bbb6d6b0e730ed37f4d5c3cdd59a5324ef4",
+     "mean_rgb": [
+      127.2433,
+      108.2792,
+      125.872
+     ],
+     "mean_rgb565": [
+      123.8593,
+      106.9648,
+      122.5144
+     ]
+    },
+    "1": {
+     "width": 160,
+     "height": 120,
+     "sha256_rgb565": "9f57b34a205cf1f884a20c156ba5b92dffba66e9684e1a4032eaf311fa472ee1",
+     "mean_rgb": [
+      127.0509,
+      108.102,
+      125.6853
+     ],
+     "mean_rgb565": [
+      123.3308,
+      106.6765,
+      121.9887
+     ]
+    },
+    "2": {
+     "width": 80,
+     "height": 60,
+     "sha256_rgb565": "5b661b9fef344f03d4c9aaf193a999263f7f04c0cee291b7f46f00ff747054fb",
+     "mean_rgb": [
+      126.9865,
+      108.0429,
+      125.5894
+     ],
+     "mean_rgb565": [
+      123.1633,
+      106.5925,
+      121.64
+     ]
+    },
+    "3": {
+     "width": 40,
+     "height": 30,
+     "sha256_rgb565": "13dd202945e4b105bc0897b096362448c11add633446f61cfa602044bb7ca8bf",
+     "mean_rgb": [
+      126.9417,
+      108.0033,
+      125.5508
+     ],
+     "mean_rgb565": [
+      123.0333,
+      106.6033,
+      121.6333
+     ]
+    }
+   }
+  },
+  "grayscale_64x48.jpg": {
+   "sha256_file": "5da348ab045a05fce417a9012e23752bdc763a58356d7d03b144829557179f27",
+   "bytes": 960,
+   "width": 64,
+   "height": 48,
+   "sof": "SOF0",
+   "sampling": "gray",
+   "components": 1,
+   "dri": null,
+   "markers": "SOI APP0 DQT SOF0 DHT DHT SOS EOI",
+   "scales": {
+    "0": {
+     "width": 64,
+     "height": 48,
+     "sha256_rgb565": "8eba70fc8596e08e44def1ed58ed51cc2009d070481d8ef6ef3bbb3653abec8e",
+     "mean_rgb": [
+      115.5286,
+      115.5286,
+      115.5286
+     ],
+     "mean_rgb565": [
+      111.875,
+      114.1367,
+      111.875
+     ]
+    },
+    "1": {
+     "width": 32,
+     "height": 24,
+     "sha256_rgb565": "eb9fbd807d5b66d6eb6272d698bd417dfd6bb00a10e67abe1c028eb983ec23ae",
+     "mean_rgb": [
+      115.3594,
+      115.3594,
+      115.3594
+     ],
+     "mean_rgb565": [
+      111.4583,
+      113.8802,
+      111.4583
+     ]
+    },
+    "2": {
+     "width": 16,
+     "height": 12,
+     "sha256_rgb565": "77953436e19b7eaec7b5edd796b794d81ad132f14dcb11a9c484c9d9be9a734c",
+     "mean_rgb": [
+      115.2865,
+      115.2865,
+      115.2865
+     ],
+     "mean_rgb565": [
+      111.375,
+      113.8542,
+      111.375
+     ]
+    },
+    "3": {
+     "width": 8,
+     "height": 6,
+     "sha256_rgb565": "5c66e9361a9ad52f285084c3c3efeca001bc28397bd7ea589eda71f9712f7a79",
+     "mean_rgb": [
+      115.25,
+      115.25,
+      115.25
+     ],
+     "mean_rgb565": [
+      111.6667,
+      113.9167,
+      111.6667
+     ]
+    }
+   }
+  },
+  "nodht_320x240.jpg": {
+   "sha256_file": "d87e5e2e2129fcdea4add8ac09b44ed1c3b0e58964fb31ebefc751bd8c988146",
+   "bytes": 10740,
+   "width": 320,
+   "height": 240,
+   "sof": "SOF0",
+   "sampling": "4:2:0",
+   "components": 3,
+   "dri": null,
+   "markers": "SOI APP0 DQT DQT SOF0 SOS EOI",
+   "scales": {
+    "0": {
+     "width": 320,
+     "height": 240,
+     "sha256_rgb565": "7080526506e0c21eb112b46ea79e2bbb6d6b0e730ed37f4d5c3cdd59a5324ef4",
+     "mean_rgb": [
+      127.2433,
+      108.2792,
+      125.872
+     ],
+     "mean_rgb565": [
+      123.8593,
+      106.9648,
+      122.5144
+     ]
+    },
+    "1": {
+     "width": 160,
+     "height": 120,
+     "sha256_rgb565": "9f57b34a205cf1f884a20c156ba5b92dffba66e9684e1a4032eaf311fa472ee1",
+     "mean_rgb": [
+      127.0509,
+      108.102,
+      125.6853
+     ],
+     "mean_rgb565": [
+      123.3308,
+      106.6765,
+      121.9887
+     ]
+    },
+    "2": {
+     "width": 80,
+     "height": 60,
+     "sha256_rgb565": "5b661b9fef344f03d4c9aaf193a999263f7f04c0cee291b7f46f00ff747054fb",
+     "mean_rgb": [
+      126.9865,
+      108.0429,
+      125.5894
+     ],
+     "mean_rgb565": [
+      123.1633,
+      106.5925,
+      121.64
+     ]
+    },
+    "3": {
+     "width": 40,
+     "height": 30,
+     "sha256_rgb565": "13dd202945e4b105bc0897b096362448c11add633446f61cfa602044bb7ca8bf",
+     "mean_rgb": [
+      126.9417,
+      108.0033,
+      125.5508
+     ],
+     "mean_rgb565": [
+      123.0333,
+      106.6033,
+      121.6333
+     ]
+    }
+   }
+  },
+  "odd_size_37x29.jpg": {
+   "sha256_file": "9efd41499254db78e4b92868095537b4f0f624c8d3fbea2f3a7d683286ef5c01",
+   "bytes": 1427,
+   "width": 37,
+   "height": 29,
+   "sof": "SOF0",
+   "sampling": "4:2:0",
+   "components": 3,
+   "dri": null,
+   "markers": "SOI APP0 DQT DQT SOF0 DHT DHT DHT DHT SOS EOI",
+   "scales": {
+    "0": {
+     "width": 37,
+     "height": 29,
+     "sha256_rgb565": "5f7b9495686f03d91250e8acb3eb0e75579cf61e8348e60d93a2eb968507af73",
+     "mean_rgb": [
+      127.4529,
+      109.0522,
+      128.205
+     ],
+     "mean_rgb565": [
+      124.1454,
+      107.5415,
+      124.7046
+     ]
+    },
+    "1": {
+     "width": 18,
+     "height": 14,
+     "sha256_rgb565": "0c9846c9bc3b267e0bb0b91dd06cda6ad903ec741002180277561506ade15996",
+     "mean_rgb": [
+      128.5437,
+      112.2262,
+      128.7857
+     ],
+     "mean_rgb565": [
+      125.0476,
+      110.6508,
+      125.1746
+     ]
+    },
+    "2": {
+     "width": 9,
+     "height": 7,
+     "sha256_rgb565": "d8c2e4957c329082965f2bf8258805ae3c1ee120034960b524404fd6c42bd68d",
+     "mean_rgb": [
+      128.4444,
+      112.127,
+      128.6508
+     ],
+     "mean_rgb565": [
+      124.5714,
+      110.7302,
+      125.4603
+     ]
+    },
+    "3": {
+     "width": 4,
+     "height": 3,
+     "sha256_rgb565": "e61c57b332eb7bbce8dfdf2809b28c7fcd0dda2845d6380eac2c9eb98b9b1cd3",
+     "mean_rgb": [
+      133.6667,
+      128.6667,
+      132.9167
+     ],
+     "mean_rgb565": [
+      130.0,
+      127.0,
+      128.6667
+     ]
+    }
+   }
+  },
+  "restart_dri_320x240.jpg": {
+   "sha256_file": "bd75b35a1555213b58d493e10738c5fc342572452a88a6e2279765b61fc2c1e9",
+   "bytes": 11348,
+   "width": 320,
+   "height": 240,
+   "sof": "SOF0",
+   "sampling": "4:2:0",
+   "components": 3,
+   "dri": 4,
+   "markers": "SOI APP0 DQT DQT SOF0 DHT DHT DHT DHT DRI SOS EOI",
+   "scales": {
+    "0": {
+     "width": 320,
+     "height": 240,
+     "sha256_rgb565": "7080526506e0c21eb112b46ea79e2bbb6d6b0e730ed37f4d5c3cdd59a5324ef4",
+     "mean_rgb": [
+      127.2433,
+      108.2792,
+      125.872
+     ],
+     "mean_rgb565": [
+      123.8593,
+      106.9648,
+      122.5144
+     ]
+    },
+    "1": {
+     "width": 160,
+     "height": 120,
+     "sha256_rgb565": "9f57b34a205cf1f884a20c156ba5b92dffba66e9684e1a4032eaf311fa472ee1",
+     "mean_rgb": [
+      127.0509,
+      108.102,
+      125.6853
+     ],
+     "mean_rgb565": [
+      123.3308,
+      106.6765,
+      121.9887
+     ]
+    },
+    "2": {
+     "width": 80,
+     "height": 60,
+     "sha256_rgb565": "5b661b9fef344f03d4c9aaf193a999263f7f04c0cee291b7f46f00ff747054fb",
+     "mean_rgb": [
+      126.9865,
+      108.0429,
+      125.5894
+     ],
+     "mean_rgb565": [
+      123.1633,
+      106.5925,
+      121.64
+     ]
+    },
+    "3": {
+     "width": 40,
+     "height": 30,
+     "sha256_rgb565": "13dd202945e4b105bc0897b096362448c11add633446f61cfa602044bb7ca8bf",
+     "mean_rgb": [
+      126.9417,
+      108.0033,
+      125.5508
+     ],
+     "mean_rgb565": [
+      123.0333,
+      106.6033,
+      121.6333
+     ]
+    }
+   }
+  }
+ },
+ "not_referenced": {
+  "progressive_320x240.jpg": "SOF2: TJpgDec is baseline-only and must refuse it"
+ }
+}
