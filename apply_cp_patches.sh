@@ -321,17 +321,22 @@ p /= filename.strip()
 print(p)
 PY
 )
+    # Anything not in the state --apply would leave behind makes --status exit
+    # nonzero. It used to report the defect and exit 0, so a caller that
+    # checked $? read a broken tree as a good one - found by planting a fault
+    # in the pin move's step-0 rehearsal, 2026-09-09.
+    STATUS_RC=0
     report() {
         local label="$1"
         local file="$2"
         if [ ! -e "$file" ]; then
-            echo "missing  $file"
+            echo "missing  $file"; STATUS_RC=1
         elif [ "$label" = "spike" ]; then
             echo "ok       $file"
         elif patch_block_present "$file"; then
             echo "patched  $file"
         else
-            echo "pending  $file"
+            echo "pending  $file"; STATUS_RC=1
         fi
     }
     report spike "$SPIKE_INIT_C"
@@ -342,7 +347,7 @@ PY
     report patch "$DEFNS_MK"
     report patch "$MPCONFIG_MK"
     report patch "$PORT_MK"
-    exit 0
+    exit $STATUS_RC
 fi
 
 log "==> Copy spike templates"
