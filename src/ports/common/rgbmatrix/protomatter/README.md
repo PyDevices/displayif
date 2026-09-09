@@ -45,5 +45,5 @@ time vs. accumulated since are unrecorded. Re-vendoring cleanly at a pinned
 tag (with the local arch/*.h deltas captured as an explicit patch set
 instead of baked-in edits) is tracked work, not done here.
 
-See [`../../../../UPSTREAM`](../../../../UPSTREAM) for how this fits with
+See [`../../../../../UPSTREAM`](../../../../../UPSTREAM) for how this fits with
 the rest of displayif's pinned dependencies.
