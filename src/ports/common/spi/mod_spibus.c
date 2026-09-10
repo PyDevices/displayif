@@ -269,7 +269,7 @@ static mp_obj_t spibus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     self->buf1 = mp_obj_new_bytearray(1, (byte[]){0});
     self->deinited = false;
     s_active = self;
-    mp_printf(&mp_plat_print, soft ? "SPIBus loaded (SoftSPI)\n" : "SPIBus loaded\n");
+    mp_printf(&mp_plat_print, soft ? "SPIBus loaded (C, SoftSPI)\n" : "SPIBus loaded (C)\n");
     return MP_OBJ_FROM_PTR(self);
 }
 
