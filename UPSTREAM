@@ -10,7 +10,7 @@ Org-pinned upstream (matches the MicroPython checkout in the org's optional aggr
   Verify locally with: git -C <your micropython checkout> describe --tags   # expect v1.28.0
 
 ## CircuitPython (usdl2 desktop path only, via apply_cp_patches.sh)
-Org oracle (same pin as audioif/CIRCUITPYTHON_ORACLE): 10.2.1
+Org oracle (same pin as audiodsp/CIRCUITPYTHON_ORACLE): 10.2.1
   https://github.com/adafruit/circuitpython @ bcfcb511352652d7cb62d3b415e4a624380f1830
 
 ## SDL2 (desktop usdl2 backend)
