@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: micropython/micropython
-          ref: v1.28.0
+          ref: v1.29.0
           path: micropython
 
       # A unix build cannot show this one: the Makefile ports fold
@@ -106,7 +106,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: micropython/micropython
-          ref: v1.28.0
+          ref: v1.29.0
           path: micropython
 
       # Pinned to the lvgl-bindings commit that turns LV_USE_TJPGD off on
