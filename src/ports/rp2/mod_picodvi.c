@@ -5,6 +5,8 @@
 #include "py/obj.h"
 #include "machine_pin.h"
 
+#include "displayif/fb_fill.h"
+
 #if defined(PICO_RP2040) && !defined(PICO_RP2350)
 #include "picodvi_rp2040.h"
 #elif defined(PICO_RP2350)
@@ -105,6 +107,52 @@ static mp_int_t picodvi_framebuffer_get_buffer(mp_obj_t self_in, mp_buffer_info_
     return 0;
 }
 
+/* fill_rect(x, y, w, h, color) -- a C fill, at whatever colour depth this
+ * framebuffer was opened with (displayif#34).
+ *
+ * The other five backends here are fixed at 16bpp and share
+ * `displayif_fb_fill_rect16`. This one is not: `color_depth` is 1, 2, 4, 8,
+ * 16 or 32, so it goes through the packed fill, which does the partial-byte
+ * masking at the two edges that a sub-byte depth needs and none of the others
+ * has to think about.
+ *
+ * Without it, `displaydev.FBDisplay.fill_rect` falls off the end of its
+ * dispatch ladder onto per-row `memoryview` assigns from Python. On the
+ * ESP32-P4, where the same fallback was measured on hardware, a 400x240 fill
+ * costs 2.46 s that way against 3.5 ms through the native fill -- a factor of
+ * 698 (displayif#28). Nobody has measured it on an rp2, but the ladder is the
+ * same one, and a DVI app that clears a region reads as a hung program rather
+ * than a slow one.
+ *
+ * Bounds through the shared `displayif_fb_rect_ok`, so this refuses exactly
+ * the rectangles the other five refuse.
+ */
+static mp_obj_t picodvi_framebuffer_fill_rect(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    picodvi_framebuffer_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    const int x = mp_obj_get_int(args[1]);
+    const int y = mp_obj_get_int(args[2]);
+    const int w = mp_obj_get_int(args[3]);
+    const int h = mp_obj_get_int(args[4]);
+    const uint32_t color = (uint32_t)mp_obj_get_int_truncated(args[5]);
+    // Not decoration: picodvi_rp2350_deinit() m_free()s the framebuffer and
+    // sets it NULL, so a fill after deinit would write through freed memory.
+    // RuntimeError, and the wording, to match rgbmatrix's guard beside it.
+    if (self->framebuffer == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError,
+            MP_ERROR_TEXT("picodvi.Framebuffer is deinited"));
+    }
+    if (!displayif_fb_rect_ok(x, y, w, h, self->width, self->height)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("fill_rect out of range"));
+    }
+    displayif_fb_fill_rect_packed((uint8_t *)self->framebuffer,
+        (size_t)self->pitch * sizeof(uint32_t), x, y, w, h, color,
+        (int)self->color_depth);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(picodvi_framebuffer_fill_rect_obj, 6, 6,
+    picodvi_framebuffer_fill_rect);
+
 static mp_obj_t picodvi_framebuffer_del(mp_obj_t self_in) {
     picodvi_framebuffer_obj_t *self = MP_OBJ_TO_PTR(self_in);
 #if defined(PICO_RP2040) && !defined(PICO_RP2350)
@@ -118,6 +166,7 @@ static MP_DEFINE_CONST_FUN_OBJ_1(picodvi_framebuffer_del_obj, picodvi_framebuffe
 
 static const mp_rom_map_elem_t picodvi_framebuffer_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&picodvi_framebuffer_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&picodvi_framebuffer_fill_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&picodvi_framebuffer_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&picodvi_framebuffer_del_obj) },
 };
