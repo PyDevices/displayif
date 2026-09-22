@@ -18,10 +18,12 @@ SRC_USERMOD_C += $(JPEGIO_DIR)/jpegio.c
 # Library source: no qstrs, so it stays out of the QSTR scan.
 SRC_USERMOD_LIB_C += $(JPEGIO_DIR)/tjpgd/tjpgd.c
 
-# Sibling detection is exactly py.mk's usermod glob, one level under
-# USER_C_MODULES (works with a relative USER_C_MODULES too). Override with
-# JPEGIO_LVGL=0/1 on the make command line.
-JPEGIO_LVGL ?= $(if $(wildcard $(USER_C_MODULES)/lvgl-micropython/micropython.mk),1,0)
+# lvgl-micropython is in this build if USER_C_MODULES names it -- either as a
+# module directory itself (MicroPython 1.29 c_module()) or as a parent
+# directory one level above it (py.mk's glob). Override with JPEGIO_LVGL=0/1
+# on the make command line.
+JPEGIO_LVMP_DIR := $(firstword $(filter %/lvgl-micropython,$(USER_C_MODULES:/=)) $(foreach d,$(USER_C_MODULES),$(wildcard $(d)/lvgl-micropython)))
+JPEGIO_LVGL ?= $(if $(JPEGIO_LVMP_DIR),1,0)
 
 ifeq ($(JPEGIO_LVGL),1)
 # The bindings checkout, derived the way lvgl-micropython/micropython.mk does
@@ -30,7 +32,7 @@ ifeq ($(JPEGIO_LVGL),1)
 # lvgl-micropython's, so a `BINDINGS_DIR ?=` here would pre-empt theirs. A
 # BINDINGS_DIR given on the make command line is honoured so both usermods
 # compile against the same lv_conf.h (struct layouts depend on it).
-JPEGIO_LVGL_BINDINGS_DIR ?= $(or $(BINDINGS_DIR),$(abspath $(USER_C_MODULES)/lvgl-micropython/../lvgl-bindings))
+JPEGIO_LVGL_BINDINGS_DIR ?= $(or $(BINDINGS_DIR),$(abspath $(JPEGIO_LVMP_DIR)/../lvgl-bindings))
 # -I<bindings> finds lv_conf.h (LVGL's lv_conf_internal.h picks it up through
 # __has_include, the same route lvgl-micropython's -I$(BINDINGS_DIR) uses);
 # -I<bindings>/lvgl finds lvgl.h and the src/... private headers.
@@ -40,5 +42,5 @@ SRC_USERMOD_LIB_C += $(JPEGIO_DIR)/lvgl_decoder.c
 # lvgl.h with LV_USE_FLOAT trips -Werror=double-promotion / float-conversion
 # on ports that append those after CFLAGS_USERMOD (unix, webassembly): the
 # same per-object suppression lvgl-micropython puts on LVGL's own objects.
-$(eval $(BUILD)/$(patsubst $(USER_C_MODULES)/%,%,$(JPEGIO_DIR)/lvgl_decoder.o): CFLAGS += -Wno-double-promotion -Wno-float-conversion)
+$(eval $(BUILD)/$(patsubst $(DISPLAYIF_MOD_DIR)/%,$(notdir $(DISPLAYIF_MOD_DIR))/%,$(JPEGIO_DIR)/lvgl_decoder.o): CFLAGS += -Wno-double-promotion -Wno-float-conversion)
 endif
