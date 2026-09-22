@@ -126,7 +126,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: PyDevices/lvgl-micropython
-          ref: d7ea1938a6d53cd03a6559f9f46fc7f07f7c2300
+          ref: 410e2e8dcf38e316f5da7bc63b35ba4b3fd07dfd
           path: lvgl-micropython
 
       - name: Install SDL2
