@@ -126,6 +126,9 @@ endif
 include $(DISPLAYIF_MOD_DIR)/src/jpegio/micropython.mk
 
 # displayif_revision_obj, read as <module>.__revision__ on every module here.
+# src/include is on the path here, not only in ports/common/micropython.mk,
+# because a port that builds jpegio alone (webassembly) never includes that.
+CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/src/include
 SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/src/ports/common/build.c
 
 # --- which displayif this firmware was built from ---------------------------
