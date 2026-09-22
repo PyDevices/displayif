@@ -180,6 +180,69 @@ static void dotclockframebuffer_fill_data_pins(dotclockframebuffer_obj_t *self, 
 
 #define DCFB_CACHE_LINE 128
 
+// ESP-IDF allocates RGB_LCD_PANEL_BOUNCE_BUF_NUM (2) bounce buffers from
+// internal DMA-capable DRAM, and requires the frame buffer to be a whole
+// number of them. At 20 rows of an 800-wide 16bpp panel that is two 32,000
+// byte allocations, each of which has to be contiguous.
+//
+// Contiguity — not total free memory — is what runs out. Measured on a
+// Waveshare ESP32-S3-Touch-LCD-4.3: at boot the big internal region has
+// 98,292 bytes free in one piece and both buffers fit; with a connected Wi-Fi
+// radio it has 53,236, the first buffer fits, the second does not, and
+// esp_lcd_new_rgb_panel returns a bare ESP_ERR_NO_MEM while 126 KB of internal
+// DRAM is still free in smaller pieces. The same happens on a board whose heap
+// has simply been fragmented by a long session.
+//
+// So ask the heap what it can actually give us, stepping down through row
+// counts that divide v_res, and if none fit, say what we needed and what the
+// heap had. Smaller bounce buffers cost more refill interrupts per frame, not
+// correctness — the same bytes are copied either way.
+#define DCFB_BOUNCE_ROWS_MAX 20
+#define DCFB_BOUNCE_ROWS_MIN 4
+// At least the strictest alignment gdma_get_alignment_constraints() reports for
+// internal memory on any supported target, so the probe is never more
+// optimistic than the allocation ESP-IDF makes moments later.
+#define DCFB_BOUNCE_PROBE_ALIGN 64
+
+// Returns the number of rows per bounce buffer, or 0 if even the smallest
+// pair will not fit. Always writes the sizes it would have accepted and the
+// largest free block it saw, so the caller can name all three in the error.
+static uint32_t dcfb_probe_bounce_rows(uint32_t h_res, uint32_t v_res,
+    size_t *out_preferred, size_t *out_smallest, size_t *out_largest) {
+    const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT;
+    *out_largest = heap_caps_get_largest_free_block(caps);
+    *out_preferred = 0;
+    *out_smallest = 0;
+
+    for (uint32_t rows = DCFB_BOUNCE_ROWS_MAX; rows >= DCFB_BOUNCE_ROWS_MIN; rows--) {
+        if (v_res == 0 || v_res % rows != 0) {
+            // ESP-IDF: "frame buffer size must be multiple of bounce buffer size".
+            continue;
+        }
+        size_t bb_size = (size_t)rows * h_res * 2; // 16 bpp
+        if (*out_preferred == 0) {
+            *out_preferred = bb_size; // what the largest usable row count would take
+        }
+        *out_smallest = bb_size;       // ends up the smallest one we actually tried
+        // Probe for real rather than reasoning from largest_free_block: that
+        // number describes one block, and ESP-IDF needs two at once, after
+        // alignment and with heap poisoning's per-block overhead applied.
+        void *a = heap_caps_aligned_alloc(DCFB_BOUNCE_PROBE_ALIGN, bb_size, caps);
+        void *b = (a != NULL) ? heap_caps_aligned_alloc(DCFB_BOUNCE_PROBE_ALIGN, bb_size, caps) : NULL;
+        bool fits = (a != NULL && b != NULL);
+        if (b != NULL) {
+            heap_caps_free(b);
+        }
+        if (a != NULL) {
+            heap_caps_free(a);
+        }
+        if (fits) {
+            return rows;
+        }
+    }
+    return 0;
+}
+
 // Incremented in bounce EOF ISR when a whole FB has been sent to LCD DMA.
 // Used by refresh() to wait until the newly promoted front is safe to leave.
 static volatile uint32_t s_dcfb_frame_count;
@@ -222,6 +285,35 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
     // Round h_res up to a multiple of 16 (same as CircuitPython DotClockFramebuffer).
     uint32_t h_res = (uint32_t)((self->width + self->overscan_left + 15) / 16 * 16);
 
+    size_t bb_preferred = 0;
+    size_t bb_smallest = 0;
+    size_t bb_largest = 0;
+    uint32_t bounce_rows = dcfb_probe_bounce_rows(h_res, (uint32_t)self->height,
+        &bb_preferred, &bb_smallest, &bb_largest);
+    if (bb_preferred == 0) {
+        // No row count between DCFB_BOUNCE_ROWS_MIN and _MAX divides v_res, so
+        // ESP-IDF's "frame buffer must be a whole number of bounce buffers" rule
+        // cannot be satisfied at any size. Not a memory problem — say which.
+        mp_raise_msg_varg(&mp_type_ValueError,
+            MP_ERROR_TEXT("RGB panel height %u has no bounce-buffer row count between %u and %u that divides it"),
+            (unsigned int)self->height, (unsigned int)DCFB_BOUNCE_ROWS_MIN, (unsigned int)DCFB_BOUNCE_ROWS_MAX);
+    }
+    if (bounce_rows == 0) {
+        mp_raise_msg_varg(&mp_type_MemoryError,
+            MP_ERROR_TEXT("RGB panel needs 2 contiguous internal DMA buffers, %u bytes each "
+                          "(%u at the smallest it will run); largest free block is %u. "
+                          "Start the display before Wi-Fi, or hard reset."),
+            (unsigned int)bb_preferred, (unsigned int)bb_smallest, (unsigned int)bb_largest);
+    }
+    if (bounce_rows != DCFB_BOUNCE_ROWS_MAX) {
+        // Say so rather than degrading silently: fewer rows means more refill
+        // interrupts per frame, and it is the tell that internal DRAM is tight.
+        mp_printf(MP_PYTHON_PRINTER,
+            "dotclockframebuffer: internal DMA RAM is tight (largest free block %u), "
+            "using %u-row bounce buffers instead of %u\n",
+            (unsigned int)bb_largest, (unsigned int)bounce_rows, (unsigned int)DCFB_BOUNCE_ROWS_MAX);
+    }
+
     esp_lcd_rgb_panel_config_t panel_config = {
         .clk_src = LCD_CLK_SRC_DEFAULT,
         .data_width = 16,
@@ -233,7 +325,8 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
         // (ESP-IDF rgb_panel example / Qualia-class panels). Without this the
         // image walks/tears horizontally under load. When bounce is on, do not
         // esp_cache_msync the FB from blit (see bounce_enabled).
-        .bounce_buffer_size_px = 20 * h_res,
+        // Rows chosen above against what internal DMA RAM is actually free.
+        .bounce_buffer_size_px = bounce_rows * h_res,
         .dma_burst_size = 64,
         .hsync_gpio_num = self->hsync_pin,
         .vsync_gpio_num = self->vsync_pin,
