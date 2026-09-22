@@ -2,6 +2,7 @@
 // picodvi module — RP2040 PIO (libdvi) and RP2350 HSTX backends.
 
 #include "py/runtime.h"
+#include "displayif/build.h"
 #include "py/obj.h"
 #include "machine_pin.h"
 
@@ -184,6 +185,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t picodvi_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_picodvi) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_Framebuffer), MP_ROM_PTR(&picodvi_framebuffer_type) },
 };
 static MP_DEFINE_CONST_DICT(picodvi_module_globals, picodvi_module_globals_table);

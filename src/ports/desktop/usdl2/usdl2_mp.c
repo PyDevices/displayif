@@ -2,6 +2,7 @@
 // usdl2 native module (MicroPython + CircuitPython unix/windows).
 
 #include "py/obj.h"
+#include "displayif/build.h"
 #include "py/runtime.h"
 #include "py/binary.h"
 #include "py/mphal.h"

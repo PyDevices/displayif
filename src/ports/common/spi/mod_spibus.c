@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "py/runtime.h"
+#include "displayif/build.h"
 #include "py/obj.h"
 #include "py/mphal.h"
 #include "py/mpprint.h"
@@ -399,6 +400,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t spibus_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_spibus) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_SPIBus), MP_ROM_PTR(&spibus_type) },
     { MP_ROM_QSTR(MP_QSTR_DC_CMD), MP_ROM_INT(DC_CMD) },
     { MP_ROM_QSTR(MP_QSTR_DC_DATA), MP_ROM_INT(DC_DATA) },

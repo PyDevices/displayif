@@ -2,6 +2,7 @@
 // Stub qspibus module for ports without accelerated QSPI display bus.
 
 #include "py/runtime.h"
+#include "displayif/build.h"
 
 static mp_obj_t qspibus_unsupported_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void)type;
@@ -37,6 +38,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t qspibus_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_qspibus) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_QSPIBus), MP_ROM_PTR(&qspibus_type) },
 };
 static MP_DEFINE_CONST_DICT(qspibus_module_globals, qspibus_module_globals_table);
