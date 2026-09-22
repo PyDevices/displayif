@@ -30,6 +30,13 @@ jobs:
           ref: v1.28.0
           path: micropython
 
+      # A unix build cannot show this one: the Makefile ports fold
+      # CFLAGS_USERMOD into CFLAGS and their qstr pass reads CFLAGS, so a name
+      # that only the CMake ports would lose is green here either way.
+      # docs/qstrs-and-usermod-defines.md.
+      - name: Every qstr is reachable on every port that compiles it
+        run: python3 displayif/tools/check_qstr_reachability.py
+
       - name: Install SDL2
         run: |
           sudo apt-get update
