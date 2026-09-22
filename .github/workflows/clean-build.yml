@@ -135,17 +135,19 @@ jobs:
           sudo apt-get install -y libsdl2-dev
 
       - name: Build the unix port with displayif + lvgl-micropython + lvgl-bindings
-        # USER_C_MODULES is the PARENT directory again; displayif's jpegio
-        # sees $(USER_C_MODULES)/lvgl-micropython/micropython.mk and compiles
-        # its LVGL decoder. FROZEN_MANIFEST freezes lvgl-micropython's
+        # Both modules are named by their own manifests (MicroPython 1.29
+        # c_module()), so a two-line manifest selects them and there is no
+        # USER_C_MODULES: passing the parent directory as well would include
+        # each module twice. FROZEN_MANIFEST also freezes lvgl-micropython's
         # display_driver.py / fs_driver.py (the file-source test uses the
-        # latter), the same command the local proof used.
+        # latter). jpegio sees lvgl-micropython in USER_C_MODULES (appended by
+        # the manifest) and compiles its LVGL decoder.
         run: |
+          printf 'include("displayif/manifest.py")\ninclude("lvgl-micropython/manifest.py")\n' > ci-manifest.py
           make -C micropython/mpy-cross -j2
           make -C micropython/ports/unix submodules
           make -C micropython/ports/unix -j2 \
-            USER_C_MODULES=$GITHUB_WORKSPACE \
-            FROZEN_MANIFEST=$GITHUB_WORKSPACE/lvgl-micropython/manifest.py
+            FROZEN_MANIFEST=$GITHUB_WORKSPACE/ci-manifest.py
 
       - name: One TJpgDec in the firmware, and it is jpegio's
         # Exactly one object defines jd_prepare (displayif's tjpgd.o; LVGL's
