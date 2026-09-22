@@ -118,7 +118,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: PyDevices/lvgl-bindings
-          ref: aa6c6bc449aed6936b644ab45b11e453945a18ee
+          ref: d5f3d341e6bcfc97d52d66f776587c215c95ff4d
           path: lvgl-bindings
           submodules: true
 
