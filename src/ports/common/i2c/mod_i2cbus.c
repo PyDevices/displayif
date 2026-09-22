@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "py/runtime.h"
+#include "displayif/build.h"
 #include "py/obj.h"
 #include "py/misc.h"
 #include "py/mphal.h"
@@ -166,6 +167,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t i2cbus_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_i2cbus) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_I2CBus), MP_ROM_PTR(&i2cbus_type) },
 };
 static MP_DEFINE_CONST_DICT(i2cbus_module_globals, i2cbus_module_globals_table);

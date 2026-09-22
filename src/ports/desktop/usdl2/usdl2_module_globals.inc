@@ -1,4 +1,5 @@
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_usdl2) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_SDL_Init), MP_ROM_PTR(&SDL_Init_fun_obj) },
     { MP_ROM_QSTR(MP_QSTR_SDL_InitSubSystem), MP_ROM_PTR(&SDL_InitSubSystem_fun_obj) },
     { MP_ROM_QSTR(MP_QSTR_SDL_Quit), MP_ROM_PTR(&SDL_Quit_fun_obj) },

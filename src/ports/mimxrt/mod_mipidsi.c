@@ -6,6 +6,7 @@
 #include <stdlib.h>
 
 #include "py/runtime.h"
+#include "displayif/build.h"
 #include "py/obj.h"
 #include "py/binary.h"
 #include "py/mphal.h"
@@ -350,6 +351,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t mipidsi_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_mipidsi) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_Bus), MP_ROM_PTR(&mipidsi_bus_type) },
     { MP_ROM_QSTR(MP_QSTR_Display), MP_ROM_PTR(&mipidsi_display_type) },
 };

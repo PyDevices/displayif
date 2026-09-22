@@ -13,6 +13,7 @@
 #include "py/obj.h"
 #include "py/objarray.h"
 #include "py/runtime.h"
+#include "displayif/build.h"
 #include "py/stream.h"
 #include "py/builtin.h"
 #include "py/mperrno.h"
@@ -522,6 +523,7 @@ static MP_DEFINE_CONST_FUN_OBJ_0(jpegio___init___obj, jpegio___init__);
 
 static const mp_rom_map_elem_t jpegio_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_jpegio) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_JpegDecoder), MP_ROM_PTR(&jpegio_jpegdecoder_type) },
     #if JPEGIO_LVGL_DECODER
     { MP_ROM_QSTR(MP_QSTR___init__), MP_ROM_PTR(&jpegio___init___obj) },

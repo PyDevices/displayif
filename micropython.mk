@@ -124,3 +124,12 @@ endif
 
 # JPEG decoder (`import jpegio`): platform-neutral C, built on every port.
 include $(DISPLAYIF_MOD_DIR)/src/jpegio/micropython.mk
+
+# displayif_revision_obj, read as <module>.__revision__ on every module here.
+SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/src/ports/common/build.c
+
+# --- which displayif this firmware was built from ---------------------------
+# Computed at build time from this repo's own git, never stored; "unknown" when
+# there is no git (a tarball). Read on a target as <module>.__revision__.
+DISPLAYIF_REVISION := $(shell git -C $(DISPLAYIF_MOD_DIR) describe --always --dirty --abbrev=7 2>/dev/null || echo unknown)
+CFLAGS_USERMOD += -DDISPLAYIF_REVISION='"$(DISPLAYIF_REVISION)"'

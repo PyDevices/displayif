@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "py/runtime.h"
+#include "displayif/build.h"
 #include "py/obj.h"
 #include "py/mperrno.h"
 #include "displayif/soft_reset.h"
@@ -640,6 +641,7 @@ static MP_DEFINE_CONST_OBJ_TYPE(
 
 static const mp_rom_map_elem_t qspibus_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_qspibus) },
+    DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_QSPIBus), MP_ROM_PTR(&qspibus_type) },
 };
 static MP_DEFINE_CONST_DICT(qspibus_module_globals, qspibus_module_globals_table);

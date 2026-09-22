@@ -19,6 +19,7 @@ target_link_options(displayif_common INTERFACE
 target_link_libraries(usermod INTERFACE displayif_common)
 
 target_sources(displayif_common INTERFACE
+    ${DISPLAYIF_MOD_DIR}/src/ports/common/build.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/mp_helpers.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/soft_reset.c
     ${DISPLAYIF_MOD_DIR}/src/ports/common/spi/mod_spibus.c
@@ -38,3 +39,16 @@ if(DISPLAYIF_RGBMATRIX_USE_PROTOMATTER)
         ${DISPLAYIF_MOD_DIR}/src/ports/common/rgbmatrix/protomatter_mp.c
     )
 endif()
+
+# --- which displayif this firmware was built from ---------------------------
+# Computed at build time from this repo's own git, never stored; "unknown" when
+# there is no git (a tarball). Read on a target as <module>.__revision__.
+execute_process(
+    COMMAND git -C ${DISPLAYIF_MOD_DIR} describe --always --dirty --abbrev=7
+    OUTPUT_VARIABLE DISPLAYIF_REVISION
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+    ERROR_QUIET)
+if(NOT DISPLAYIF_REVISION)
+    set(DISPLAYIF_REVISION "unknown")
+endif()
+target_compile_definitions(displayif_common INTERFACE DISPLAYIF_REVISION=\"${DISPLAYIF_REVISION}\")
