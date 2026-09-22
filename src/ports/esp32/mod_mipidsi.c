@@ -18,6 +18,7 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/fb_fill.h"
 #include "displayif/soft_reset.h"
 
 #include "sdkconfig.h"
@@ -498,6 +499,30 @@ static mp_obj_t mipidsi_display_blit(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_display_blit_obj, 6, 6, mipidsi_display_blit);
 
+/* Without this, displaydev's FBDisplay.fill_rect falls through to a banded blit
+ * (a w*rows temporary built in Python) or, before that existed, to per-row
+ * memoryview assigns -- 1.387 s for a 100x100 fill on the P4 Touch-LCD-4B
+ * (displayif#28). The pointer and the stride are right here. */
+static mp_obj_t mipidsi_display_fill_rect(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("MIPI DSI display is deinited"));
+    }
+    int x = mp_obj_get_int(args[1]);
+    int y = mp_obj_get_int(args[2]);
+    int w = mp_obj_get_int(args[3]);
+    int h = mp_obj_get_int(args[4]);
+    uint16_t color = (uint16_t)mp_obj_get_int(args[5]);
+    if (!displayif_fb_rect_ok(x, y, w, h, self->width, self->height)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("fill_rect out of range"));
+    }
+    displayif_fb_fill_rect16(self->buf, self->row_stride, x, y, w, h, color);
+    mipidsi_msync_rows(self, y, h);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_display_fill_rect_obj, 6, 6, mipidsi_display_fill_rect);
+
 static mp_int_t mipidsi_display_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
     (void)flags;
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
@@ -540,6 +565,9 @@ static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
         } else if (attr == MP_QSTR_blit) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_blit_obj);
             dest[1] = self_in;
+        } else if (attr == MP_QSTR_fill_rect) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_fill_rect_obj);
+            dest[1] = self_in;
         } else if (attr == MP_QSTR_deinit) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_deinit_obj);
             dest[1] = self_in;
@@ -560,6 +588,7 @@ static const mp_rom_map_elem_t mipidsi_display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&mipidsi_display_refresh_obj) },
     { MP_ROM_QSTR(MP_QSTR_refresh_rect), MP_ROM_PTR(&mipidsi_display_refresh_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_blit), MP_ROM_PTR(&mipidsi_display_blit_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&mipidsi_display_fill_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mipidsi_display_deinit_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mipidsi_display_deinit_obj) },
 };
