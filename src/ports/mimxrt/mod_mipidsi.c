@@ -10,6 +10,7 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/fb_fill.h"
 #include "displayif/soft_reset.h"
 
 #if defined(MIMXRT1176_SERIES) || defined(CPU_MIMXRT1176) || defined(CPU_MIMXRT1176DVMAA_cm7)
@@ -245,6 +246,29 @@ static mp_obj_t mipidsi_display_refresh(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mipidsi_display_refresh_obj, mipidsi_display_refresh);
 
+/* The LCDIFv2 scans out of this buffer, so a fill is a write to memory and
+ * nothing else; refresh() does the DCACHE clean over the whole buffer, which is
+ * the same order FBDisplay draws in. Without this, a fill falls back to per-row
+ * memoryview assigns from Python (displayif#28). */
+static mp_obj_t mipidsi_display_fill_rect(size_t n_args, const mp_obj_t *args) {
+    (void)n_args;
+    mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    if (self->deinited || self->buf == NULL) {
+        mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("MIPI DSI display is deinited"));
+    }
+    int x = mp_obj_get_int(args[1]);
+    int y = mp_obj_get_int(args[2]);
+    int w = mp_obj_get_int(args[3]);
+    int h = mp_obj_get_int(args[4]);
+    uint16_t color = (uint16_t)mp_obj_get_int(args[5]);
+    if (!displayif_fb_rect_ok(x, y, w, h, self->width, self->height)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("fill_rect out of range"));
+    }
+    displayif_fb_fill_rect16(self->buf, self->row_stride, x, y, w, h, color);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_display_fill_rect_obj, 6, 6, mipidsi_display_fill_rect);
+
 static mp_obj_t mipidsi_display_del(mp_obj_t self_in) {
     mipidsi_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     mipidsi_display_deinit_internal(self);
@@ -263,6 +287,9 @@ static void mipidsi_display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
             dest[0] = mp_obj_new_int(self->row_stride);
         } else if (attr == MP_QSTR_refresh) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_refresh_obj);
+            dest[1] = self_in;
+        } else if (attr == MP_QSTR_fill_rect) {
+            dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_fill_rect_obj);
             dest[1] = self_in;
         } else if (attr == MP_QSTR_deinit) {
             dest[0] = MP_OBJ_FROM_PTR(&mipidsi_display_del_obj);
@@ -297,6 +324,7 @@ static MP_DEFINE_CONST_DICT(mipidsi_bus_locals_dict, mipidsi_bus_locals_dict_tab
 
 static const mp_rom_map_elem_t mipidsi_display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_refresh), MP_ROM_PTR(&mipidsi_display_refresh_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_rect), MP_ROM_PTR(&mipidsi_display_fill_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_deinit), MP_ROM_PTR(&mipidsi_display_del_obj) },
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&mipidsi_display_del_obj) },
 };

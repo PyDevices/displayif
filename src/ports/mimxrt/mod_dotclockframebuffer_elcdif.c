@@ -16,6 +16,7 @@
 #include "py/binary.h"
 #include "py/mphal.h"
 #include "displayif/mp_helpers.h"
+#include "displayif/fb_fill.h"
 #include "displayif/soft_reset.h"
 #include "displayif_mimxrt.h"
 #include "pin.h"
@@ -382,15 +383,10 @@ static mp_obj_t dotclockframebuffer_fill_rect(size_t n_args, const mp_obj_t *arg
     int w = mp_obj_get_int(args[3]);
     int h = mp_obj_get_int(args[4]);
     uint16_t color = (uint16_t)mp_obj_get_int(args[5]);
-    if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > self->width || y + h > self->height) {
+    if (!displayif_fb_rect_ok(x, y, w, h, self->width, self->height)) {
         mp_raise_ValueError(MP_ERROR_TEXT("fill_rect out of range"));
     }
-    for (int row = 0; row < h; row++) {
-        uint16_t *dst = (uint16_t *)(self->buf + (size_t)(y + row) * self->row_stride + (size_t)x * sizeof(uint16_t));
-        for (int col = 0; col < w; col++) {
-            dst[col] = color;
-        }
-    }
+    displayif_fb_fill_rect16(self->buf, self->row_stride, x, y, w, h, color);
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(dotclockframebuffer_fill_rect_obj, 6, 6, dotclockframebuffer_fill_rect);
