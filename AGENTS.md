@@ -34,6 +34,7 @@ Desktop also: root `circuitpython.mk` + `apply_cp_patches.sh` (unix `usdl2` only
 ## Hard rules
 
 - **Fix root causes in displayif** (or the owning binding). Do not require hard reset, and do not special-case pydevices board configs to avoid second init.
+- **Never put an `MP_QSTR_` name behind a define this usermod supplies** (a `target_compile_definitions(... INTERFACE ...)`): the CMake QSTR pass cannot see it and the port fails with `'MP_QSTR_<name>' undeclared`, while unix stays green. `python3 tools/check_qstr_reachability.py` — [docs/qstrs-and-usermod-defines.md](docs/qstrs-and-usermod-defines.md).
 - **Do not patch `micropython/`** for soft-reset teardown when a usermod `--wrap` or registry hook will do (see soft-reset docs). Do not commit upstream MicroPython trees.
 - **Every** accelerated backend that owns DMA/IRQ/PIO/SDK handles must register with `displayif_register_soft_reset()` and tear down from the same path used by `deinit` / `__del__` / idempotent ctors.
 - Desktop `usdl2` registers the same way (SDL timers + `SDL_Quit`); wired on unix/windows MP and CP unix.

@@ -12,7 +12,19 @@
 #include "displayif/i80bus_gpio.h"
 #include "pin.h"
 
+// SAMD51 is what this file implements, and only the *implementation* may sit
+// behind that. Every MP_QSTR_ name below is outside the guard, because a name
+// referenced only under a define the usermod supplies through
+// target_compile_definitions(... INTERFACE ...) is invisible to the CMake QSTR
+// pass and the build fails with 'MP_QSTR_<name>' undeclared. The rule, and how
+// to check it, is in docs/qstrs-and-usermod-defines.md.
 #if defined(MCU_SAMD51) || defined(__SAMD51__)
+#define DISPLAYIF_I80BUS_SAMD51 (1)
+#else
+#define DISPLAYIF_I80BUS_SAMD51 (0)
+#endif
+
+#if DISPLAYIF_I80BUS_SAMD51
 
 #include "sam.h"
 
@@ -89,6 +101,20 @@ static void samd_i80bus_pin_output(int pin_id) {
     samd_i80bus_hi_drive(pin_id);
 }
 
+#else /* !DISPLAYIF_I80BUS_SAMD51 */
+
+// Nothing here needs a SAMD51 header. The build systems pick
+// src/ports/common/notimpl/mod_i80bus.c for a SAMD21, so this path is normally
+// dead -- it exists so that a stray compile of this file on another MCU says
+// what is wrong instead of failing on PORT->Group, and so that the names below
+// are compiled either way.
+static void i80bus_not_samd51(void) {
+    mp_raise_msg(&mp_type_NotImplementedError,
+        MP_ERROR_TEXT("i80bus.I80Bus is the SAMD51 GPIO bit-bang bus; this build is for another MCU"));
+}
+
+#endif /* DISPLAYIF_I80BUS_SAMD51 */
+
 static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum {
         ARG_data0,
@@ -112,6 +138,15 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
+
+    // The signature above is parsed on every build -- that is what keeps its
+    // keyword qstrs collected -- and only the work is SAMD51's.
+    #if !DISPLAYIF_I80BUS_SAMD51
+    (void)type;
+    (void)vals;
+    i80bus_not_samd51();
+    return mp_const_none;
+    #else
 
     if (!i80bus_arg_is_set(vals[ARG_command].u_obj) || !i80bus_arg_is_set(vals[ARG_write].u_obj)) {
         mp_raise_ValueError(MP_ERROR_TEXT("command and write pins must be specified"));
@@ -203,9 +238,16 @@ static mp_obj_t i80bus_make(const mp_obj_type_t *type, size_t n_args, size_t n_k
     displayif_pin_set(self->dc_pin, 0);
     self->deinited = false;
     return MP_OBJ_FROM_PTR(self);
+    #endif /* DISPLAYIF_I80BUS_SAMD51 */
 }
 
 static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
+    #if !DISPLAYIF_I80BUS_SAMD51
+    (void)n_args;
+    (void)args;
+    i80bus_not_samd51();
+    return mp_const_none;
+    #else
     i80bus_obj_t *self = MP_OBJ_TO_PTR(args[0]);
     if (self->deinited) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
@@ -237,10 +279,16 @@ static mp_obj_t i80bus_send(size_t n_args, const mp_obj_t *args) {
     }
 
     return mp_const_none;
+    #endif /* DISPLAYIF_I80BUS_SAMD51 */
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(i80bus_send_obj, 1, 3, i80bus_send);
 
 static mp_obj_t i80bus_reset(mp_obj_t self_in) {
+    #if !DISPLAYIF_I80BUS_SAMD51
+    (void)self_in;
+    i80bus_not_samd51();
+    return mp_const_none;
+    #else
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (self->deinited) {
         mp_raise_msg(&mp_type_RuntimeError, MP_ERROR_TEXT("i80bus is deinited"));
@@ -252,16 +300,24 @@ static mp_obj_t i80bus_reset(mp_obj_t self_in) {
     mp_hal_delay_us(4);
     displayif_pin_set(self->reset_pin, 1);
     return mp_const_none;
+    #endif /* DISPLAYIF_I80BUS_SAMD51 */
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_reset_obj, i80bus_reset);
 
 static mp_obj_t i80bus_deinit(mp_obj_t self_in) {
+    #if !DISPLAYIF_I80BUS_SAMD51
+    // deinit is idempotent everywhere, and on a board that never opened the bus
+    // there is nothing to tear down -- so this one succeeds rather than raising.
+    (void)self_in;
+    return mp_const_none;
+    #else
     i80bus_obj_t *self = MP_OBJ_TO_PTR(self_in);
     if (self->deinited) {
         return mp_const_none;
     }
     self->deinited = true;
     return mp_const_none;
+    #endif /* DISPLAYIF_I80BUS_SAMD51 */
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(i80bus_deinit_obj, i80bus_deinit);
 
@@ -293,5 +349,3 @@ const mp_obj_module_t i80bus_user_cmodule = {
 };
 
 MP_REGISTER_MODULE(MP_QSTR_i80bus, i80bus_user_cmodule);
-
-#endif /* SAMD51 */
