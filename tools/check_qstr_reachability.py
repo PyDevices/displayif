@@ -80,6 +80,14 @@ def interface_macros(root: Path) -> set[str]:
     return macros
 
 
+def _where(path: Path) -> str:
+    """Repo-relative when it can be -- ``--root`` may point somewhere else."""
+    try:
+        return str(path.relative_to(REPO))
+    except ValueError:
+        return str(path)
+
+
 def _positive_for(condition: str, macros: set[str]) -> set[str]:
     """Which of *macros* this condition requires to be SET to be taken.
 
@@ -138,9 +146,7 @@ def scan(root: Path, macros: set[str]) -> tuple[dict[str, list[str]], int]:
             at_risk = any(stack)
             for name in QSTR.findall(line):
                 if at_risk:
-                    guarded.setdefault(name, []).append(
-                        f"{path.relative_to(REPO)}:{lineno}"
-                    )
+                    guarded.setdefault(name, []).append(f"{_where(path)}:{lineno}")
                 else:
                     unguarded.add(name)
         seen += len(guarded)
