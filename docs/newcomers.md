@@ -48,7 +48,7 @@ commands and shows how to combine several CMake user modules.
 | Path | Purpose |
 |---|---|
 | `src/ports/common/` | Shared buses, helpers, RGB matrix code, and lifecycle support. |
-| `src/ports/<port>/` | SoC-specific backends for ESP32, RP2, SAMD, MIMXRT, and others. |
+| `src/ports/<port>/` | SoC-specific backends for ESP32, RP2, SAMD, and MIMXRT; `stm32` builds the portable buses only. |
 | `src/ports/desktop/usdl2/` | SDL2 desktop backend for MicroPython unix and Windows. |
 | `src/jpegio/` | Platform-neutral JPEG decoder and optional LVGL decoder integration. |
 | `src/include/displayif/` | Public native headers. |
@@ -72,8 +72,7 @@ resets or board-config special cases; follow
 This is native portability work. Read [AGENTS.md](../AGENTS.md) before
 changing lifecycle, soft-reset, board bring-up, or QSTR definitions. A new
 backend needs the appropriate port build, a real smoke test, then a soft reset
-and successful second construction. Use `mpftp` for supported build/flash
-workflows when available.
+and successful second construction.
 
 For a safe first contribution, improve a port note, add a focused API test, or
 clarify a matrix entry. Keep generated firmware artifacts and upstream
