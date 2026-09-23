@@ -45,7 +45,7 @@ RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_
 
 ## 🚀 Build
 
-Tested against MicroPython v1.28.0, the CircuitPython 10.2.1 oracle, and SDL2 >= 2.0
+Tested against MicroPython v1.29.0, the CircuitPython 10.2.1 oracle, and SDL2 >= 2.0
 (desktop `usdl2`) — see [UPSTREAM](UPSTREAM) for exact pins and how to verify them locally.
 
 Clone as a sibling of `micropython/`:
@@ -90,8 +90,6 @@ cd micropython/ports/windows && make USER_C_MODULES=../../..
 ```
 
 CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
-
-See the [org's optional aggregator workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 ### First run (unix `usdl2` smoke)
 
