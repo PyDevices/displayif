@@ -12,6 +12,11 @@
 extern const mp_obj_type_t usdl2_event_type;
 extern const mp_obj_type_t usdl2_timer_cb_type;
 
+// The __revision__ entry in that table needs displayif/build.h; both the
+// MicroPython module and CircuitPython's shared-bindings copy include this
+// header before the .inc, so it is pulled in here rather than in each.
+#include "displayif/build.h"
+
 // Binding fun objs referenced by usdl2_module_globals.inc (CP shared-bindings + MP).
 extern const mp_obj_fun_builtin_var_t usdl2_SDL_DEFINE_PIXELFORMAT_fun_obj;
 extern const mp_obj_fun_builtin_var_t SDL_Init_fun_obj;
