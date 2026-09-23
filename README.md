@@ -4,6 +4,9 @@
 
 Native display **interface** modules for PyDevices `displaydev`. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/`.
 
+New here? Read the [newcomer's guide](docs/newcomers.md) for the board-to-
+backend map, firmware integration boundary, and lifecycle rules.
+
 MicroPython board configs in `pydevices` that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
 
 **CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use `pydevices/board_configs/cp/` with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) is built from this repo via `./apply_cp_patches.sh` + CircuitPython unix.
@@ -42,7 +45,7 @@ RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_
 
 ## 🚀 Build
 
-Tested against MicroPython v1.28.0, the CircuitPython 10.2.1 oracle, and SDL2 >= 2.0
+Tested against MicroPython v1.29.0, the CircuitPython 10.2.1 oracle, and SDL2 >= 2.0
 (desktop `usdl2`) — see [UPSTREAM](UPSTREAM) for exact pins and how to verify them locally.
 
 Clone as a sibling of `micropython/`:
@@ -87,8 +90,6 @@ cd micropython/ports/windows && make USER_C_MODULES=../../..
 ```
 
 CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
-
-See the [org's optional aggregator workspace](https://github.com/PyDevices/cmods) for an easier way to build this repo with other user C modules.
 
 ### First run (unix `usdl2` smoke)
 
