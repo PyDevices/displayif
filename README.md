@@ -1,6 +1,6 @@
 # displayif
 
-**Status:** source-integrated component — built into firmware from source as a `USER_C_MODULES` usermod, not installed as a package. By design it has no versioned releases and is **not** in PyDevices' publishing set (unlike `pydevices` / `pydevices-desktop`). Maturity: **Alpha**. Issues: [PyDevices/displayif/issues](https://github.com/PyDevices/displayif/issues).
+**Status:** source-integrated component — built into firmware from source as a user C module, not installed as a package. By design it has no versioned releases and is **not** in PyDevices' publishing set (unlike `pydevices` / `pydevices-desktop`). Maturity: **Alpha**. Issues: [PyDevices/displayif/issues](https://github.com/PyDevices/displayif/issues).
 
 Native display **interface** modules for PyDevices `displaydev`. Portable code in `src/ports/common/`; SoC-specific code under `src/ports/<mp-port>/`.
 
@@ -13,7 +13,7 @@ MicroPython board configs in `pydevices` that raise `NotImplementedError` on imp
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/port-matrix.md](docs/port-matrix.md).
 
-Use this repo when a `pydevices` board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with the matching `USER_C_MODULES` path. If you are debugging a bring-up problem, begin with [docs/soft-reset-and-bring-up.md](docs/soft-reset-and-bring-up.md) and the port notes in [docs/port-matrix.md](docs/port-matrix.md).
+Use this repo when a `pydevices` board config needs a native display interface that is not available in the stock MicroPython port. In practice, you usually start with the target board’s port and the relevant display backend (for example `mipidsi`, `dotclockframebuffer`, or `picodvi`), then build the firmware with this module in it (see [Build](#-build)). If you are debugging a bring-up problem, begin with [docs/soft-reset-and-bring-up.md](docs/soft-reset-and-bring-up.md) and the port notes in [docs/port-matrix.md](docs/port-matrix.md).
 
 **Agents:** start at [AGENTS.md](AGENTS.md). Soft-reset / idempotent lifecycle
 (**implemented**): [docs/idempotent-lifecycle.md](docs/idempotent-lifecycle.md). Bring-up /
@@ -48,46 +48,59 @@ RGB and DSI framebuffers prefer **PSRAM** (`MALLOC_CAP_SPIRAM`). Ensure `CONFIG_
 Tested against MicroPython v1.29.0, the CircuitPython 10.2.1 oracle, and SDL2 >= 2.0
 (desktop `usdl2`) — see [UPSTREAM](UPSTREAM) for exact pins and how to verify them locally.
 
-Clone as a sibling of `micropython/`:
+On MicroPython 1.29 or later, clone this repository anywhere and add one line
+to the manifest your build already uses:
 
-```
-workspace/
-  displayif/      ← this repo
-  micropython/
+```python
+include("/path/to/displayif/manifest.py")
 ```
 
-**Make ports** (mimxrt, samd, …): `USER_C_MODULES` is the **workspace parent** (directory that contains `displayif/` and any other `*/micropython.mk` siblings):
+On unix that manifest is `ports/unix/variants/standard/manifest.py`; on esp32
+and rp2 it is usually `ports/<port>/boards/manifest.py`, unless your board
+brings its own. Then build as usual:
 
 ```bash
-cd micropython/ports/mimxrt && make USER_C_MODULES=../../.. BOARD=TEENSY41
-cd micropython/ports/samd && make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
+# esp32, after sourcing ESP-IDF's export.sh
+cd micropython/ports/esp32 && make BOARD=ESP32_GENERIC_S3
+# or unix
+cd micropython/ports/unix && make submodules && make
 ```
 
-**CMake ports** (esp32, rp2): `USER_C_MODULES` points at **this repo** (or `displayif/micropython.cmake`). CMake does not scan siblings the way Make does:
+The manifest freezes no Python; it only names the C module, and the build glue
+picks the modules your port supports (see [docs/port-matrix.md](docs/port-matrix.md)).
+On unix that is `usdl2` and `jpegio`; the bus and framebuffer modules are
+MCU-only. Tested on the unix port against MicroPython v1.29.0.
+
+If you would rather not edit the MicroPython tree, write a manifest of your own
+and pass it as `FROZEN_MANIFEST=`. That replaces the port's default, so include
+the default too (`include("$(PORT_DIR)/variants/standard/manifest.py")` on
+unix, `include("$(PORT_DIR)/boards/manifest.py")` on esp32) or you lose
+`asyncio` and the port's other frozen modules.
+
+**Older than 1.29?** Manifests there have no `c_module()`; use
+`USER_C_MODULES` instead. On esp32 and rp2 point it at this repository:
 
 ```bash
-cd micropython/ports/esp32
-make submodules BOARD=ESP32_GENERIC_S3
-make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=../../../displayif
-
-cd micropython/ports/rp2
-make BOARD=RPI_PICO USER_C_MODULES=../../../displayif
-```
-
-To build this module **plus** other usermods on a CMake port, pass a semicolon-separated list (no aggregator file required):
-
-```bash
+make BOARD=ESP32_GENERIC_S3 USER_C_MODULES=/abs/path/to/displayif
 make BOARD=ESP32_GENERIC_S3 \
   USER_C_MODULES="/abs/path/to/displayif;/abs/path/to/lvgl-micropython"
 ```
 
-**Desktop SDL (`usdl2`):** builds automatically on MicroPython `unix` / `windows` when this repo is on the `USER_C_MODULES` scan path. Unix needs `libsdl2-dev`. Windows (MinGW) needs an unpacked [SDL2 MinGW development ZIP](https://github.com/libsdl-org/SDL/releases) and `SDL2_DEV` pointing at its root (see [`tools/sdl2_dev_env.sh`](tools/sdl2_dev_env.sh)).
+On Make ports (unix, windows, mimxrt, samd) point it at the directory that
+*contains* this repository, which builds every module in that directory:
 
 ```bash
-cd micropython/ports/unix && make USER_C_MODULES=../../..
-# windows: export SDL2_DEV=/path/to/SDL2-2.x.x first
-cd micropython/ports/windows && make USER_C_MODULES=../../..
+cd micropython/ports/samd && make USER_C_MODULES=../../.. BOARD=ADAFRUIT_METRO_M4_EXPRESS
 ```
+
+**Desktop SDL (`usdl2`)** builds automatically on the `unix` and `windows`
+ports. Unix needs `libsdl2-dev`. Windows (MinGW) needs an unpacked
+[SDL2 MinGW development ZIP](https://github.com/libsdl-org/SDL/releases) and
+`SDL2_DEV` pointing at its root (see [`tools/sdl2_dev_env.sh`](tools/sdl2_dev_env.sh)).
+
+For several PyDevices modules at once,
+[micropython-pydevices](https://github.com/PyDevices/micropython-pydevices)
+keeps ready-made manifests, variants and boards.
 
 CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
 
