@@ -254,7 +254,10 @@ a second decoder:
   module registers itself. MicroPython runs a built-in module's `__init__`
   on every `import` statement (`MICROPY_MODULE_BUILTIN_INIT`, on by default
   at the "extra features" ROM level: unix, esp32, rp2, stm32, mimxrt,
-  SAMD51; not on SAMD21's "basic" level).
+  SAMD51; not on SAMD21's "basic" level). Upstream's windows variants sit at
+  the core level and leave it off; the PyDevices windows variant in
+  micropython-pydevices turns it on, so `micropython.exe` registers on import
+  like unix. On any other windows build, call `register_lvgl_decoder()`.
 - `jpegio.register_lvgl_decoder() -> bool` registers explicitly: `True`
   when this call added the decoder, `False` when it was already there,
   `RuntimeError` when LVGL is not initialised. Use it when `import jpegio`
