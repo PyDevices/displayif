@@ -89,6 +89,9 @@ GOLDEN = FRAMES + "/golden_tjpgd.json"
 REFERENCE = FRAMES + "/reference.json"
 W, H = 320, 240
 DECODER = "jpegio"
+# Platforms whose interpreters run a built-in module's __init__ on import
+# (MICROPY_MODULE_BUILTIN_INIT), so `import jpegio` after lv.init() registers.
+DESKTOP_WITH_BUILTIN_INIT = ("linux", "darwin", "win32")
 CORPUS = ("baseline_jfif_320x240.jpg", "restart_dri_320x240.jpg", "c920e_320x240_dri.jpg")
 
 # The synthetic pattern (make_corpus.py): eight colour bars in the top 40 %.
@@ -250,6 +253,13 @@ def main():
     import jpegio as jpegio_again  # noqa: F401 -- a second import statement re-runs the module's __init__ hook
     auto = decoders().count(DECODER)
     assert auto <= 1, decoders()
+    # The desktop interpreters all have the hook: unix at its extra-features
+    # ROM level, windows through the PyDevices variant (displayif#41).
+    if sys.platform in DESKTOP_WITH_BUILTIN_INIT:
+        assert auto == 1, (
+            "%s: `import jpegio` after lv.init() registered nothing -- this build lacks "
+            "MICROPY_MODULE_BUILTIN_INIT (decoders %s)" % (sys.platform, decoders())
+        )
     print("import-time registration (MICROPY_MODULE_BUILTIN_INIT): %s" % ("yes" if auto == 1 else "no -- explicit call needed"))
     added = jpegio.register_lvgl_decoder()
     assert added is (auto == 0), (added, auto)
