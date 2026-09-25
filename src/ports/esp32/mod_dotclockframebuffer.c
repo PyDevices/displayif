@@ -79,6 +79,8 @@ typedef struct _dotclockframebuffer_obj_t {
     bool pclk_active_high;
     bool pclk_idle_high;
     int overscan_left;
+    // Upper bound on bounce-buffer rows (0 = DCFB_BOUNCE_ROWS_MAX).
+    uint32_t bounce_rows_max;
     uint8_t bits_per_pixel;
     bool deinited;
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
@@ -209,14 +211,14 @@ static void dotclockframebuffer_fill_data_pins(dotclockframebuffer_obj_t *self, 
 // Returns the number of rows per bounce buffer, or 0 if even the smallest
 // pair will not fit. Always writes the sizes it would have accepted and the
 // largest free block it saw, so the caller can name all three in the error.
-static uint32_t dcfb_probe_bounce_rows(uint32_t h_res, uint32_t v_res,
+static uint32_t dcfb_probe_bounce_rows(uint32_t h_res, uint32_t v_res, uint32_t rows_max,
     size_t *out_preferred, size_t *out_smallest, size_t *out_largest) {
     const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT;
     *out_largest = heap_caps_get_largest_free_block(caps);
     *out_preferred = 0;
     *out_smallest = 0;
 
-    for (uint32_t rows = DCFB_BOUNCE_ROWS_MAX; rows >= DCFB_BOUNCE_ROWS_MIN; rows--) {
+    for (uint32_t rows = rows_max; rows >= DCFB_BOUNCE_ROWS_MIN; rows--) {
         if (v_res == 0 || v_res % rows != 0) {
             // ESP-IDF: "frame buffer size must be multiple of bounce buffer size".
             continue;
@@ -290,7 +292,8 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
     size_t bb_preferred = 0;
     size_t bb_smallest = 0;
     size_t bb_largest = 0;
-    uint32_t bounce_rows = dcfb_probe_bounce_rows(h_res, (uint32_t)self->height,
+    uint32_t rows_max = self->bounce_rows_max;
+    uint32_t bounce_rows = dcfb_probe_bounce_rows(h_res, (uint32_t)self->height, rows_max,
         &bb_preferred, &bb_smallest, &bb_largest);
     if (bb_preferred == 0) {
         // No row count between DCFB_BOUNCE_ROWS_MIN and _MAX divides v_res, so
@@ -298,7 +301,7 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
         // cannot be satisfied at any size. Not a memory problem — say which.
         mp_raise_msg_varg(&mp_type_ValueError,
             MP_ERROR_TEXT("RGB panel height %u has no bounce-buffer row count between %u and %u that divides it"),
-            (unsigned int)self->height, (unsigned int)DCFB_BOUNCE_ROWS_MIN, (unsigned int)DCFB_BOUNCE_ROWS_MAX);
+            (unsigned int)self->height, (unsigned int)DCFB_BOUNCE_ROWS_MIN, (unsigned int)rows_max);
     }
     if (bounce_rows == 0) {
         mp_raise_msg_varg(&mp_type_MemoryError,
@@ -307,13 +310,13 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
                           "Start the display before Wi-Fi, or hard reset."),
             (unsigned int)bb_preferred, (unsigned int)bb_smallest, (unsigned int)bb_largest);
     }
-    if (bounce_rows != DCFB_BOUNCE_ROWS_MAX) {
+    if (bounce_rows != rows_max) {
         // Say so rather than degrading silently: fewer rows means more refill
         // interrupts per frame, and it is the tell that internal DRAM is tight.
         mp_printf(MP_PYTHON_PRINTER,
             "dotclockframebuffer: internal DMA RAM is tight (largest free block %u), "
             "using %u-row bounce buffers instead of %u\n",
-            (unsigned int)bb_largest, (unsigned int)bounce_rows, (unsigned int)DCFB_BOUNCE_ROWS_MAX);
+            (unsigned int)bb_largest, (unsigned int)bounce_rows, (unsigned int)rows_max);
     }
 
     esp_lcd_rgb_panel_config_t panel_config = {
@@ -464,6 +467,7 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         ARG_pclk_active_high,
         ARG_pclk_idle_high,
         ARG_overscan_left,
+        ARG_bounce_rows,
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_de, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
@@ -488,6 +492,12 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
         { MP_QSTR_pclk_active_high, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
         { MP_QSTR_pclk_idle_high, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
         { MP_QSTR_overscan_left, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
+        // Largest bounce buffer, in rows (default 20). Two of them come out of
+        // internal DMA RAM, which Wi-Fi, TLS and a USB host also need: at 20
+        // rows an 800-wide panel takes 64 KB of it. A board that runs those
+        // alongside the panel asks for fewer rows; the probe still steps down
+        // from here if even that does not fit.
+        { MP_QSTR_bounce_rows, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
@@ -529,6 +539,18 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
     self->pclk_active_high = vals[ARG_pclk_active_high].u_bool;
     self->pclk_idle_high = vals[ARG_pclk_idle_high].u_bool;
     self->overscan_left = vals[ARG_overscan_left].u_int;
+    {
+        mp_int_t rows = vals[ARG_bounce_rows].u_int;
+        if (rows == 0) {
+            rows = DCFB_BOUNCE_ROWS_MAX;
+        }
+        if (rows < DCFB_BOUNCE_ROWS_MIN || rows > DCFB_BOUNCE_ROWS_MAX) {
+            mp_raise_msg_varg(&mp_type_ValueError,
+                MP_ERROR_TEXT("bounce_rows must be %u..%u"),
+                (unsigned int)DCFB_BOUNCE_ROWS_MIN, (unsigned int)DCFB_BOUNCE_ROWS_MAX);
+        }
+        self->bounce_rows_max = (uint32_t)rows;
+    }
     self->bits_per_pixel = 16;
     self->deinited = false;
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED

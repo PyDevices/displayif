@@ -49,10 +49,17 @@ Behavioral contract (proven on Qualia S3 + TL040HDS20):
 |-------|----------|
 | Scanout | Continuous DMA (`refresh_on_demand=0`); panel-owned FB |
 | `refresh()` | Cache writeback only (`esp_cache_msync`) |
-| Large panels | Bounce buffer `20 * h_res` px + dirty-row msync |
+| Large panels | Bounce buffers `bounce_rows * h_res` px each (`bounce_rows=`, 4..20, default 20; stepped down if internal DMA RAM will not hold two) + dirty-row msync |
 | Buffer protocol | typecode `'B'` (MP has no `memoryview.cast`) |
 | Fast paths | Native `blit` / `fill_rect` (expose via custom `attr`) |
 | Lifecycle | Idempotent `deinit` / `__del__` / ctor + soft-reset teardown |
+
+Both bounce buffers come out of internal DMA RAM, which Wi-Fi, hardware AES
+and a USB host need too: an 800-wide panel takes 64 KB of it at 20 rows. A
+board that runs those beside the panel asks for fewer, e.g.
+`DotClockFramebuffer(..., bounce_rows=10)` on the Waveshare
+ESP32-S3-Touch-LCD-7 (32 KB). Fewer rows mean more refill interrupts per
+frame, not less throughput: the same bytes are copied either way.
 
 See [soft-reset-and-bring-up.md](../soft-reset-and-bring-up.md#reference-dotclockframebufferdotclockframebuffer-on-qualia-esp32-s3).
 
