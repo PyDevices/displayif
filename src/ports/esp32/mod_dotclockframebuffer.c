@@ -35,6 +35,12 @@
 #define DCFB_MAX_DATA_PINS 18
 #define DCFB_NUM_FBS 2
 #define DCFB_PRESENT_TIMEOUT_US 100000
+// The bounce-buffer row range bounce_rows= is checked against. Outside the
+// SOC_LCD_RGB_SUPPORTED block below, because the constructor that checks it
+// is too: the esp32 port compiles user C modules a second time in the
+// executable's own target, without ESP_PLATFORM, and there the block is empty.
+#define DCFB_BOUNCE_ROWS_MAX 20
+#define DCFB_BOUNCE_ROWS_MIN 4
 
 #if defined(ESP_PLATFORM)
 #include "esp_heap_caps.h"
@@ -201,8 +207,6 @@ static void dotclockframebuffer_fill_data_pins(dotclockframebuffer_obj_t *self, 
 // counts that divide v_res, and if none fit, say what we needed and what the
 // heap had. Smaller bounce buffers cost more refill interrupts per frame, not
 // correctness — the same bytes are copied either way.
-#define DCFB_BOUNCE_ROWS_MAX 20
-#define DCFB_BOUNCE_ROWS_MIN 4
 // At least the strictest alignment gdma_get_alignment_constraints() reports for
 // internal memory on any supported target, so the probe is never more
 // optimistic than the allocation ESP-IDF makes moments later.
