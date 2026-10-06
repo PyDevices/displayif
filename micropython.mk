@@ -3,7 +3,7 @@
 # Discovered via USER_C_MODULES pointing at the workspace directory that
 # contains this repo (its parent), e.g. `make USER_C_MODULES=../../..`.
 # Hardware interfaces (spibus, dotclockframebuffer, …) build only on MCU ports.
-# Desktop SDL (`usdl2`) builds on unix and windows ports. `jpegio` builds everywhere.
+# Desktop SDL (`usdl2`) builds on unix and windows ports.
 
 DISPLAYIF_MOD_DIR := $(USERMOD_DIR)
 
@@ -122,12 +122,11 @@ ifneq ($(DISPLAYIF_PORT_UNIX)$(DISPLAYIF_PORT_WINDOWS),00)
 include $(DISPLAYIF_MOD_DIR)/src/ports/desktop/usdl2/micropython.mk
 endif
 
-# JPEG decoder (`import jpegio`): platform-neutral C, built on every port.
-include $(DISPLAYIF_MOD_DIR)/src/jpegio/micropython.mk
+# The JPEG decoder, jpegio, moved to micropython-pydevices' modules/jpegio.
 
 # displayif_revision_obj, read as <module>.__revision__ on every module here.
 # src/include is on the path here, not only in ports/common/micropython.mk,
-# because a port that builds jpegio alone (webassembly) never includes that.
+# because a port that builds no display module (webassembly) never includes that.
 CFLAGS_USERMOD += -I$(DISPLAYIF_MOD_DIR)/src/include
 SRC_USERMOD_C += $(DISPLAYIF_MOD_DIR)/src/ports/common/build.c
 

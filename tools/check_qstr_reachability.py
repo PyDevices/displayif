@@ -49,8 +49,8 @@ REPO = Path(__file__).resolve().parents[1]
 #: exist on every build whether anything here collects them or not. Keep this
 #: list short and add to it only with the reason: a name is in the pool because
 #: MicroPython's own core uses it, and that can change between versions.
-#: ``__init__`` is here for ``src/jpegio/jpegio.c``'s LVGL decoder registration.
-CORE_POOL = frozenset({"__init__"})
+#: Empty since jpegio (which needed ``__init__``) moved to micropython-pydevices.
+CORE_POOL = frozenset()
 
 QSTR = re.compile(r"MP_QSTR_(\w+)")
 IFACE_BLOCK = re.compile(

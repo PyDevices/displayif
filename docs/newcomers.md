@@ -50,7 +50,6 @@ commands and shows how to combine several CMake user modules.
 | `src/ports/common/` | Shared buses, helpers, RGB matrix code, and lifecycle support. |
 | `src/ports/<port>/` | SoC-specific backends for ESP32, RP2, SAMD, and MIMXRT; `stm32` builds the portable buses only. |
 | `src/ports/desktop/usdl2/` | SDL2 desktop backend for MicroPython unix and Windows. |
-| `src/jpegio/` | Platform-neutral JPEG decoder and optional LVGL decoder integration. |
 | `src/include/displayif/` | Public native headers. |
 | `micropython.mk`, `micropython.cmake` | Make/CMake user-module entrypoints. |
 | `docs/port-matrix.md` | Module/port/board-config support matrix. |
