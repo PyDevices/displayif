@@ -36,6 +36,7 @@
 #include "esp_heap_caps.h"
 #include "hal/mipi_dsi_hal.h"
 #include "hal/mipi_dsi_host_ll.h"
+#include "esp_timer.h"
 
 /* SPIKE (KeDei 5" DSI, 2026-10-06): ESP-IDF has no public way to send a MIPI
  * DSI *generic* long write; its DBI IO sends DCS only. The bus handle points at
@@ -662,7 +663,59 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &mipidsi_bus_locals_dict
 );
 
+/* SPIKE: generic_read(bus, payload, n) -> bytes, or None if nothing answered.
+ * A DSI generic read request with 0-2 parameter bytes, the way the HAL's
+ * mipi_dsi_hal_host_gen_read_short_packet does it, but with bounded waits (the
+ * HAL's spin forever on a device that never answers). Video mode is paused for
+ * the read and restored after. */
+static mp_obj_t mipidsi_spike_generic_read(size_t n_args, const mp_obj_t *args) {
+    mipidsi_bus_obj_t *bus = MP_OBJ_TO_PTR(args[0]);
+    if (!mp_obj_is_type(args[0], &mipidsi_bus_type) || bus->deinited || bus->dsi_bus == NULL) {
+        mp_raise_TypeError(MP_ERROR_TEXT("bus must be an initialized mipidsi.Bus"));
+    }
+    mp_buffer_info_t req;
+    mp_get_buffer_raise(args[1], &req, MP_BUFFER_READ);
+    int want = mp_obj_get_int(args[2]);
+    uint8_t vc = n_args > 3 ? (uint8_t)mp_obj_get_int(args[3]) : 0;
+    if (req.len > 2 || want <= 0 || want > 64) {
+        mp_raise_ValueError(MP_ERROR_TEXT("payload is 0-2 bytes, n is 1-64"));
+    }
+    static const mipi_dsi_data_type_t dts[] = {
+        MIPI_DSI_DT_GENERIC_READ_REQUEST_0, MIPI_DSI_DT_GENERIC_READ_REQUEST_1, MIPI_DSI_DT_GENERIC_READ_REQUEST_2,
+    };
+    const uint8_t *p = req.buf;
+    uint16_t header = (uint16_t)((req.len > 0 ? p[0] : 0) | ((req.len > 1 ? p[1] : 0) << 8));
+    mipi_dsi_hal_context_t *hal = &((mipidsi_spike_dsi_bus_t *)bus->dsi_bus)->hal;
+    bool was_video = !hal->host->mode_cfg.cmd_video_mode;
+
+    mipi_dsi_hal_host_gen_write_short_packet(hal, vc, MIPI_DSI_DT_SET_MAXIMUM_RETURN_PKT, (uint16_t)want);
+    mipi_dsi_host_ll_enable_video_mode(hal->host, false);
+    mipi_dsi_host_ll_enable_bta(hal->host, true);
+    mipi_dsi_host_ll_gen_set_rx_vcid(hal->host, vc);
+    mipi_dsi_hal_host_gen_write_short_packet(hal, vc, dts[req.len], header);
+
+    uint8_t out[64];
+    int got = 0;
+    int64_t deadline = esp_timer_get_time() + 50000;
+    while (mipi_dsi_host_ll_gen_is_read_cmd_busy(hal->host) && esp_timer_get_time() < deadline) {
+    }
+    while (mipi_dsi_host_ll_gen_is_read_fifo_empty(hal->host) && esp_timer_get_time() < deadline) {
+    }
+    while (!mipi_dsi_host_ll_gen_is_read_fifo_empty(hal->host)) {
+        uint32_t w = mipi_dsi_host_ll_gen_read_payload_fifo(hal->host);
+        for (int i = 0; i < 4 && got < want; i++) {
+            out[got++] = (w >> (8 * i)) & 0xFF;
+        }
+    }
+    if (was_video) {
+        mipi_dsi_host_ll_enable_video_mode(hal->host, true);
+    }
+    return got ? mp_obj_new_bytes(out, got) : mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(mipidsi_spike_generic_read_obj, 3, 4, mipidsi_spike_generic_read);
+
 static const mp_rom_map_elem_t mipidsi_module_globals_table[] = {
+    { MP_ROM_QSTR(MP_QSTR_generic_read), MP_ROM_PTR(&mipidsi_spike_generic_read_obj) },
     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_mipidsi) },
     DISPLAYIF_REVISION_ENTRY,
     { MP_ROM_QSTR(MP_QSTR_Bus), MP_ROM_PTR(&mipidsi_bus_type) },
