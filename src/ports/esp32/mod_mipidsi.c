@@ -34,6 +34,28 @@
 #include "esp_ldo_regulator.h"
 #include "esp_cache.h"
 #include "esp_heap_caps.h"
+#include "esp_idf_version.h"
+
+/* Video mode and clock lane: ESP-IDF's DPI panel always sends burst-mode video
+ * and lets the clock lane drop to LP between lines, with no public way to ask
+ * for anything else. A bridge such as the Chipone ICN6211 on Raspberry Pi-style
+ * DSI panels needs non-burst video with sync pulses and a continuous HS clock,
+ * or it produces nothing. The only route to those registers is the HAL context
+ * inside ESP-IDF's private esp_lcd_dsi_bus_t (components/esp_lcd/dsi/
+ * mipi_dsi_priv.h), whose leading fields are mirrored below. That layout is
+ * checked for v5.5.4 only: on any other ESP-IDF the options raise instead of
+ * reaching into a struct that may have moved. */
+#if ESP_IDF_VERSION == ESP_IDF_VERSION_VAL(5, 5, 4)
+#define MIPIDSI_VIDEO_MODE_CTRL (1)
+#include "hal/mipi_dsi_hal.h"
+#include "hal/mipi_dsi_host_ll.h"
+typedef struct {
+    int bus_id;
+    mipi_dsi_hal_context_t hal;
+} mipidsi_idf_dsi_bus_t;
+#else
+#define MIPIDSI_VIDEO_MODE_CTRL (0)
+#endif
 
 #define MIPIDSI_INIT_DELAY_FLAG 0x80
 
@@ -292,6 +314,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         ARG_pixel_clock_frequency,
         ARG_virtual_channel,
         ARG_color_depth,
+        ARG_non_burst,
+        ARG_continuous_clock,
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_bus, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
@@ -307,6 +331,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_pixel_clock_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_virtual_channel, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
+        { MP_QSTR_non_burst, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
+        { MP_QSTR_continuous_clock, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
@@ -331,6 +357,11 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     if (vals[ARG_virtual_channel].u_int < 0 || vals[ARG_virtual_channel].u_int > 3) {
         mp_raise_ValueError(MP_ERROR_TEXT("virtual_channel must be 0..3"));
     }
+    #if !MIPIDSI_VIDEO_MODE_CTRL
+    if (vals[ARG_non_burst].u_bool || vals[ARG_continuous_clock].u_bool) {
+        mp_raise_NotImplementedError(MP_ERROR_TEXT("non_burst and continuous_clock are checked against ESP-IDF v5.5.4 only"));
+    }
+    #endif
 
     mp_buffer_info_t init_bufinfo;
     mp_get_buffer_raise(vals[ARG_init_sequence].u_obj, &init_bufinfo, MP_BUFFER_READ);
@@ -377,7 +408,20 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     esp_lcd_panel_handle_t panel = NULL;
     mipidsi_raise_esp_err(esp_lcd_new_panel_dpi(bus->dsi_bus, &dpi_config, &panel));
     s_host.panel = panel;
+    #if MIPIDSI_VIDEO_MODE_CTRL
+    mipi_dsi_hal_context_t *hal = &((mipidsi_idf_dsi_bus_t *)bus->dsi_bus)->hal;
+    if (vals[ARG_non_burst].u_bool) {
+        /* Before panel init, which turns video mode on. */
+        mipi_dsi_host_ll_dpi_set_video_burst_type(hal->host, MIPI_DSI_LL_VIDEO_NON_BURST_WITH_SYNC_PULSES);
+    }
+    #endif
     mipidsi_raise_esp_err(esp_lcd_panel_init(panel));
+    #if MIPIDSI_VIDEO_MODE_CTRL
+    if (vals[ARG_continuous_clock].u_bool) {
+        /* After panel init, which sets the clock lane to AUTO. */
+        mipi_dsi_host_ll_set_clock_lane_state(hal->host, MIPI_DSI_LL_CLOCK_LANE_STATE_HS);
+    }
+    #endif
 
     mipidsi_display_obj_t *self = mp_obj_malloc(mipidsi_display_obj_t, type);
     self->bus = bus;

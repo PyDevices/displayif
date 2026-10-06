@@ -73,7 +73,12 @@ Waveshare / Espressif P4 4B touch LCD with LVGL soft-reset re-import.
 
 `Display(bus, init_sequence, *, …)` takes positional `bus` and `init_sequence`
 like CircuitPython. Optional kwargs: `virtual_channel=0` (wired into esp_lcd
-DBI/DPI) and `color_depth=16`. Panel **reset** and **backlight** GPIO are owned
+DBI/DPI), `color_depth=16`, and `non_burst=False` / `continuous_clock=False`.
+Set both of those to `True` for a panel behind a DSI-to-RGB bridge such as the
+Chipone ICN6211 on Raspberry Pi-style DSI displays: ESP-IDF otherwise sends
+burst-mode video with an idling clock lane, and the bridge shows nothing (a
+white panel). They reach a private ESP-IDF struct checked against v5.5.4 only,
+and raise on any other ESP-IDF. Panel **reset** and **backlight** GPIO are owned
 by board_config (not `Display`). CircuitPython-only kwargs (`rotation`,
 `brightness`, `backlight_pin`, `backlight_on_high`, `native_frames_per_second`)
 are not accepted.
