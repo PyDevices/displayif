@@ -35,6 +35,7 @@
 #include "esp_cache.h"
 #include "esp_heap_caps.h"
 #include "hal/mipi_dsi_hal.h"
+#include "hal/mipi_dsi_host_ll.h"
 
 /* SPIKE (KeDei 5" DSI, 2026-10-06): ESP-IDF has no public way to send a MIPI
  * DSI *generic* long write; its DBI IO sends DCS only. The bus handle points at
@@ -319,6 +320,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         ARG_color_depth,
         ARG_generic_sequence,
         ARG_dsi_color_depth,
+        ARG_non_burst,
+        ARG_continuous_clock,
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_bus, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
@@ -336,6 +339,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
         { MP_QSTR_generic_sequence, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
         { MP_QSTR_dsi_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
+        { MP_QSTR_non_burst, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
+        { MP_QSTR_continuous_clock, MP_ARG_KW_ONLY | MP_ARG_BOOL, { .u_bool = false } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
@@ -411,7 +416,17 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     esp_lcd_panel_handle_t panel = NULL;
     mipidsi_raise_esp_err(esp_lcd_new_panel_dpi(bus->dsi_bus, &dpi_config, &panel));
     s_host.panel = panel;
+    mipi_dsi_hal_context_t *spike_hal = &((mipidsi_spike_dsi_bus_t *)bus->dsi_bus)->hal;
+    /* SPIKE: IDF picks burst mode; a Toshiba-style bridge (TC358762, ICN6211)
+     * driven the way Linux drives it wants non-burst with sync pulses. */
+    if (vals[ARG_non_burst].u_bool) {
+        mipi_dsi_host_ll_dpi_set_video_burst_type(spike_hal->host, MIPI_DSI_LL_VIDEO_NON_BURST_WITH_SYNC_PULSES);
+    }
     mipidsi_raise_esp_err(esp_lcd_panel_init(panel));
+    /* SPIKE: IDF lets the clock lane drop to LP between lines; keep it in HS. */
+    if (vals[ARG_continuous_clock].u_bool) {
+        mipi_dsi_host_ll_set_clock_lane_state(spike_hal->host, MIPI_DSI_LL_CLOCK_LANE_STATE_HS);
+    }
 
     mipidsi_display_obj_t *self = mp_obj_malloc(mipidsi_display_obj_t, type);
     self->bus = bus;
