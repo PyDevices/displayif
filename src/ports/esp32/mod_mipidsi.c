@@ -34,6 +34,31 @@
 #include "esp_ldo_regulator.h"
 #include "esp_cache.h"
 #include "esp_heap_caps.h"
+#include "hal/mipi_dsi_hal.h"
+
+/* SPIKE (KeDei 5" DSI, 2026-10-06): ESP-IDF has no public way to send a MIPI
+ * DSI *generic* long write; its DBI IO sends DCS only. The bus handle points at
+ * esp_lcd_dsi_bus_t (components/esp_lcd/dsi/mipi_dsi_priv.h, private), whose
+ * first two fields are mirrored here to reach the HAL context. IDF v5.5.4. */
+typedef struct {
+    int bus_id;
+    mipi_dsi_hal_context_t hal;
+} mipidsi_spike_dsi_bus_t;
+
+static void mipidsi_send_generic_sequence(esp_lcd_dsi_bus_handle_t dsi_bus, uint8_t vc, const uint8_t *seq, size_t len) {
+    mipi_dsi_hal_context_t *hal = &((mipidsi_spike_dsi_bus_t *)dsi_bus)->hal;
+    size_t i = 0;
+    while (i < len) {
+        int size = seq[i] & 0x7F;
+        bool delay = (seq[i] & 0x80) != 0;
+        if (i + 1 + (size_t)size + (delay ? 1 : 0) > len) {
+            mp_raise_ValueError(MP_ERROR_TEXT("invalid generic_sequence"));
+        }
+        mipi_dsi_hal_host_gen_write_long_packet(hal, vc, MIPI_DSI_DT_GENERIC_LONG_WRITE, &seq[i + 1], (uint16_t)size);
+        i += 1 + (size_t)size;
+        mp_hal_delay_ms(delay ? seq[i++] : 1);
+    }
+}
 
 #define MIPIDSI_INIT_DELAY_FLAG 0x80
 
@@ -292,6 +317,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         ARG_pixel_clock_frequency,
         ARG_virtual_channel,
         ARG_color_depth,
+        ARG_generic_sequence,
+        ARG_dsi_color_depth,
     };
     static const mp_arg_t allowed_args[] = {
         { MP_QSTR_bus, MP_ARG_REQUIRED | MP_ARG_OBJ, { .u_obj = MP_OBJ_NULL } },
@@ -307,6 +334,8 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         { MP_QSTR_pixel_clock_frequency, MP_ARG_REQUIRED | MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_virtual_channel, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 0 } },
         { MP_QSTR_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
+        { MP_QSTR_generic_sequence, MP_ARG_KW_ONLY | MP_ARG_OBJ, { .u_obj = mp_const_none } },
+        { MP_QSTR_dsi_color_depth, MP_ARG_KW_ONLY | MP_ARG_INT, { .u_int = 16 } },
     };
     mp_arg_val_t vals[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, vals);
@@ -350,6 +379,11 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
     s_host.io = io;
 
     mipidsi_send_init_sequence(io, init_bufinfo.buf, init_bufinfo.len);
+    if (vals[ARG_generic_sequence].u_obj != mp_const_none) {
+        mp_buffer_info_t gen_bufinfo;
+        mp_get_buffer_raise(vals[ARG_generic_sequence].u_obj, &gen_bufinfo, MP_BUFFER_READ);
+        mipidsi_send_generic_sequence(bus->dsi_bus, virtual_channel, gen_bufinfo.buf, gen_bufinfo.len);
+    }
 
     uint32_t dpi_clock_mhz = (uint32_t)(vals[ARG_pixel_clock_frequency].u_int / 1000000);
     if (dpi_clock_mhz == 0) {
@@ -361,7 +395,7 @@ static mp_obj_t mipidsi_display_make(const mp_obj_type_t *type, size_t n_args, s
         .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
         .dpi_clock_freq_mhz = dpi_clock_mhz,
         .in_color_format = LCD_COLOR_FMT_RGB565,
-        .out_color_format = LCD_COLOR_FMT_RGB565,
+        .out_color_format = vals[ARG_dsi_color_depth].u_int == 24 ? LCD_COLOR_FMT_RGB888 : LCD_COLOR_FMT_RGB565,
         .video_timing = {
             .h_size = vals[ARG_width].u_int,
             .v_size = vals[ARG_height].u_int,
