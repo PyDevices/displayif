@@ -29,9 +29,9 @@
 // pixel buffer that happens to start FF D8 falls through to LVGL's built-in
 // decoder instead of being claimed.
 
-#include "lvgl.h"
-#include "src/draw/lv_image_decoder_private.h"  // lv_image_decoder_t.info_cb, lv_image_cache_data_t
-#include "src/core/lv_global.h"                 // LV_GLOBAL_DEFAULT()->image_cache_draw_buf_handlers
+#include "lvgl/lvgl.h"
+#include "lvgl/src/draw/lv_image_decoder_private.h"  // lv_image_decoder_t.info_cb, lv_image_cache_data_t
+#include "lvgl/src/core/lv_global.h"                 // LV_GLOBAL_DEFAULT()->image_cache_draw_buf_handlers
 
 #include <string.h>
 

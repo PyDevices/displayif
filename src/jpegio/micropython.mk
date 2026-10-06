@@ -26,17 +26,11 @@ JPEGIO_LVMP_DIR := $(firstword $(filter %/lvgl-micropython,$(USER_C_MODULES:/=))
 JPEGIO_LVGL ?= $(if $(JPEGIO_LVMP_DIR),1,0)
 
 ifeq ($(JPEGIO_LVGL),1)
-# The bindings checkout, derived the way lvgl-micropython/micropython.mk does
-# (BINDINGS_DIR ?= $(abspath $(LVMP_DIR)/../lvgl-bindings)) but under a
-# displayif-private name: displayif's micropython.mk is included before
-# lvgl-micropython's, so a `BINDINGS_DIR ?=` here would pre-empt theirs. A
-# BINDINGS_DIR given on the make command line is honoured so both usermods
-# compile against the same lv_conf.h (struct layouts depend on it).
-JPEGIO_LVGL_BINDINGS_DIR ?= $(or $(BINDINGS_DIR),$(abspath $(JPEGIO_LVMP_DIR)/../lvgl-bindings))
-# -I<bindings> finds lv_conf.h (LVGL's lv_conf_internal.h picks it up through
-# __has_include, the same route lvgl-micropython's -I$(BINDINGS_DIR) uses);
-# -I<bindings>/lvgl finds lvgl.h and the src/... private headers.
-CFLAGS_USERMOD += -DJPEGIO_LVGL_DECODER=1 -I$(JPEGIO_LVGL_BINDINGS_DIR) -I$(JPEGIO_LVGL_BINDINGS_DIR)/lvgl
+# lvgl_decoder.c includes "lvgl/lvgl.h" and "lvgl/src/...", which resolve
+# through the -I$(BINDINGS_DIR) lvgl-micropython adds, wherever its bindings
+# are (a sibling checkout or its own fetched .deps/), so nothing here derives
+# that path.
+CFLAGS_USERMOD += -DJPEGIO_LVGL_DECODER=1
 # No qstrs of its own (the Python-visible names live in jpegio.c).
 SRC_USERMOD_LIB_C += $(JPEGIO_DIR)/lvgl_decoder.c
 # lvgl.h with LV_USE_FLOAT trips -Werror=double-promotion / float-conversion

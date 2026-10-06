@@ -22,9 +22,15 @@ target_sources(displayif_jpegio INTERFACE
 # listed earlier in a semicolon-separated USER_C_MODULES. Pass
 # -DJPEGIO_LVGL=ON/OFF to decide by hand (the list form with lvgl-micropython
 # elsewhere needs ON plus JPEGIO_LVGL_BINDINGS_DIR).
-get_filename_component(_JPEGIO_WORKSPACE_DIR ${DISPLAYIF_MOD_DIR} DIRECTORY)
+# The LVGL image decoder (lvgl_decoder.c) is built only when lvgl-micropython is
+# in this build, decided from USER_C_MODULES the way micropython.mk decides it:
+# what is on disk beside displayif says nothing about what this build selected,
+# and jpegio has to build without LVGL. Override with -DJPEGIO_LVGL=ON/OFF.
+# The decoder includes "lvgl/lvgl.h" and "lvgl/src/...", which resolve through
+# the bindings directory lvgl-micropython itself puts on the include path, so
+# nothing here needs to know where the bindings are.
 if(NOT DEFINED JPEGIO_LVGL)
-    if(EXISTS ${_JPEGIO_WORKSPACE_DIR}/lvgl-micropython/micropython.cmake OR TARGET lv_micropython)
+    if("${USER_C_MODULES}" MATCHES "lvgl-micropython")
         set(JPEGIO_LVGL ON)
     else()
         set(JPEGIO_LVGL OFF)
@@ -32,25 +38,8 @@ if(NOT DEFINED JPEGIO_LVGL)
 endif()
 
 if(JPEGIO_LVGL)
-    # Derived the way lvgl-micropython/micropython.cmake derives BINDINGS_DIR
-    # (the workspace sibling lvgl-bindings), under a displayif-private name;
-    # a BINDINGS_DIR already set (command line, or lvgl-micropython included
-    # earlier) wins so both usermods see one lv_conf.h.
-    if(NOT DEFINED JPEGIO_LVGL_BINDINGS_DIR)
-        if(DEFINED BINDINGS_DIR)
-            set(JPEGIO_LVGL_BINDINGS_DIR ${BINDINGS_DIR})
-        else()
-            set(JPEGIO_LVGL_BINDINGS_DIR ${_JPEGIO_WORKSPACE_DIR}/lvgl-bindings)
-        endif()
-    endif()
-    if(NOT EXISTS ${JPEGIO_LVGL_BINDINGS_DIR}/lv_conf.h)
-        message(FATAL_ERROR "jpegio: JPEGIO_LVGL is ON but ${JPEGIO_LVGL_BINDINGS_DIR}/lv_conf.h does not exist (set JPEGIO_LVGL_BINDINGS_DIR)")
-    endif()
     target_compile_definitions(displayif_jpegio INTERFACE JPEGIO_LVGL_DECODER=1)
-    target_include_directories(displayif_jpegio INTERFACE
-        ${JPEGIO_LVGL_BINDINGS_DIR}
-        ${JPEGIO_LVGL_BINDINGS_DIR}/lvgl
-    )
+    # No qstrs of its own (the Python-visible names live in jpegio.c).
     target_sources(displayif_jpegio INTERFACE
         ${JPEGIO_DIR}/lvgl_decoder.c
     )
