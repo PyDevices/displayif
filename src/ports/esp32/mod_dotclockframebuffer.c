@@ -101,6 +101,13 @@ typedef struct _dotclockframebuffer_obj_t {
     uint8_t *fbs[DCFB_NUM_FBS];
     uint8_t draw_index;
     uint8_t num_fbs;
+    // What fill_rect() and blit() painted into the back buffer since the last
+    // present: refresh() copies it into the new back buffer after the flip, so
+    // a program that paints once or paints incrementally shows the same thing
+    // in both buffers instead of blinking (displayif#45). A GUI that paints
+    // the buffers itself (LVGL DIRECT) never touches it and keeps its own sync.
+    bool dirty;
+    int dirty_x0, dirty_y0, dirty_x1, dirty_y1;  // half-open
 #endif
 } dotclockframebuffer_obj_t;
 
@@ -264,6 +271,34 @@ static bool IRAM_ATTR dcfb_on_frame_buf_complete(esp_lcd_panel_handle_t panel,
     return false;
 }
 
+#if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
+static void dotclockframebuffer_mark_dirty(dotclockframebuffer_obj_t *self, int x, int y, int w, int h) {
+    if (self->num_fbs < 2) {
+        return;
+    }
+    if (!self->dirty) {
+        self->dirty = true;
+        self->dirty_x0 = x;
+        self->dirty_y0 = y;
+        self->dirty_x1 = x + w;
+        self->dirty_y1 = y + h;
+        return;
+    }
+    if (x < self->dirty_x0) {
+        self->dirty_x0 = x;
+    }
+    if (y < self->dirty_y0) {
+        self->dirty_y0 = y;
+    }
+    if (x + w > self->dirty_x1) {
+        self->dirty_x1 = x + w;
+    }
+    if (y + h > self->dirty_y1) {
+        self->dirty_y1 = y + h;
+    }
+}
+#endif
+
 // Sync dirty rows for DMA that reads PSRAM behind the cache (no bounce).
 // With bounce buffers, refill uses CPU memcpy through DCache — skip msync.
 static void dotclockframebuffer_msync_rows(dotclockframebuffer_obj_t *self, int y, int h) {
@@ -406,6 +441,7 @@ static void dotclockframebuffer_init_panel(dotclockframebuffer_obj_t *self) {
     // Kick starts scanning fb0; paint the other until first refresh().
     self->draw_index = 1;
     self->buf = self->fbs[self->draw_index];
+    self->dirty = false;
     self->buf_owned = false;
     self->row_stride = (uint16_t)(2 * h_res);
     self->buf_len = (size_t)self->row_stride * self->height;
@@ -565,6 +601,7 @@ static mp_obj_t dotclockframebuffer_make(const mp_obj_type_t *type, size_t n_arg
     self->fbs[1] = NULL;
     self->draw_index = 0;
     self->num_fbs = 0;
+    self->dirty = false;
 #endif
     self->data_pin_count = 0;
 
@@ -618,10 +655,22 @@ static mp_obj_t dotclockframebuffer_refresh(mp_obj_t self_in) {
     // Advance the paint target. Do not memcpy the full FB — that costs
     // ~100ms+ on 800x480 PSRAM and is redundant when a dual-buffer GUI
     // (e.g. LVGL DIRECT) already syncs dirty regions across both panel FBs.
-    // Painters that only touch dirty areas stay correct after the flip.
+    // What fill_rect()/blit() painted is copied below instead.
     uint8_t next = (uint8_t)(1 - presented);
     self->draw_index = next;
     self->buf = self->fbs[next];
+    // Bring the new back buffer up to date with what was just presented, but
+    // only where fill_rect()/blit() painted: a whole-frame copy is 100 ms+.
+    if (self->dirty) {
+        size_t off = (size_t)self->dirty_x0 * sizeof(uint16_t);
+        size_t row_bytes = (size_t)(self->dirty_x1 - self->dirty_x0) * sizeof(uint16_t);
+        for (int row = self->dirty_y0; row < self->dirty_y1; row++) {
+            size_t at = (size_t)row * self->row_stride + off;
+            memcpy(self->fbs[next] + at, self->fbs[presented] + at, row_bytes);
+        }
+        dotclockframebuffer_msync_rows(self, self->dirty_y0, self->dirty_y1 - self->dirty_y0);
+        self->dirty = false;
+    }
     return mp_const_none;
 #else
     mp_raise_msg(&mp_type_NotImplementedError, MP_ERROR_TEXT("ESP-IDF dotclock scanout not supported on this target"));
@@ -660,6 +709,7 @@ static mp_obj_t dotclockframebuffer_blit(size_t n_args, const mp_obj_t *args) {
     }
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     dotclockframebuffer_msync_rows(self, y, h);
+    dotclockframebuffer_mark_dirty(self, x, y, w, h);
 #endif
     return mp_const_none;
 }
@@ -683,6 +733,7 @@ static mp_obj_t dotclockframebuffer_fill_rect(size_t n_args, const mp_obj_t *arg
     displayif_fb_fill_rect16(self->buf, self->row_stride, x, y, w, h, color);
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     dotclockframebuffer_msync_rows(self, y, h);
+    dotclockframebuffer_mark_dirty(self, x, y, w, h);
 #endif
     return mp_const_none;
 }
