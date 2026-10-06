@@ -2,8 +2,8 @@
 
 Native MicroPython display **interface** modules for PyDevices `displaydev` (`USER_C_MODULES`).
 Portable code in `src/ports/common/`; SoC code under `src/ports/<mp-port>/`;
-desktop SDL (`usdl2`) under `src/ports/desktop/usdl2/`; the `jpegio` JPEG
-decoder (every port) under `src/jpegio/`. CircuitPython: MCU
+desktop SDL (`usdl2`) under `src/ports/desktop/usdl2/`. The `jpegio` JPEG
+decoder moved to micropython-pydevices' `modules/jpegio` (2026-10-06). CircuitPython: MCU
 interfaces stay on stock CP; only `usdl2` uses `./apply_cp_patches.sh` (unix).
 
 **Before editing lifecycle / soft-reset / a new board bring-up**, read:
@@ -21,7 +21,6 @@ attr / soft-reset patterns when changing siblings.
 |------|----------|
 | `src/include/` | Public headers (`displayif/` subdir) |
 | `src/ports/` | Port C sources + per-port `micropython.mk` / `.cmake` (`common/`, `esp32/`, `desktop/usdl2/`, …) |
-| `src/jpegio/` | `jpegio` JPEG decoder (CircuitPython API, vendored TJpgDec in `tjpgd/`); platform-neutral, built on every port; `lvgl_decoder.c` registers it as LVGL's JPEG decoder when the `lvgl-micropython` sibling usermod is in the build — [src/jpegio/README.md](src/jpegio/README.md) |
 | `src/circuitpython_spike/` | CP unix spike for `usdl2` (copied by `apply_cp_patches.sh`) |
 | `docs/` | Markdown docs (root keeps `README.md` and `AGENTS.md` only) |
 | `docs/ports/` | Per-port notes moved from former `ports/*/README.md` |

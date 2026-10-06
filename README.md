@@ -33,7 +33,6 @@ failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
 | `picodvi`           | `rp2` (RP2040 PIO / RP2350 HSTX)                                                                | **FBDisplay**     |
 | `rgbmatrix`         | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2`                                        | **FBDisplay**     |
 | `usdl2`             | `desktop` (MicroPython `unix` / `windows`; CircuitPython unix via `apply_cp_patches.sh`)       | **SDLDisplay**    |
-| `jpegio`            | every port (`src/jpegio/`, platform-neutral; CircuitPython has it natively)                     | any — decodes JPEG to RGB565 for `blit_rect`; beside `lvgl-micropython` it is also LVGL's JPEG decoder ([docs](src/jpegio/README.md)) |
 | stubs               | `samd` / `rp2` / non-1062 mimxrt (`dotclockframebuffer.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`); non-S3 `qspibus` | ctor raises |
 
 
@@ -68,7 +67,7 @@ cd micropython/ports/unix && make submodules && make
 
 The manifest freezes no Python; it only names the C module, and the build glue
 picks the modules your port supports (see [docs/port-matrix.md](docs/port-matrix.md)).
-On unix that is `usdl2` and `jpegio`; the bus and framebuffer modules are
+On unix that is `usdl2`; the bus and framebuffer modules are
 MCU-only. Tested on the unix port against MicroPython v1.29.0.
 
 If you would rather not edit the MicroPython tree, write a manifest of your own
@@ -138,9 +137,8 @@ Then run the lifecycle API test under the same interpreter:
 [the protomatter/ README](src/ports/common/rgbmatrix/protomatter/README.md)
 for the identified upstream revision and license text.
 
-`src/jpegio/tjpgd/` vendors ChaN's TJpgDec R0.03 (with patch1, via
-CircuitPython's `lib/tjpgd`) under its own permissive notice; see
-[src/jpegio/README.md](src/jpegio/README.md#notice--tjpgdec).
+The JPEG decoder, `jpegio`, moved to micropython-pydevices'
+[modules/jpegio](https://github.com/PyDevices/micropython-pydevices/tree/main/modules/jpegio) on 2026-10-06, with its vendored TJpgDec and its notice.
 
 ## Related
 

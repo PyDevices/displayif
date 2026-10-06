@@ -52,9 +52,9 @@ months looking like nothing.
 A guarded name is only safe if something else collects it:
 
 1. **It is in MicroPython's static pool** (`py/qstrdefs.h`) — `__init__`,
-   `__name__` and the rest. `src/jpegio/jpegio.c` relies on this for
-   `MP_QSTR___init__`, which is why the checker carries a short `CORE_POOL`
-   list. Add to that list only with the reason written down; the pool is
+   `__name__` and the rest. jpegio relied on this for `MP_QSTR___init__`
+   while it lived here (it's now micropython-pydevices' `modules/jpegio`), which
+   is why the checker has a `CORE_POOL` list, empty today. Add to that list only with the reason written down; the pool is
    MicroPython's, and it changes between versions.
 2. **The same file references it unguarded elsewhere.**
    `src/ports/common/spi/mod_spibus.c` guards `sck`/`mosi`/`miso` behind
@@ -81,8 +81,8 @@ pass does, with no INTERFACE define:
 | before | 0 | 14 |
 | after | 14 | 14 |
 
-`src/jpegio/README.md` has the same story from the day it was found, with the
-LVGL decoder's specifics.
+jpegio's README (now micropython-pydevices' `modules/jpegio/README.md`) has the
+same story from the day it was found, with the LVGL decoder's specifics.
 
 <!-- sources: displayif#24; the jpegio fix fb4fd6a; micropython v1.29.0
 py/mkrules.cmake and py/py.mk -->
