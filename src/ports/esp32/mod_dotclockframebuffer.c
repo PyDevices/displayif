@@ -720,9 +720,18 @@ static mp_obj_t dotclockframebuffer_framebuffers(mp_obj_t self_in) {
     }
 #if defined(ESP_PLATFORM) && SOC_LCD_RGB_SUPPORTED
     if (self->num_fbs >= 2 && self->fbs[0] != NULL && self->fbs[1] != NULL) {
+        // Paint order, not index order: the buffer refresh() presents next
+        // comes first. A double-buffered GUI (LVGL DIRECT) paints its first
+        // buffer, swaps after each flush, and refresh() swaps after each
+        // present, so the two stay in step only if they start on the same
+        // buffer. Handed (fb0, fb1) while fb0 was the one scanning out, LVGL
+        // painted the visible buffer and each present showed the other, a
+        // frame stale: on the LCD-7 an animated arc's tip stepped back every
+        // other frame (2026-10-05).
+        uint8_t back = self->draw_index;
         mp_obj_t items[2] = {
-            mp_obj_new_bytearray_by_ref(self->buf_len, self->fbs[0]),
-            mp_obj_new_bytearray_by_ref(self->buf_len, self->fbs[1]),
+            mp_obj_new_bytearray_by_ref(self->buf_len, self->fbs[back]),
+            mp_obj_new_bytearray_by_ref(self->buf_len, self->fbs[1 - back]),
         };
         return mp_obj_new_tuple(2, items);
     }
