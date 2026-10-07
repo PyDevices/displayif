@@ -146,3 +146,5 @@ The JPEG decoder, `jpegio`, moved to micropython-pydevices'
 - [docs/ports/esp32.md](docs/ports/esp32.md) — Qualia DotClock + P4 mipidsi behavioral notes
 - [PyDevices/pydevices](https://github.com/PyDevices/pydevices) — canonical drivers and board configs
 - [PyDevices/pydevices-examples](https://github.com/PyDevices/pydevices-examples) — examples and gallery
+
+What's planned next is in [ROADMAP.md](ROADMAP.md).
