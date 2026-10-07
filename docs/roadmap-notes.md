@@ -4,6 +4,9 @@ Working checklist tracking displayif's build-out, moved out of
 [port-matrix.md](port-matrix.md) (a reference page, not a task list). Status
 verified against the tree on 2026-08-29.
 
+What's still ahead is in the repository's [ROADMAP.md](../ROADMAP.md); this page
+keeps the record of how the build-out went.
+
 1. Scaffold — done
 2. pydevices board configs on `dotclockframebuffer.DotClockFramebuffer` + `FBDisplay` — done
 3. `spibus` + smoke tests — done
