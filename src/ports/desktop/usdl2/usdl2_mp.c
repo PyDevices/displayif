@@ -1338,9 +1338,14 @@ static mp_obj_t SDL_GetDesktopDisplayMode_obj(size_t n_args, const mp_obj_t *arg
 }
 MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(SDL_GetDesktopDisplayMode_fun_obj, 1, 2, SDL_GetDesktopDisplayMode_obj);
 
-// --- Module registration (MicroPython only; CP uses shared-bindings/usdl2/__init.c) ---
+// --- Module registration ---
+//
+// Here for MicroPython, and for CircuitPython built through USER_C_MODULES
+// (micropython.mk passes DISPLAYIF_USER_C_MODULE). A CircuitPython tree patched
+// by apply_cp_patches.sh registers it from shared-bindings/usdl2/__init__.c
+// instead.
 
-#if !CIRCUITPY
+#if !CIRCUITPY || DISPLAYIF_USER_C_MODULE
 
 //| """Desktop SDL2 subset for PyDevices displaydev (linked against libSDL2)."""
 

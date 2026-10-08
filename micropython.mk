@@ -7,6 +7,17 @@
 
 DISPLAYIF_MOD_DIR := $(USERMOD_DIR)
 
+# CircuitPython (its py/ has circuitpy_mpconfig.h): usdl2 on the unix port,
+# nothing else. Boards there have CircuitPython's own displayio, and displayif's
+# display modules are not ported to it.
+DISPLAYIF_CIRCUITPY := $(if $(wildcard $(TOP)/py/circuitpy_mpconfig.h),1,0)
+ifeq ($(DISPLAYIF_CIRCUITPY),1)
+ifeq ($(findstring /ports/unix,$(abspath $(CURDIR))),)
+$(error displayif on CircuitPython is usdl2 on the unix port only; boards use CircuitPython's displayio)
+endif
+CFLAGS_USERMOD += -DDISPLAYIF_USER_C_MODULE=1
+endif
+
 PORT_DIR_ABS := $(abspath $(CURDIR))
 DISPLAYIF_PORT_ESP32 := $(findstring /ports/esp32,$(PORT_DIR_ABS))
 DISPLAYIF_PORT_MIMXRT := $(findstring /ports/mimxrt,$(PORT_DIR_ABS))
