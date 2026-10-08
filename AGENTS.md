@@ -4,7 +4,8 @@ Native MicroPython display **interface** modules for PyDevices `displaydev` (`US
 Portable code in `src/ports/common/`; SoC code under `src/ports/<mp-port>/`;
 desktop SDL (`usdl2`) under `src/ports/desktop/usdl2/`. The `jpegio` JPEG
 decoder moved to micropython-pydevices' `modules/jpegio` (2026-10-06). CircuitPython: MCU
-interfaces stay on stock CP; only `usdl2` uses `./apply_cp_patches.sh` (unix).
+interfaces stay on stock CP; only `usdl2` builds there, on unix, as a user C module
+(root `micropython.mk`).
 
 **Before editing lifecycle / soft-reset / a new board bring-up**, read:
 
@@ -21,14 +22,13 @@ attr / soft-reset patterns when changing siblings.
 |------|----------|
 | `src/include/` | Public headers (`displayif/` subdir) |
 | `src/ports/` | Port C sources + per-port `micropython.mk` / `.cmake` (`common/`, `esp32/`, `desktop/usdl2/`, …) |
-| `src/circuitpython_spike/` | CP unix spike for `usdl2` (copied by `apply_cp_patches.sh`) |
 | `docs/` | Markdown docs (root keeps `README.md` and `AGENTS.md` only) |
 | `docs/ports/` | Per-port notes moved from former `ports/*/README.md` |
 | `tests/` | Unit tests only (e.g. `test_lifecycle_api.py`) |
 | `tools/` | Developer / hardware smoke tests (`*_smoke.py`), `test_usdl2.py`, `sdl2_dev_env.sh` |
 
 Root `micropython.mk` / `micropython.cmake` stay at the repo root for `USER_C_MODULES`.
-Desktop also: root `circuitpython.mk` + `apply_cp_patches.sh` (unix `usdl2` only).
+CircuitPython reads the same root `micropython.mk` (unix `usdl2` only).
 
 ## Hard rules
 

@@ -106,8 +106,7 @@ user C module, `make -C ports/unix USER_C_MODULES=/path/to/displayif` from a
 CircuitPython 11 checkout, or micropython-pydevices'
 `./build_mp.py --interpreter circuitpython --port unix --modules displayif`.
 Only `usdl2` builds there; any other CircuitPython port refuses this module,
-because boards there use CircuitPython's own `displayio`. (`./apply_cp_patches.sh`
-still patches a CircuitPython tree the older way.)
+because boards there use CircuitPython's own `displayio`.
 
 ### First run (unix `usdl2` smoke)
 

@@ -35,8 +35,8 @@ displayif backend.
 
 CircuitPython already provides its MCU display interfaces; use its stock
 firmware and the CircuitPython board configs for those targets. The exception
-is desktop `usdl2`, which displayif can add to CircuitPython unix through
-`apply_cp_patches.sh`.
+is desktop `usdl2`, which displayif adds to CircuitPython unix as a user C
+module (`make -C ports/unix USER_C_MODULES=/path/to/displayif`).
 
 For MicroPython Make ports, `USER_C_MODULES` points at the workspace parent
 containing this repository. For CMake ports such as ESP32 and RP2, it points

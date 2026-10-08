@@ -9,9 +9,10 @@ Org-pinned upstream (the ref CI builds against): v1.29.0
   https://github.com/micropython/micropython @ v1.29.0
   Verify locally with: git -C <your micropython checkout> describe --tags   # expect v1.29.0
 
-## CircuitPython (usdl2 desktop path only, via apply_cp_patches.sh)
-Org oracle (same pin as audiodsp/CIRCUITPYTHON_ORACLE): 10.2.1
-  https://github.com/adafruit/circuitpython @ bcfcb511352652d7cb62d3b415e4a624380f1830
+## CircuitPython (usdl2 desktop path only, as a user C module)
+Tested against: 11.0.0-alpha.1 (CircuitPython 11 is the first line whose
+USER_C_MODULES block matches MicroPython 1.29's)
+  https://github.com/adafruit/circuitpython @ 520805e12
 
 ## SDL2 (desktop usdl2 backend)
 Minimum: >= 2.0 (SDL_* API used by src/ports/desktop/usdl2/)
