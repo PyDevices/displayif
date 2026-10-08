@@ -1340,10 +1340,9 @@ MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(SDL_GetDesktopDisplayMode_fun_obj, 1, 2, SDL
 
 // --- Module registration ---
 //
-// Here for MicroPython, and for CircuitPython built through USER_C_MODULES
-// (micropython.mk passes DISPLAYIF_USER_C_MODULE). A CircuitPython tree patched
-// by apply_cp_patches.sh registers it from shared-bindings/usdl2/__init__.c
-// instead.
+// Here for MicroPython and for CircuitPython. CircuitPython's unix port sets
+// CIRCUITPY, so micropython.mk passes DISPLAYIF_USER_C_MODULE to say this
+// build is the user C module one.
 
 #if !CIRCUITPY || DISPLAYIF_USER_C_MODULE
 
