@@ -9,7 +9,7 @@ backend map, firmware integration boundary, and lifecycle rules.
 
 MicroPython board configs in `pydevices` that raise `NotImplementedError` on import need firmware built with the matching displayif module. Native C modules register directly — **no Python re-export layer** in this repo.
 
-**CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use `pydevices/board_configs/cp/` with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) is built from this repo via `./apply_cp_patches.sh` + CircuitPython unix.
+**CircuitPython** already has MCU display interfaces (`dotclockframebuffer`, `mipidsi`, `picodvi`, …) — use `pydevices/board_configs/cp/` with stock CP firmware for those. **Exception:** desktop `usdl2` (unix) builds into CircuitPython's unix port as a user C module, from this repo's `micropython.mk`.
 
 **Status:** Accelerated interfaces on esp32, mimxrt, samd, and rp2. See [docs/port-matrix.md](docs/port-matrix.md).
 
@@ -32,7 +32,7 @@ failure modes (P4 `mipidsi`, Qualia `dotclockframebuffer.DotClockFramebuffer`):
 | `mipidsi`           | `esp32` (P4), `mimxrt` (1176)                                                                   | **FBDisplay**     |
 | `picodvi`           | `rp2` (RP2040 PIO / RP2350 HSTX)                                                                | **FBDisplay**     |
 | `rgbmatrix`         | `esp32` (S3) / `mimxrt` (1062) / `samd` (SAMD51) / `rp2`                                        | **FBDisplay**     |
-| `usdl2`             | `desktop` (MicroPython `unix` / `windows`; CircuitPython unix via `apply_cp_patches.sh`)       | **SDLDisplay**    |
+| `usdl2`             | `desktop` (MicroPython `unix` / `windows`; CircuitPython unix as a user C module)              | **SDLDisplay**    |
 | stubs               | `samd` / `rp2` / non-1062 mimxrt (`dotclockframebuffer.DotClockFramebuffer`, `mipidsi`); non-1176 mimxrt (`mipidsi`); non-S3 `qspibus` | ctor raises |
 
 
@@ -101,7 +101,13 @@ For several PyDevices modules at once,
 [micropython-pydevices](https://github.com/PyDevices/micropython-pydevices)
 keeps ready-made manifests, variants and boards.
 
-CircuitPython unix: `./apply_cp_patches.sh --apply --port unix --variant coverage`, then build the unix port.
+CircuitPython unix: build CircuitPython's unix port with this repository as a
+user C module, `make -C ports/unix USER_C_MODULES=/path/to/displayif` from a
+CircuitPython 11 checkout, or micropython-pydevices'
+`./build_mp.py --interpreter circuitpython --port unix --modules displayif`.
+Only `usdl2` builds there; any other CircuitPython port refuses this module,
+because boards there use CircuitPython's own `displayio`. (`./apply_cp_patches.sh`
+still patches a CircuitPython tree the older way.)
 
 ### First run (unix `usdl2` smoke)
 
