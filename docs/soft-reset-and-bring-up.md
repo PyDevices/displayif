@@ -91,7 +91,8 @@ Use this loop on a new board / interface instead of guessing from one symptom.
 
 ### 2. Prefer fast package install over serial spam
 
-- Push only thin host-side files with mpftp (`wifi.py`, `secrets.py`).
+- Push only thin host-side files with mpftp (`secrets.py`, and `wifi.py` when
+  the firmware doesn't freeze pydevices).
 - Use **`mip.install` over Wi‑Fi** for pydevices board packages / libs — much
   faster than recursive mpftp/mpremote for large trees.
 - Soft-reset between major FS changes so imports see a clean heap.
